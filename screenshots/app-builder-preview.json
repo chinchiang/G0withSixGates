@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "六道閘門",
+      "hasCanvas": false,
+      "bodyTextLen": 1441,
+      "bodyTextHash": "7a719690ca867cb30c87e7a743e8c0f773c89f642bab53513b355dc1ebe5a891",
+      "bodyTextPrefix": "VIBEGATE 六道閘門 對外客服知識庫 L2 總覽 管線 閘門 分級 對照 工具 對齊 OWASP ASVS 5.0.0。章",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "六道閘門",
+      "hasCanvas": false,
+      "bodyTextLen": 1416,
+      "bodyTextHash": "1f5b58d62b7c83b4cc8ae610e77af47e6fd4b706c7e45b4d2b8d870a6b2642df",
+      "bodyTextPrefix": "VIBEGATE 六道閘門 對外客服知識庫 L2 WHITE BOX · BLACK BOX · RED TEAM 測試被留成最",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
