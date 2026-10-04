@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { INCIDENTS, PRINCIPLES, SYMPTOMS, GATES, GATE_NAME } from "@/data/model";
+import { ASVS_TOTAL, INCIDENTS, LEVEL_META, PRINCIPLES, SYMPTOMS, GATES, GATE_NAME } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
 
 const LEVELS = [
-  { name: "L1", pct: 20 },
-  { name: "L2 累計", pct: 70 },
-  { name: "L3 累計", pct: 100 },
+  { name: "L1", pct: LEVEL_META.L1.cumulative },
+  { name: "L2 累計", pct: LEVEL_META.L2.cumulative },
+  { name: "L3 累計", pct: LEVEL_META.L3.cumulative },
 ];
 
 export function Overview() {
@@ -22,7 +22,8 @@ export function Overview() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">測試被留成最後一道，就把它做成不可繞過的。</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">
           Vibe Coding 讓人全部接受模型產出，撰寫與同儕審查被擠掉，品質只剩測試。Stanford 的 Perry 等人（ACM CCS
-          2023）觀察到：用助手的人寫出更不安全的程式，卻更相信它是安全的。Harness 把 G0 到 G6 包成一次放行裁決。
+          2023）觀察到：用助手的人寫出更不安全的程式，卻更相信它是安全的。Harness 先用 G0 威脅建模定級，再把 G1 到 G6
+          六道閘門包成一次放行裁決。
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -98,7 +99,9 @@ export function Overview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel eyebrow="ASVS 5.0" title="等級是成熟度，不是黑箱好不好測">
           <p className="text-sm leading-6 text-muted">
-            舊版 L1 約佔 46%，門檻高又偏可測試性。5.0 改成大約 20／50／30。達到 L2 要做完 L1 加 L2，約整份標準的七成。
+            舊版 L1 約佔 46%，門檻高又偏可測試性。5.0 共 {ASVS_TOTAL} 項，L1 {LEVEL_META.L1.count} 項、L2 再加{" "}
+            {LEVEL_META.L2.count} 項、L3 再加 {LEVEL_META.L3.count} 項。達到 L2 要做完 L1 加 L2，約整份標準的{" "}
+            {LEVEL_META.L2.cumulative}%。
           </p>
           <div className="mt-4 h-44">
             {mounted ? (

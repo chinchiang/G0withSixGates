@@ -1,25 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Play, Square } from "lucide-react";
-import { GATE_NAME, type GateStatus, type Profile } from "@/data/model";
-import { RELEASE_LABEL, buildPlan, reportMarkdown, type RunPlan } from "@/data/engine";
+import { GATE_NAME } from "@/data/model";
+import { DEMO_NOTICE, RELEASE_LABEL, STATUS_LABEL, buildPlan, reportMarkdown } from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 
-const STATUS_LABEL: Record<GateStatus, string> = {
-  pass: "通過",
-  block: "阻擋",
-  advisory: "警示",
-  na: "不適用",
-};
-
 export function HarnessView() {
-  const { profile } = useApp();
-  const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
-  const [visible, setVisible] = useState(0);
-  const [plan, setPlan] = useState<RunPlan | null>(null);
-  const [snap, setSnap] = useState<Profile | null>(null);
-  const [signature, setSignature] = useState("");
+  const { profile, run, startRun, clearRun } = useApp();
+  const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
+  // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。
+  const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
+  const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reduced, setReduced] = useState(false);
 
@@ -29,54 +21,59 @@ export function HarnessView() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "running" || !plan) return;
+    if (!running || !plan) return;
     if (visible >= plan.steps.length) {
-      setPhase("done");
+      setRunning(false);
       return;
     }
     const timer = window.setTimeout(() => setVisible((value) => value + 1), reduced ? 0 : 680);
     return () => window.clearTimeout(timer);
-  }, [phase, visible, plan, reduced]);
+  }, [running, visible, plan, reduced]);
 
-  const currentKey = JSON.stringify(profile);
-  const stale = phase === "done" && signature !== currentKey;
-  const shown = plan?.steps.slice(0, visible) ?? [];
+  const phase = !run ? "idle" : running ? "running" : "done";
+  const stale = phase === "done" && JSON.stringify(run?.profile) !== JSON.stringify(profile);
   const activeIndex = phase === "running" ? visible : -1;
 
   function start() {
-    const next = buildPlan(profile);
-    setPlan(next);
-    setSnap(profile);
-    setSignature(currentKey);
+    startRun();
     setVisible(0);
     setOpenId(null);
-    setPhase("running");
+    setRunning(true);
   }
 
   function stop() {
-    setPhase("idle");
-    setPlan(null);
+    clearRun();
+    setRunning(false);
     setVisible(0);
   }
 
   function download() {
-    if (!plan || !snap) return;
-    const blob = new Blob([reportMarkdown(snap, plan)], { type: "text/markdown;charset=utf-8" });
+    if (!plan || !run) return;
+    const blob = new Blob([reportMarkdown(run.profile, plan, run.at)], {
+      type: "text/markdown;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "vibegate-release.md";
+    link.download = `vibegate-release-${run.at.toISOString().slice(0, 10)}.md`;
     link.click();
-    URL.revokeObjectURL(url);
+    // 立即撤銷會讓部分瀏覽器（Safari）取消下載。
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
     <div className="space-y-4">
       <div>
         <p className="font-mono text-xs tracking-widest text-accent">HARNESS AGENT</p>
-        <h1 className="mt-1 text-2xl font-semibold">一次包住六道閘門</h1>
+        <h1 className="mt-1 text-2xl font-semibold">G0 定級，六道閘門一次跑完</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
           Harness 不另做掃描。它讀取風險、排定順序、把結果收成同一份紀錄，並拒絕靜默略過。不適用的閘門會寫明理由。
+        </p>
+        <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm leading-6">
+          <span className="shrink-0">
+            <Badge tone="advisory">示範</Badge>
+          </span>
+          <span>{DEMO_NOTICE}實際放行要接你們自己的 SAST、SCA、DAST 與紅隊結果。</span>
         </p>
       </div>
 
@@ -127,7 +124,7 @@ export function HarnessView() {
           {phase === "idle" && (
             <Panel eyebrow="尚未執行" title="閘門會依序亮起">
               <p className="text-sm leading-6 text-muted">
-                預設情境是對外客服知識庫。若要看放行長什麼樣子，改選「已整治的客服知識庫」。高權限平台會在 G0 就被三要素擋下。
+                預設情境是對外客服知識庫。「已整治的客服知識庫」只剩縱深警示，會得到有條件放行；程式狀態改成「已整治」才會完全放行。高權限平台在 G0 就被三要素擋下，要切斷三要素並加上人工核可。
               </p>
             </Panel>
           )}

@@ -1,13 +1,16 @@
 import {
+  DEFECT_LABEL,
+  EXPOSURE_LABEL,
   GATES,
   GATE_NAME,
   MITIGATION_LABEL,
+  SENSITIVITY_LABEL,
   type GateId,
   type GateStatus,
   type Level,
   type Profile,
   type Severity,
-} from "@/data/model";
+} from "./model.ts";
 
 export interface Finding {
   id: string;
@@ -41,6 +44,16 @@ export interface RunPlan {
   headline: string;
 }
 
+export const STATUS_LABEL: Record<GateStatus, string> = {
+  pass: "通過",
+  block: "阻擋",
+  advisory: "警示",
+  na: "不適用",
+};
+
+export const DEMO_NOTICE =
+  "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。";
+
 const TRACK: Record<GateId, GateStep["track"]> = {
   G0: "設計期",
   G1: "白箱",
@@ -52,25 +65,37 @@ const TRACK: Record<GateId, GateStep["track"]> = {
 };
 
 export function webSurface(p: Profile): boolean {
-  return p.exposure !== "internal" || p.llm;
+  return p.api || p.exposure !== "internal" || p.llm;
+}
+
+/** 致命三要素是 AI 系統的問題：沒有模型或 Agent，就沒有提示詞注入把三者串起來。 */
+export function trifectaPresent(p: Profile): boolean {
+  return (p.llm || p.agent) && p.privateData && p.untrusted && p.egress;
+}
+
+/** 只有沙箱與出向允許清單能切斷一腳。人工核可擋不住安靜的外洩。 */
+function cutLabels(p: Profile): string[] {
+  return p.mitigations.filter((item) => item !== "hitl").map((item) => MITIGATION_LABEL[item]);
 }
 
 export function trifectaOpen(p: Profile): boolean {
-  const raw = p.privateData && p.untrusted && p.egress;
-  const cut = p.mitigation === "sandbox" || p.mitigation === "egress-list";
-  return raw && !cut;
+  return trifectaPresent(p) && cutLabels(p).length === 0;
+}
+
+/** 破壞性工具只認人工核可。沙箱擋不住對正式資料的刪改，除非工具根本不掛上。 */
+export function agencyOpen(p: Profile): boolean {
+  return p.agent && p.destructive && !p.mitigations.includes("hitl");
 }
 
 export function recommendLevel(p: Profile): { level: Level; reasons: string[] } {
   const reasons: string[] = [];
-  const open = trifectaOpen(p);
-  const agency =
-    p.agent && p.destructive && p.mitigation !== "hitl" && p.mitigation !== "sandbox";
   if (p.sensitivity === "pii" && p.exposure === "public") {
     reasons.push("對外系統處理個資，不適合停在第一道防線。");
   }
-  if (open) reasons.push("致命三要素同時成立，而且沒有切斷私有資料、不受信任內容或對外通訊。");
-  if (agency) reasons.push("Agent 具破壞性工具，卻沒有人工核可或沙箱。");
+  if (trifectaOpen(p)) {
+    reasons.push("致命三要素同時成立，而且沒有切斷私有資料、不受信任內容或對外通訊。");
+  }
+  if (agencyOpen(p)) reasons.push("Agent 具破壞性工具，卻沒有人工核可。沙箱不能取代這一項。");
   if (reasons.length > 0) return { level: "L3", reasons };
 
   if (p.sensitivity === "pii") reasons.push("有個資，即使不對外也應達到標準實踐。");
@@ -81,7 +106,11 @@ export function recommendLevel(p: Profile): { level: Level; reasons: string[] } 
 
   return {
     level: "L1",
-    reasons: ["內部、低敏感、沒有模型介面。先把供應鏈、金鑰與注入做完。"],
+    reasons: [
+      webSurface(p)
+        ? "內部、低敏感、沒有模型介面。內部 API 仍要過 G4 與 G5。"
+        : "內部、低敏感、沒有模型介面。先把供應鏈、金鑰與注入做完。",
+    ],
   };
 }
 
@@ -103,9 +132,20 @@ function f(
   return partial;
 }
 
+/** 縱深項：L1／L2 先警示；L3 的定義就是縱深防禦，所以直接阻擋。 */
+function depth(level: Level, partial: Omit<Finding, "severity">): Finding {
+  return level === "L3"
+    ? { ...partial, severity: "block", detail: `${partial.detail} L3 把縱深項視為阻擋。` }
+    : { ...partial, severity: "advisory", detail: `${partial.detail} L1／L2 先警示，不擋這次合併。` };
+}
+
 export function buildPlan(p: Profile): RunPlan {
   const { level, reasons } = recommendLevel(p);
   const open = trifectaOpen(p);
+  const vibe = p.defects === "vibe";
+  const web = webSurface(p);
+  const pii = p.sensitivity === "pii";
+  const cut = cutLabels(p).join("、");
   const toolchain =
     level === "L1"
       ? "Semgrep 社群版、Trivy、Gitleaks、ZAP"
@@ -118,10 +158,11 @@ export function buildPlan(p: Profile): RunPlan {
     `Harness 載入「${p.name}」，工具鏈對應 ${level}：${toolchain}。`,
     ...reasons.map((r) => `分級：${r}`),
   ];
-  if (!(p.privateData && p.untrusted && p.egress)) {
-    g0logs.push("致命三要素沒有同時成立。");
+  if (level === "L3") g0logs.push("L3：未文件化的威脅模型與縱深項一律阻擋。");
+  if (!trifectaPresent(p)) {
+    g0logs.push(p.llm || p.agent ? "致命三要素沒有同時成立。" : "沒有模型或 Agent，致命三要素不適用。");
   } else if (!open) {
-    g0logs.push(`三要素同時出現，已用「${MITIGATION_LABEL[p.mitigation]}」切斷至少一腳。`);
+    g0logs.push(`三要素同時出現，已用「${cut}」切斷至少一腳。`);
   } else {
     g0logs.push("三要素同時成立，設計期沒有切斷任何一腳。");
     g0.push(
@@ -132,8 +173,8 @@ export function buildPlan(p: Profile): RunPlan {
         title: "致命三要素未切斷",
         detail:
           "Agent 或應用同時能讀私有資料、吃不受信任內容，並且對外通訊。間接提示詞注入可以把資料送出去。",
-        evidence: "私有資料＝是；不受信任內容＝是；對外通訊＝是；緩解＝未切斷。",
-        fix: "在沙箱與出向允許清單中至少拿掉一項。只加人工核可擋不住安靜的外洩。",
+        evidence: "私有資料＝是；不受信任內容＝是；對外通訊＝是；沙箱與出向允許清單＝皆無。",
+        fix: "用沙箱或出向允許清單切斷至少一腳。只加人工核可擋不住安靜的外洩。",
         tool: "MAESTRO／威脅建模",
         cwe: "營運對照：LLM01 提示詞注入",
         asvs: "V15.1 文件化安全決策",
@@ -162,7 +203,7 @@ export function buildPlan(p: Profile): RunPlan {
 
   const g1: Finding[] = [];
   const g1logs = ["安裝前檢查：存在性、名稱距離、安裝腳本、冷卻期。"];
-  if (p.defects && (p.llm || p.agent)) {
+  if (vibe && (p.llm || p.agent)) {
     g1logs.push("規則檔與套件清單出現模型推薦的名稱。");
     g1.push(
       f({
@@ -180,7 +221,7 @@ export function buildPlan(p: Profile): RunPlan {
       }),
     );
   }
-  if (p.defects && p.agent && p.destructive) {
+  if (vibe && p.agent && p.destructive) {
     g1.push(
       f({
         id: "g1-hook",
@@ -195,7 +236,7 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V15.2",
       }),
     );
-  } else if (p.defects && !p.llm && !p.agent) {
+  } else if (vibe && !p.llm && !p.agent) {
     g1.push(
       f({
         id: "g1-cool",
@@ -210,7 +251,7 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V15.2",
       }),
     );
-  } else if (!p.defects) {
+  } else if (!vibe) {
     g1logs.push("套件均存在，下載量與冷卻期通過。Syft 已產出 CycloneDX。");
   }
 
@@ -220,7 +261,7 @@ export function buildPlan(p: Profile): RunPlan {
       ? "PR 模式：只掃本次差異。全歷史排入夜間，這不是省略。"
       : "全歷史模式：正則與熵值掃描所有提交。",
   ];
-  if (p.defects && (p.llm || p.agent || p.exposure !== "internal")) {
+  if (vibe && (p.llm || p.agent || p.exposure !== "internal")) {
     g2.push(
       f({
         id: "g2-key",
@@ -257,7 +298,7 @@ export function buildPlan(p: Profile): RunPlan {
 
   const g3: Finding[] = [];
   const g3logs = ["跨檔污點分析。來源包含請求與模型輸出。"];
-  if (p.defects && p.llm) {
+  if (vibe && p.llm) {
     g3.push(
       f({
         id: "g3-xss",
@@ -267,12 +308,12 @@ export function buildPlan(p: Profile): RunPlan {
         detail: "回覆在服務層組裝，在另一個元件用 innerHTML 渲染。單檔規則看不到這條路徑。",
         evidence: "src/llm/reply.ts → src/ui/message.tsx innerHTML。無上下文編碼。",
         fix: "改為文字節點或經過核准的淨化函式庫。把模型輸出視為不受信任來源。",
-        tool: level === "L1" ? "Semgrep（能力不足，建議升級 Pro）" : "Semgrep Pro",
+        tool: "Semgrep Pro",
         cwe: "營運對照：CWE-79",
         asvs: "V1.2、V3.2",
       }),
     );
-  } else if (p.defects) {
+  } else if (vibe) {
     g3.push(
       f({
         id: "g3-cmd",
@@ -290,14 +331,13 @@ export function buildPlan(p: Profile): RunPlan {
   } else {
     g3logs.push("抽樣的查詢與指令皆為參數化。");
   }
-  if (p.defects && p.exposure !== "internal") {
+  if (vibe && p.exposure !== "internal") {
     g3.push(
-      f({
+      depth(level, {
         id: "g3-imds",
         gate: "G3",
-        severity: "advisory",
         title: "IMDSv2 未強制",
-        detail: "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前先不當成已證實的阻斷。",
+        detail: "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前還沒有證實可達。",
         evidence: "terraform/compute.tf：http_tokens = \"optional\"。",
         fix: "改為 required。G5 若打得到 169.254.169.254，這項升級為阻擋。",
         tool: "Checkov",
@@ -306,14 +346,13 @@ export function buildPlan(p: Profile): RunPlan {
       }),
     );
   }
-  if (!p.defects && webSurface(p)) {
+  if (p.defects === "depth" && web) {
     g3.push(
-      f({
+      depth(level, {
         id: "g3-csp",
         gate: "G3",
-        severity: "advisory",
         title: "CSP 仍是 report-only",
-        detail: "政策已寫，但瀏覽器還沒有強制。這是縱深項目，不擋這次合併。",
+        detail: "政策已寫，但瀏覽器還沒有強制。這是縱深項目。",
         evidence: "Content-Security-Policy-Report-Only 已送出；無強制標頭。",
         fix: "觀察報告一週後改為強制，並保留違規日誌。",
         tool: "標頭審查",
@@ -321,15 +360,17 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V3.4 瀏覽器安全標頭",
       }),
     );
+  } else if (p.defects === "none" && web) {
+    g3logs.push("CSP 已強制，違規報告持續收集。");
   }
 
   let g4: GateStep;
-  if (!webSurface(p) && !p.agent) {
+  if (!web && !p.agent) {
     g4 = step(GATES[4], ["沒有 HTTP API，也沒有 Agent 工具。"], [], "不適用：沒有授權邊界需要審查。");
   } else {
     const findings: Finding[] = [];
     const logs = ["檢查伺服器端授權、列層安全性與工具允許清單。"];
-    if (p.defects && webSurface(p)) {
+    if (vibe && web) {
       findings.push(
         f({
           id: "g4-bola",
@@ -345,7 +386,23 @@ export function buildPlan(p: Profile): RunPlan {
         }),
       );
     }
-    if (p.defects && p.agent && p.destructive && p.mitigation !== "hitl" && p.mitigation !== "sandbox") {
+    if (vibe && web && pii) {
+      findings.push(
+        f({
+          id: "g4-pii",
+          gate: "G4",
+          severity: "block",
+          title: "個資未分級，且寫進瀏覽器儲存",
+          detail: "沒有資料分級表，前端把整筆客戶資料放進 localStorage。登出後仍留在裝置上。",
+          evidence: "src/lib/profile.ts：localStorage.setItem(\"customer\", JSON.stringify(row))；無資料分級文件。",
+          fix: "先在 G0 寫下個資欄位與保護等級，瀏覽器端只留工作階段權杖。",
+          tool: "資料分級＋架構審查",
+          cwe: "營運對照：CWE-922",
+          asvs: "V14.1.1、V14.3.3",
+        }),
+      );
+    }
+    if (agencyOpen(p)) {
       findings.push(
         f({
           id: "g4-tool",
@@ -353,22 +410,23 @@ export function buildPlan(p: Profile): RunPlan {
           severity: "block",
           title: "破壞性工具沒有人工核可",
           detail: "通用助手可以直接呼叫刪除或任意查詢。這是過度代理，不是功能完整。",
-          evidence: "tools：delete_records、execute_sql 在預設允許清單。HITL＝無。",
+          evidence: "tools：delete_records、execute_sql 在預設允許清單。人工核可＝無。",
           fix: "移出允許清單，或改成人工核可。沙箱不能取代這條，除非工具根本不掛上。",
           tool: "Agent 審查",
           cwe: "營運對照：LLM06 過度代理",
           asvs: "V8、V15",
         }),
       );
+    } else if (p.agent && p.destructive) {
+      logs.push("破壞性工具要先經人工核可才會執行。");
     }
-    if (p.defects && p.agent) {
+    if (vibe && p.agent) {
       findings.push(
-        f({
+        depth(level, {
           id: "g4-rules",
           gate: "G4",
-          severity: "advisory",
           title: "規則檔未掃隱形字元",
-          detail: "代理會讀取的 Markdown 與規則檔可能夾帶看不見的指令。這次沒有證實命中，所以先警示。",
+          detail: "代理會讀取的 Markdown 與規則檔可能夾帶看不見的指令。這次沒有證實命中。",
           evidence: ".cursorrules、AGENTS.md 無 Unicode 掃描紀錄。",
           fix: "把規則檔納入相同的祕密與隱形字元掃描。",
           tool: "規則檔掃描",
@@ -377,14 +435,15 @@ export function buildPlan(p: Profile): RunPlan {
         }),
       );
     }
-    if (!p.defects && webSurface(p)) logs.push("抽樣查詢含擁有者條件，RLS 為開啟。");
+    if (!vibe && web) logs.push("抽樣查詢含擁有者條件，RLS 為開啟。");
+    if (!vibe && web && pii) logs.push("個資欄位已分級，瀏覽器端只留工作階段權杖。");
     g4 = step(GATES[4], logs, findings);
   }
 
   let g5: GateStep;
-  if (!webSurface(p)) {
+  if (!web) {
     g5 = step(GATES[5], ["沒有可部署的 Web 或 API。"], [], "不適用：沒有運行中的 HTTP 表面。");
-  } else if (p.defects) {
+  } else if (vibe) {
     const findings: Finding[] = [
       f({
         id: "g5-idor",
@@ -399,6 +458,22 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V8、V9.1",
       }),
     ];
+    if (pii) {
+      findings.push(
+        f({
+          id: "g5-mfa",
+          gate: "G5",
+          severity: "block",
+          title: "只憑帳密就能進個資頁",
+          detail: "登入流程沒有第二要素。ASVS 從 L2 起要求多重要素，L3 其中一個要素必須是硬體式驗證器。",
+          evidence: "POST /login（帳號＋密碼）→ 302 /customers；未要求 OTP 或 WebAuthn。",
+          fix: "為存取個資的角色開啟多重要素，並在 G4 確認沒有繞過的第二條登入路徑。",
+          tool: "Burp 登入流程",
+          cwe: "營運對照：CWE-308",
+          asvs: "V6.3.3",
+        }),
+      );
+    }
     if (p.exposure === "public") {
       findings.push(
         f({
@@ -419,14 +494,14 @@ export function buildPlan(p: Profile): RunPlan {
   } else {
     const findings: Finding[] = [];
     const logs = ["雙帳號請求被拒絕。alg:none 被拒絕。中繼資料位址沒有被匯入端點跟隨。"];
-    if (p.exposure !== "internal") {
+    if (pii) logs.push("存取個資的角色要求多重要素。");
+    if (p.exposure !== "internal" && p.defects === "depth") {
       findings.push(
-        f({
+        depth(level, {
           id: "g5-rate",
           gate: "G5",
-          severity: "advisory",
           title: "重設密碼的速率限制弱於登入",
-          detail: "登入有限制，重設密碼沒有同等控制。這是防自動化的落差，先不擋合併。",
+          detail: "登入有限制，重設密碼沒有同等控制。這是防自動化的落差。",
           evidence: "POST /login 429；POST /password/reset 連續 40 次仍 200。",
           fix: "兩條流程共用同一套限制與紀錄。",
           tool: "ZAP",
@@ -434,6 +509,8 @@ export function buildPlan(p: Profile): RunPlan {
           asvs: "V2.4",
         }),
       );
+    } else if (p.exposure !== "internal") {
+      logs.push("登入與重設密碼共用同一套速率限制。");
     }
     g5 = step(GATES[5], logs, findings);
   }
@@ -441,60 +518,65 @@ export function buildPlan(p: Profile): RunPlan {
   let g6: GateStep;
   if (!p.llm && !p.agent) {
     g6 = step(GATES[6], ["系統沒有模型或 Agent 介面。"], [], "不適用：沒有自然語言攻擊面。傳統 DAST 即為黑箱終點。");
-  } else if (p.defects) {
-    const findings: Finding[] = [
-      f({
-        id: "g6-pi",
-        gate: "G6",
-        severity: "block",
-        title: "提示詞注入抽出系統政策",
-        detail: p.untrusted
-          ? "直接越獄成功，且上傳文件中的間接指令讓模型嘗試外連。"
-          : "直接越獄成功，系統提示詞被複述到回覆。",
-        evidence: "promptfoo：jailbreak 案例失敗。回應含「系統政策：你必須…」。",
-        fix: "工具權限不要寫在可被複述的提示詞裡。間接注入要配合 G0 切斷對外通訊。",
-        tool: level === "L3" ? "PyRIT" : "promptfoo",
-        cwe: "營運對照：LLM01",
-        asvs: "V1 輸出處理；V15 架構（無 LLM 專章）",
-      }),
-    ];
-    findings.push(
-      f({
+  } else {
+    const findings: Finding[] = [];
+    const logs: string[] = [];
+    if (vibe) {
+      logs.push("執行直接注入、間接注入與配額案例。");
+      findings.push(
+        f({
+          id: "g6-pi",
+          gate: "G6",
+          severity: "block",
+          title: "提示詞注入抽出系統政策",
+          detail: p.untrusted
+            ? "直接越獄成功，且上傳文件中的間接指令讓模型嘗試外連。"
+            : "直接越獄成功，系統提示詞被複述到回覆。",
+          evidence: "promptfoo：jailbreak 案例失敗。回應含「系統政策：你必須…」。",
+          fix: "工具權限不要寫在可被複述的提示詞裡。間接注入要配合 G0 切斷對外通訊。",
+          tool: level === "L3" ? "PyRIT" : "promptfoo",
+          cwe: "營運對照：LLM01",
+          asvs: "V1 輸出處理；V15 架構（無 LLM 專章）",
+        }),
+      );
+      const dow = {
         id: "g6-dow",
-        gate: "G6",
-        severity: p.exposure === "public" ? "block" : "advisory",
+        gate: "G6" as const,
         title: p.exposure === "public" ? "沒有權杖配額" : "配額尚未寫進測試",
         detail:
           p.exposure === "public"
             ? "長文與併發沒有熔斷，公開端點會直接轉成帳單。"
-            : "內部端點仍建議有配額。這次先警示。",
+            : "內部端點仍建議有配額。",
         evidence: "50 條 100k token 請求皆 200，未見 429。",
         fix: "加上每主體配額、超時與熔斷，並把拒絕寫進安全日誌。",
         tool: "promptfoo",
         cwe: "營運對照：LLM10",
         asvs: "V2.4、V16",
-      }),
-    );
-    g6 = step(GATES[6], ["執行直接注入、間接注入與配額案例。"], findings);
-  } else {
-    g6 = step(
-      GATES[6],
-      ["promptfoo 案例通過：未抽出系統提示，上傳文件未觸發外連。"],
-      [
+      };
+      findings.push(p.exposure === "public" ? { ...dow, severity: "block" } : depth(level, dow));
+    } else {
+      logs.push("promptfoo 案例通過：未抽出系統提示，上傳文件未觸發外連。");
+      logs.push("執行期護欄不算通過條件；這次的通過依據是紅隊案例，而非護欄自述。");
+    }
+    if (open) {
+      findings.push(
         f({
-          id: "g6-rail",
+          id: "g6-tri",
           gate: "G6",
-          severity: "advisory",
-          title: "護欄不是通過條件",
-          detail: "執行期護欄可以留下，但不能把『有裝護欄』寫成閘門通過。通過依據是測試案例。",
-          evidence: "護欄啟用中；本次依據為紅隊案例，而非護欄自述。",
-          fix: "把這句話留在放行紀錄，避免下次有人拿護欄取代 G6。",
+          severity: "block",
+          title: "三要素未切斷，間接注入以阻擋論",
+          detail: "G0 沒有切斷任何一腳之前，紅隊這次沒打中也不能放行。下一份外部文件就可能成功。",
+          evidence: "G0 裁決：致命三要素未切斷。",
+          fix: "先在 G0 用沙箱或出向允許清單切斷一腳，再複測間接注入。",
           tool: "Harness 政策",
-          cwe: "不適用",
-          asvs: "驗證必須能判通過或失敗",
+          cwe: "營運對照：LLM01",
+          asvs: "V15.1 文件化安全決策",
         }),
-      ],
-    );
+      );
+    } else if (trifectaPresent(p)) {
+      logs.push(`三要素已用「${cut}」切斷：複測間接注入是否仍能外連。`);
+    }
+    g6 = step(GATES[6], logs, findings);
   }
 
   const steps = [
@@ -517,31 +599,43 @@ export function buildPlan(p: Profile): RunPlan {
       ? "不准放行。阻擋項不能用時間或人工口頭同意略過。"
       : release === "conditional"
         ? "可以合併，但警示要有期限與負責人。"
-        : "放行。六道閘門都有紀錄，沒有靜默略過。";
+        : "放行。G0 與六道閘門都有紀錄，沒有靜默略過。";
 
   return { level, reasons, trifectaOpen: open, steps, release, blockCount, advisoryCount, headline };
 }
 
-export function reportMarkdown(p: Profile, plan: RunPlan): string {
+const yesNo = (value: boolean) => (value ? "是" : "否");
+
+export function reportMarkdown(p: Profile, plan: RunPlan, at: Date): string {
   const lines: string[] = [
     `# 六道閘門放行紀錄`,
     ``,
+    `> ${DEMO_NOTICE}`,
+    ``,
     `- 系統：${p.name}`,
+    `- 執行時間：${at.toISOString()}`,
     `- 建議等級：${plan.level}`,
-    `- 裁決：${plan.release === "block" ? "阻擋" : plan.release === "conditional" ? "有條件放行" : "放行"}`,
+    `- 裁決：${RELEASE_LABEL[plan.release]}`,
     `- 阻擋 ${plan.blockCount}、警示 ${plan.advisoryCount}`,
     ``,
     plan.headline,
+    ``,
+    `## 受測設定`,
+    `- 暴露面：${EXPOSURE_LABEL[p.exposure]}；資料敏感度：${SENSITIVITY_LABEL[p.sensitivity]}`,
+    `- HTTP API 或網頁：${yesNo(webSurface(p))}；LLM：${yesNo(p.llm)}；Agent：${yesNo(p.agent)}；破壞性工具：${yesNo(p.agent && p.destructive)}`,
+    `- 私有資料：${yesNo(p.privateData)}；不受信任內容：${yesNo(p.untrusted)}；對外通訊：${yesNo(p.egress)}`,
+    `- 設計期緩解：${p.mitigations.map((item) => MITIGATION_LABEL[item]).join("、") || "無"}`,
+    `- 威脅模型：${p.threatModel ? "已完成" : "未完成"}；PR 只掃差異：${yesNo(p.diffOnly)}；程式狀態：${DEFECT_LABEL[p.defects]}`,
     ``,
     `## 分級理由`,
     ...plan.reasons.map((r) => `- ${r}`),
     ``,
   ];
   for (const s of plan.steps) {
-    lines.push(`## ${s.gate} ${GATE_NAME[s.gate]}（${s.track}／${s.status}）`);
+    lines.push(`## ${s.gate} ${GATE_NAME[s.gate]}（${s.track}／${STATUS_LABEL[s.status]}）`);
     for (const log of s.logs) lines.push(`- ${log}`);
     for (const item of s.findings) {
-      lines.push(`- **${item.severity === "block" ? "阻擋" : "警示"}** ${item.title}`);
+      lines.push(`- **${STATUS_LABEL[item.severity]}** ${item.title}`);
       lines.push(`  - ${item.detail}`);
       lines.push(`  - 證據：${item.evidence}`);
       lines.push(`  - 修正：${item.fix}`);

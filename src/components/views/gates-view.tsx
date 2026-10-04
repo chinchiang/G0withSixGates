@@ -21,7 +21,7 @@ export function GatesView() {
         <p className="font-mono text-xs tracking-widest text-accent">G0–G6</p>
         <h1 className="mt-1 text-2xl font-semibold">閘門怎麼落地</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          勾選會留在這台裝置，用來對照你們自己的管線，不會上傳。它不是掃描結果。
+          G0 是設計期的前置關卡，G1 到 G6 是六道閘門。勾選會留在這台裝置，用來對照你們自己的管線，不會上傳。它不是掃描結果。
         </p>
       </div>
 
