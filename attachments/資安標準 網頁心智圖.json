@@ -1,0 +1,614 @@
+{
+  "title": "資安標準 網頁心智圖",
+  "root": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-0",
+                "level": 4,
+                "text": "應用程式: 整合安全控制的軟體產品"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-1",
+                "level": 4,
+                "text": "安全性: 對降低風險具可證實的影響"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-2",
+                "level": 4,
+                "text": "驗證: 結果必須為失敗或通過"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-3",
+                "level": 4,
+                "text": "標準: 實作的安全性需求集合"
+              }
+            ],
+            "expanded": true,
+            "id": "node-4",
+            "level": 3,
+            "text": "核心範圍定義"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-5",
+                "level": 4,
+                "text": "級別 1: 第一層防禦的最低要求 (約佔20%)"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-6",
+                "level": 4,
+                "text": "級別 2: 標準安全實踐的全方位視角 (約佔50%)"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-7",
+                "level": 4,
+                "text": "級別 3: 高級高保證需求與縱深防禦 (約佔30%)"
+              }
+            ],
+            "expanded": true,
+            "id": "node-8",
+            "level": 3,
+            "text": "安全驗證級別"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-9",
+                "level": 4,
+                "text": "規劃安全設計與實作機制"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-10",
+                "level": 4,
+                "text": "定義輸入驗證與權限規則文件"
+              }
+            ],
+            "expanded": true,
+            "id": "node-11",
+            "level": 3,
+            "text": "文件化安全決策"
+          }
+        ],
+        "expanded": true,
+        "id": "node-12",
+        "level": 2,
+        "text": "標準範圍與原則"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-13",
+                "level": 4,
+                "text": "正則化解碼: 僅解碼一次並在處理前完成"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-14",
+                "level": 4,
+                "text": "輸出編碼: 解釋器使用前的最終步驟"
+              }
+            ],
+            "expanded": true,
+            "id": "node-15",
+            "level": 3,
+            "text": "編碼與淨化架構"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-16",
+                "level": 4,
+                "text": "HTML與XML: 根據上下文進行相關編碼"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-17",
+                "level": 4,
+                "text": "動態URL: 依內容進行URL或base64url編碼"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-18",
+                "level": 4,
+                "text": "資料庫查詢: 使用參數化查詢或ORM"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-19",
+                "level": 4,
+                "text": "OS指令: 使用參數化OS查詢或命令列編碼"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-20",
+                "level": 4,
+                "text": "CSV與公式注入: 遵循RFC 4180轉義規則"
+              }
+            ],
+            "expanded": true,
+            "id": "node-21",
+            "level": 3,
+            "text": "注入防範"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-22",
+                "level": 4,
+                "text": "HTML淨化: 使用安全函式庫處理WYSIWYG輸入"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-23",
+                "level": 4,
+                "text": "動態執行: 避免使用 eval() 或 SpEL"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-24",
+                "level": 4,
+                "text": "SSRF防範: 驗證協定、網域與連接埠白名單"
+              }
+            ],
+            "expanded": true,
+            "id": "node-25",
+            "level": 3,
+            "text": "淨化機制"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-26",
+                "level": 4,
+                "text": "記憶體安全: 防止堆疊或緩衝區溢位"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-27",
+                "level": 4,
+                "text": "XML解析: 停用外部實體以防XXE攻擊"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-28",
+                "level": 4,
+                "text": "安全反序列化: 使用型別白名單限制物件"
+              }
+            ],
+            "expanded": true,
+            "id": "node-29",
+            "level": 3,
+            "text": "記憶體與序列化"
+          }
+        ],
+        "expanded": true,
+        "id": "node-30",
+        "level": 2,
+        "text": "編碼與淨化 (V1)"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-31",
+                "level": 4,
+                "text": "輸入驗證規則: 定義預期結構的檢查方式"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-32",
+                "level": 4,
+                "text": "商業邏輯限制: 記錄全域與使用者級別限制"
+              }
+            ],
+            "expanded": true,
+            "id": "node-33",
+            "level": 3,
+            "text": "驗證與商業邏輯文件"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-34",
+                "level": 4,
+                "text": "業務期望驗證: 使用正面驗證與白名單"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-35",
+                "level": 4,
+                "text": "信任服務層: 於伺服器端強制執行驗證"
+              }
+            ],
+            "expanded": true,
+            "id": "node-36",
+            "level": 3,
+            "text": "輸入驗證"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-37",
+                "level": 4,
+                "text": "順序流程: 按順序處理且不可略過步驟"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-38",
+                "level": 4,
+                "text": "多人審批: 高價值業務流程需多方授權"
+              }
+            ],
+            "expanded": true,
+            "id": "node-39",
+            "level": 3,
+            "text": "商業邏輯安全"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-40",
+                "level": 4,
+                "text": "反自動化控制: 防止過度呼叫與資源耗盡"
+              }
+            ],
+            "expanded": true,
+            "id": "node-41",
+            "level": 3,
+            "text": "防自動化"
+          }
+        ],
+        "expanded": true,
+        "id": "node-42",
+        "level": 2,
+        "text": "驗證與商業邏輯 (V2)"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-43",
+                "level": 4,
+                "text": "內容渲染控制: 防止錯誤上下文呈現"
+              }
+            ],
+            "expanded": true,
+            "id": "node-44",
+            "level": 3,
+            "text": "未預期內容解釋"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-45",
+                "level": 4,
+                "text": "Secure 屬性: 確保Cookie僅透過加密傳輸"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-46",
+                "level": 4,
+                "text": "SameSite 屬性: 限制跨站請求偽造 (CSRF)"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-47",
+                "level": 4,
+                "text": "__Host- 前綴: 加強Cookie安全性"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-48",
+                "level": 4,
+                "text": "HttpOnly 屬性: 防止前端指令碼存取敏感Cookie"
+              }
+            ],
+            "expanded": true,
+            "id": "node-49",
+            "level": 3,
+            "text": "Cookie 設定"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-50",
+                "level": 4,
+                "text": "CORS 設定: 嚴格驗證跨來源資源共用"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-51",
+                "level": 4,
+                "text": "Content-Security-Policy (CSP): 限制載入受信任資源"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-52",
+                "level": 4,
+                "text": "X-Content-Type-Options: 禁止MIME類型嗅探"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-53",
+                "level": 4,
+                "text": "Referrer-Policy: 防止敏感資料泄漏"
+              }
+            ],
+            "expanded": true,
+            "id": "node-54",
+            "level": 3,
+            "text": "瀏覽器安全標頭"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-55",
+                "level": 4,
+                "text": "請求偽造防範: 驗證防偽權杖或自訂標頭"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-56",
+                "level": 4,
+                "text": "postMessage 驗證: 確保訊息來源可信"
+              }
+            ],
+            "expanded": true,
+            "id": "node-57",
+            "level": 3,
+            "text": "瀏覽器來源隔離"
+          }
+        ],
+        "expanded": true,
+        "id": "node-58",
+        "level": 2,
+        "text": "網頁前端安全 (V3)"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-59",
+                "level": 4,
+                "text": "Content-Type 標頭: 確保與回應內容相符"
+              }
+            ],
+            "expanded": true,
+            "id": "node-60",
+            "level": 3,
+            "text": "通用網頁服務安全"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-61",
+                "level": 4,
+                "text": "請求走私防範: 正確判定HTTP訊息邊界"
+              }
+            ],
+            "expanded": true,
+            "id": "node-62",
+            "level": 3,
+            "text": "HTTP 訊息結構驗證"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-63",
+                "level": 4,
+                "text": "GraphQL 限制: 使用深度限制與查詢成本分析防範DoS"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-64",
+                "level": 4,
+                "text": "WebSocket 安全: 所有連線強制使用TLS (WSS)"
+              }
+            ],
+            "expanded": true,
+            "id": "node-65",
+            "level": 3,
+            "text": "GraphQL 與 WebSocket"
+          }
+        ],
+        "expanded": true,
+        "id": "node-66",
+        "level": 2,
+        "text": "API 與網頁服務 (V4)"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-67",
+                "level": 4,
+                "text": "上傳規範: 定義允許的副檔名與大小限制"
+              }
+            ],
+            "expanded": true,
+            "id": "node-68",
+            "level": 3,
+            "text": "檔案處理文件"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-69",
+                "level": 4,
+                "text": "解壓縮檢查: 檢查未壓縮大小與檔案數量"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-70",
+                "level": 4,
+                "text": "路徑安全: 使用內部產生資料取代使用者檔名以防路徑走訪"
+              }
+            ],
+            "expanded": true,
+            "id": "node-71",
+            "level": 3,
+            "text": "檔案上傳與儲存"
+          }
+        ],
+        "expanded": true,
+        "id": "node-72",
+        "level": 2,
+        "text": "檔案處理 (V5)"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-73",
+                "level": 4,
+                "text": "密碼長度: 最少8個字元，強烈建議15個字元以上"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-74",
+                "level": 4,
+                "text": "密碼變更: 需提供目前與新密碼"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-75",
+                "level": 4,
+                "text": "密碼黑名單: 檢查前3000個常見密碼"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-76",
+                "level": 4,
+                "text": "密碼外洩檢查: 比對已外洩的密碼資料庫"
+              }
+            ],
+            "expanded": true,
+            "id": "node-77",
+            "level": 3,
+            "text": "密碼安全"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-78",
+                "level": 4,
+                "text": "多因數驗證 (MFA): L2以上應用程式強制要求"
+              },
+              {
+                "children": [],
+                "expanded": false,
+                "id": "node-79",
+                "level": 4,
+                "text": "硬體驗證: L3應用程式使用受信執行環境 (TEE)"
+              }
+            ],
+            "expanded": true,
+            "id": "node-80",
+            "level": 3,
+            "text": "通用身分驗證安全"
+          }
+        ],
+        "expanded": true,
+        "id": "node-81",
+        "level": 2,
+        "text": "身分驗證 (V6)"
+      }
+    ],
+    "expanded": true,
+    "id": "node-82",
+    "level": 1,
+    "text": "OWASP 應用程式安全驗證標準 (ASVS) 5.0.0"
+  }
+}
