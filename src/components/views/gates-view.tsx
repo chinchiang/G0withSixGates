@@ -1,5 +1,6 @@
-import { GATE_DOCS, GATES, MAESTRO, GATE_NAME } from "@/data/model";
+import { GATE_DOCS, GATES, GATE_TRACK, MAESTRO, GATE_NAME } from "@/data/model";
 import { caughtBy } from "@/data/engine";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
@@ -12,7 +13,30 @@ const LAYERS = [
 ];
 
 export function GatesView() {
-  const { gate, openGate, checks, toggleCheck, run, plan, setView } = useApp();
+  const { gate, openGate, checks, toggleCheck, replaceChecks, checkProgress, run, plan, setView } = useApp();
+  // 清除是立即生效的，誤按時用「復原」拿回來；再勾任何一項就不再提供復原。
+  const [undo, setUndo] = useState<Record<string, boolean> | null>(null);
+  const [notice, setNotice] = useState("");
+  const countOf = (state: Record<string, boolean>) => Object.values(state).filter(Boolean).length;
+
+  function clearAll() {
+    setUndo(checks);
+    setNotice(`已清除 ${countOf(checks)} 個勾選。`);
+    replaceChecks({});
+  }
+
+  function restore() {
+    if (!undo) return;
+    replaceChecks(undo);
+    setNotice(`已復原 ${countOf(undo)} 個勾選。`);
+    setUndo(null);
+  }
+
+  function toggle(id: string) {
+    setUndo(null);
+    setNotice("");
+    toggleCheck(id);
+  }
   const doc = GATE_DOCS.find((item) => item.id === gate) ?? GATE_DOCS[0];
   const done = doc.controls.filter((item) => checks[item.id]).length;
 
@@ -44,7 +68,7 @@ export function GatesView() {
       </nav>
 
       <Panel
-        eyebrow={`${doc.id} · ${doc.track}`}
+        eyebrow={`${doc.id} · ${GATE_TRACK[doc.id]}`}
         title={doc.name}
         action={
           <span className="font-mono text-xs text-muted tabular-nums">
@@ -85,13 +109,13 @@ export function GatesView() {
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => toggleCheck(item.id)}
+                  onClick={() => toggle(item.id)}
                   aria-pressed={on}
                   className="flex min-h-11 w-full items-start gap-3 rounded-md border border-line bg-bg px-3 py-3 text-left"
                 >
                   <span
                     className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-sm border ${
-                      on ? "border-accent bg-accent text-accent-ink" : "border-line"
+                      on ? "border-accent bg-accent text-accent-ink" : "border-line-strong"
                     }`}
                     aria-hidden="true"
                   >
@@ -124,6 +148,26 @@ export function GatesView() {
           >
             {run ? "回到 Harness 結果" : "去執行 Harness"}
           </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-xs text-muted">
+          <span className="tabular-nums">
+            全部閘門已勾 {checkProgress.done}/{checkProgress.total}
+          </span>
+          <span role="status">{notice}</span>
+          {undo ? (
+            <button type="button" onClick={restore} className="min-h-11 text-accent">
+              復原
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={clearAll}
+              disabled={checkProgress.done === 0}
+              className="min-h-11 text-accent disabled:text-faint"
+            >
+              清除全部勾選
+            </button>
+          )}
         </div>
       </Panel>
 

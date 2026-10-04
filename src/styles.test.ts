@@ -83,3 +83,24 @@ describe("text contrast", () => {
     assert.ok(contrast(color("muted"), surface) - contrast(color("faint"), surface) >= 0.8);
   });
 });
+
+/** 元件邊界與狀態指示（WCAG 1.4.11）：至少 3:1。 */
+const COMPONENT_PAIRS: [string, Rgb, Rgb][] = [
+  ["輸入框邊框 on bg", color("line-strong"), bg],
+  ["輸入框邊框 on surface", color("line-strong"), surface],
+  ["關閉開關的軌道外框 on bg-raised", color("line-strong"), raised],
+  ["未勾選核取方塊 on bg", color("line-strong"), bg],
+  ["關閉開關的圓鈕 on 軌道", color("muted"), color("surface-2")],
+  ["開啟開關的軌道 on bg-raised", accent, raised],
+  ["開啟開關的圓鈕 on 軌道", bg, accent],
+  ["已勾選核取方塊 on bg", accent, bg],
+];
+
+describe("component contrast", () => {
+  for (const [label, mark, base] of COMPONENT_PAIRS) {
+    it(`${label} meets WCAG 1.4.11 3:1`, () => {
+      const ratio = contrast(mark, base);
+      assert.ok(ratio >= 3, `${label}: ${ratio.toFixed(2)}:1`);
+    });
+  }
+});

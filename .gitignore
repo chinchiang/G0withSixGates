@@ -3,3 +3,19 @@ node_modules/
 .github_repo
 .env
 .env.*
+
+# 建置輸出：部署時平台會重新執行 npm run build
+.vercel/
+.output/
+.nitro/
+dist/
+
+# 本機與沙箱的執行期產物
+.node_modules.lock
+.grok/preview.log
+.grok/status
+.grok/og-pending
+
+# QA 截圖與驗證結果（browser-smoke 會寫到這裡），只保留目錄
+screenshots/*
+!screenshots/.gitkeep

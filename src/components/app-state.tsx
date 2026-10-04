@@ -30,6 +30,8 @@ interface AppState {
   patchProfile: (partial: Partial<Profile>) => void;
   checks: Record<string, boolean>;
   toggleCheck: (id: string) => void;
+  /** 整份換掉，用於清除全部與復原。 */
+  replaceChecks: (next: Record<string, boolean>) => void;
   checkProgress: { done: number; total: number };
   run: HarnessRun | null;
   /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 */
@@ -92,6 +94,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setProfileState((current) => ({ ...current, ...partial, preset: "custom" })),
       checks,
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
+      replaceChecks: setChecks,
       checkProgress: { done, total },
       run,
       plan,
