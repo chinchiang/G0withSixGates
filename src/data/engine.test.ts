@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   agencyOpen,
   buildPlan,
+  catchingControls,
+  caughtBy,
+  coverage,
   recommendLevel,
   reportMarkdown,
   trifectaOpen,
@@ -11,6 +14,8 @@ import {
 } from "./engine.ts";
 import {
   DEFECT_STATES,
+  FINDING_CONTROLS,
+  GATE_DOCS,
   MITIGATIONS,
   PRESETS,
   parseProfile,
@@ -174,6 +179,7 @@ describe("invariants over every profile", () => {
     const DEPTH = new Set(["g3-imds", "g3-csp", "g4-rules", "g5-rate", "g6-dow"]);
     let count = 0;
     let passWithModel = 0;
+    const produced = new Set<string>();
     for (const p of everyProfile()) {
       count++;
       const plan = buildPlan(p);
@@ -194,6 +200,7 @@ describe("invariants over every profile", () => {
           if (DEPTH.has(item.id)) assert.equal(item.severity, "block", `${item.id} ${label}`);
         }
       }
+      for (const item of findings) produced.add(item.id);
       for (const s of plan.steps) {
         if (s.status === "na") assert.equal(s.findings.length, 0, label);
         assert.ok(s.logs.length > 0, `${s.gate} has no log ${label}`);
@@ -203,6 +210,42 @@ describe("invariants over every profile", () => {
     }
     assert.equal(count, 3 * 3 * 8 * 3 * 512);
     assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
+
+    // 每個可能出現的發現都有控制項攔得下，對照表也沒有過期的條目。
+    const controlIds = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
+    for (const id of produced) {
+      const controls = catchingControls(id);
+      assert.ok(controls.length > 0, `${id} has no catching control`);
+      for (const item of controls) assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
+    }
+    assert.deepEqual(Object.keys(FINDING_CONTROLS).sort(), [...produced].sort());
+  });
+});
+
+describe("pipeline coverage", () => {
+  const plan = buildPlan(PRESETS.kb);
+
+  it("treats every finding as missed when nothing is checked", () => {
+    const result = coverage(plan, {});
+    assert.equal(result.length, plan.blockCount + plan.advisoryCount);
+    assert.ok(result.every((item) => !item.caught));
+  });
+
+  it("any one checked control covers a finding, including cross-gate pairs", () => {
+    const byId = new Map(coverage(plan, { "g2-push": true, "g5-bola": true }).map((c) => [c.finding.id, c]));
+    assert.equal(byId.get("g2-key")?.caught, true);
+    assert.equal(byId.get("g4-bola")?.caught, true);
+    assert.equal(byId.get("g5-idor")?.caught, true);
+    assert.equal(byId.get("g3-xss")?.caught, false);
+    assert.deepEqual(
+      byId.get("g2-key")?.controls.map((c) => [c.id, c.checked]),
+      [["g2-hook", false], ["g2-push", true]],
+    );
+  });
+
+  it("finds what a control catches in the run", () => {
+    assert.deepEqual(caughtBy(plan, "g5-bola").map((f) => f.id), ["g4-bola", "g5-idor"]);
+    assert.deepEqual(caughtBy(plan, "g1-sbom"), []);
   });
 });
 
@@ -232,12 +275,16 @@ describe("parseProfile", () => {
 describe("reportMarkdown", () => {
   it("records the demo notice, run time, inputs and localized statuses", () => {
     const at = new Date("2026-10-04T02:00:00.000Z");
-    const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at);
+    const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at, { "g3-csp": true });
     assert.match(md, /示範模擬/);
     assert.match(md, /執行時間：2026-10-04T02:00:00\.000Z/);
     assert.match(md, /設計期緩解：出向 Allow-list/);
     assert.match(md, /程式狀態：剩縱深項/);
     assert.match(md, /## G3 靜態分析（白箱／警示）/);
     assert.doesNotMatch(md, /／(pass|block|advisory|na)）/);
+    assert.match(md, /你們的管線：已涵蓋（✓ G3 CSP/);
+    assert.match(md, /你們的管線：會漏掉（✗ G5 /);
+    assert.match(md, /## 你們的管線缺口/);
+    assert.match(md, /本次 2 個發現中，有 1 個可能會漏掉/);
   });
 });
