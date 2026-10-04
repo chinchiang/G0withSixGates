@@ -33,7 +33,8 @@ export function Panel({
 }
 
 const TONE: Record<string, string> = {
-  block: "bg-signal/15 text-signal border-signal/40",
+  // 底色只疊 10%：疊 15% 會讓紅字在卡片上低於 4.5:1。
+  block: "bg-signal/10 text-signal border-signal/40",
   advisory: "bg-accent/15 text-accent border-accent/40",
   pass: "bg-surface-2 text-fg border-line",
   na: "bg-bg text-faint border-line",
