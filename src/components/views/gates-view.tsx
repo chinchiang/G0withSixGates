@@ -115,7 +115,7 @@ export function GatesView() {
                 >
                   <span
                     className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-sm border ${
-                      on ? "border-accent bg-accent text-accent-ink" : "border-line"
+                      on ? "border-accent bg-accent text-accent-ink" : "border-line-strong"
                     }`}
                     aria-hidden="true"
                   >

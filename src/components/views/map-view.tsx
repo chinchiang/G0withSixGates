@@ -65,7 +65,7 @@ export function MapView() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜尋章節、工具或風險"
-          className="min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"
+          className="min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 text-sm"
         />
       </label>
 

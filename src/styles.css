@@ -49,6 +49,8 @@
   --color-muted: #93a196;
   --color-faint: #7f8f85;
   --color-line: #314038;
+  /* 輸入框、核取方塊與關閉狀態開關的邊界：對所有底色至少 3:1（WCAG 1.4.11）。 */
+  --color-line-strong: #63746b;
   --color-accent: #e8b86d;
   --color-accent-ink: #1a1408;
   --color-signal: #e67360;
