@@ -6,7 +6,8 @@ export type ViewId = "overview" | "harness" | "gates" | "levels" | "map" | "tool
 
 export type Exposure = "internal" | "partner" | "public";
 export type Sensitivity = "low" | "business" | "pii";
-export type Mitigation = "none" | "sandbox" | "egress-list" | "hitl";
+export type Mitigation = "sandbox" | "egress-list" | "hitl";
+export type DefectState = "vibe" | "depth" | "none";
 export type PresetId = "script" | "kb" | "platform" | "hardened" | "custom";
 
 export interface Profile {
@@ -14,6 +15,7 @@ export interface Profile {
   name: string;
   exposure: Exposure;
   sensitivity: Sensitivity;
+  api: boolean;
   llm: boolean;
   agent: boolean;
   privateData: boolean;
@@ -21,12 +23,25 @@ export interface Profile {
   egress: boolean;
   destructive: boolean;
   threatModel: boolean;
-  mitigation: Mitigation;
+  mitigations: Mitigation[];
   diffOnly: boolean;
-  defects: boolean;
+  defects: DefectState;
 }
 
+export const VIEWS: ViewId[] = ["overview", "harness", "gates", "levels", "map", "tools"];
 export const GATES: GateId[] = ["G0", "G1", "G2", "G3", "G4", "G5", "G6"];
+
+export interface AppSearch {
+  view?: ViewId;
+  gate?: GateId;
+}
+
+/** 網址只留合法的 view 與 gate，其他參數一律丟掉。 */
+export function parseSearch(search: Record<string, unknown>): AppSearch {
+  const view = VIEWS.find((item) => item === search.view);
+  const gate = GATES.find((item) => item === search.gate);
+  return { view: view === "overview" ? undefined : view, gate };
+}
 
 export const GATE_NAME: Record<GateId, string> = {
   G0: "威脅建模",
@@ -38,11 +53,44 @@ export const GATE_NAME: Record<GateId, string> = {
   G6: "AI 紅隊",
 };
 
+export const EXPOSURE_LABEL: Record<Exposure, string> = {
+  internal: "內部",
+  partner: "夥伴",
+  public: "對外",
+};
+
+export const SENSITIVITY_LABEL: Record<Sensitivity, string> = {
+  low: "低",
+  business: "業務",
+  pii: "個資",
+};
+
+export const MITIGATIONS: Mitigation[] = ["sandbox", "egress-list", "hitl"];
+
 export const MITIGATION_LABEL: Record<Mitigation, string> = {
-  none: "未切斷",
   sandbox: "沙箱隔離",
   "egress-list": "出向 Allow-list",
   hitl: "人工核可",
+};
+
+export const MITIGATION_HINT: Record<Mitigation, string> = {
+  sandbox: "切斷三要素",
+  "egress-list": "切斷三要素",
+  hitl: "只管破壞性工具",
+};
+
+export const DEFECT_STATES: DefectState[] = ["vibe", "depth", "none"];
+
+export const DEFECT_LABEL: Record<DefectState, string> = {
+  vibe: "仍有缺陷",
+  depth: "剩縱深項",
+  none: "已整治",
+};
+
+export const DEFECT_HINT: Record<DefectState, string> = {
+  vibe: "示範程式仍帶著 Vibe Coding 常見的缺陷。",
+  depth: "阻擋項已修，CSP 強制與重設密碼限速這類縱深項還沒做完。",
+  none: "阻擋項與縱深項都已依閘門整治。",
 };
 
 export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
@@ -51,6 +99,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: "內部排程腳本",
     exposure: "internal",
     sensitivity: "low",
+    api: false,
     llm: false,
     agent: false,
     privateData: false,
@@ -58,15 +107,16 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     egress: false,
     destructive: false,
     threatModel: false,
-    mitigation: "none",
+    mitigations: [],
     diffOnly: true,
-    defects: true,
+    defects: "vibe",
   },
   kb: {
     preset: "kb",
     name: "對外客服知識庫",
     exposure: "public",
     sensitivity: "business",
+    api: true,
     llm: true,
     agent: false,
     privateData: true,
@@ -74,15 +124,16 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     egress: false,
     destructive: false,
     threatModel: false,
-    mitigation: "none",
+    mitigations: [],
     diffOnly: true,
-    defects: true,
+    defects: "vibe",
   },
   platform: {
     preset: "platform",
     name: "Vibe 平台（高權限 Agent）",
     exposure: "public",
     sensitivity: "pii",
+    api: true,
     llm: true,
     agent: true,
     privateData: true,
@@ -90,15 +141,16 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     egress: true,
     destructive: true,
     threatModel: false,
-    mitigation: "none",
+    mitigations: [],
     diffOnly: true,
-    defects: true,
+    defects: "vibe",
   },
   hardened: {
     preset: "hardened",
     name: "已整治的客服知識庫",
     exposure: "public",
     sensitivity: "business",
+    api: true,
     llm: true,
     agent: false,
     privateData: true,
@@ -106,13 +158,50 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     egress: false,
     destructive: false,
     threatModel: true,
-    mitigation: "egress-list",
+    mitigations: ["egress-list"],
     diffOnly: false,
-    defects: false,
+    defects: "depth",
   },
 };
 
 export const DEFAULT_PROFILE: Profile = PRESETS.kb;
+
+const PRESET_IDS: PresetId[] = ["script", "kb", "platform", "hardened", "custom"];
+
+/** 讀回本機存檔。欄位不合法就用預設值；舊版的單選 mitigation 與布林 defects 會轉成新格式。 */
+export function parseProfile(raw: unknown): Profile {
+  if (!raw || typeof raw !== "object") return DEFAULT_PROFILE;
+  const r = raw as Record<string, unknown>;
+  const d = DEFAULT_PROFILE;
+  const pick = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+    allowed.includes(value as T) ? (value as T) : fallback;
+  const bool = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+  const mitigations: unknown[] = Array.isArray(r.mitigations)
+    ? r.mitigations
+    : typeof r.mitigation === "string"
+      ? [r.mitigation]
+      : d.mitigations;
+  const defects = typeof r.defects === "boolean" ? (r.defects ? "vibe" : "depth") : r.defects;
+
+  return {
+    preset: pick(r.preset, PRESET_IDS, "custom"),
+    name: typeof r.name === "string" ? r.name : d.name,
+    exposure: pick(r.exposure, Object.keys(EXPOSURE_LABEL) as Exposure[], d.exposure),
+    sensitivity: pick(r.sensitivity, Object.keys(SENSITIVITY_LABEL) as Sensitivity[], d.sensitivity),
+    // 舊版沒有這個欄位，當時內部系統一律視為沒有 HTTP API。
+    api: bool(r.api, false),
+    llm: bool(r.llm, d.llm),
+    agent: bool(r.agent, d.agent),
+    privateData: bool(r.privateData, d.privateData),
+    untrusted: bool(r.untrusted, d.untrusted),
+    egress: bool(r.egress, d.egress),
+    destructive: bool(r.destructive, d.destructive),
+    threatModel: bool(r.threatModel, d.threatModel),
+    mitigations: MITIGATIONS.filter((item) => mitigations.includes(item)),
+    diffOnly: bool(r.diffOnly, d.diffOnly),
+    defects: pick(defects, DEFECT_STATES, d.defects),
+  };
+}
 
 export interface GateControl {
   id: string;
@@ -352,7 +441,15 @@ export const CHAPTERS: Chapter[] = [
     name: "網頁前端安全",
     objective: "Cookie、CSP 與來源隔離是前端的安全邊界，不能靠隱藏按鈕。",
     gates: ["G3", "G5"],
-    sections: ["文件", "未預期內容解釋", "Cookie", "瀏覽器安全標頭", "來源隔離"],
+    sections: [
+      "文件",
+      "未預期內容解釋",
+      "Cookie",
+      "瀏覽器安全標頭",
+      "來源隔離",
+      "外部資源完整性",
+      "其他瀏覽器考量",
+    ],
   },
   {
     id: "V4",
@@ -373,14 +470,23 @@ export const CHAPTERS: Chapter[] = [
     name: "身分驗證",
     objective: "密碼只是起點。L2 以上要多重要素，L3 才考慮硬體與受信執行環境。",
     gates: ["G4", "G5"],
-    sections: ["文件", "密碼", "通用驗證", "生命週期", "多重要素", "身分提供者"],
+    sections: [
+      "文件",
+      "密碼",
+      "通用驗證",
+      "生命週期與復原",
+      "多重要素",
+      "頻外驗證",
+      "密碼學驗證機制",
+      "身分提供者",
+    ],
   },
   {
     id: "V7",
     name: "工作階段管理",
     objective: "逾時與終止要符合文件化決策，而不是抄一套死板秒數。",
     gates: ["G5"],
-    sections: ["文件", "基礎安全", "逾時", "終止", "濫用防禦"],
+    sections: ["文件", "基礎安全", "逾時", "終止", "濫用防禦", "聯合重新驗證"],
   },
   {
     id: "V8",
@@ -401,14 +507,14 @@ export const CHAPTERS: Chapter[] = [
     name: "OAuth 與 OIDC",
     objective: "用戶端、資源伺服器與授權伺服器的責任分開驗證；未使用就可整章略過。",
     gates: ["G4", "G5"],
-    sections: ["通用", "用戶端", "資源伺服器", "授權伺服器", "OIDC", "同意"],
+    sections: ["通用", "用戶端", "資源伺服器", "授權伺服器", "OIDC 用戶端", "OpenID 提供者", "同意管理"],
   },
   {
     id: "V11",
     name: "密碼學",
     objective: "先有演算法清冊，再只用仍被接受的加密、雜湊與隨機數。",
     gates: ["G3"],
-    sections: ["清冊", "實作", "加密", "雜湊", "隨機數", "公鑰"],
+    sections: ["清冊", "實作", "加密", "雜湊", "隨機數", "公鑰", "使用中資料加密"],
   },
   {
     id: "V12",
@@ -531,7 +637,7 @@ export const MAP_ROWS: MapRow[] = [
     asvs: "V13 組態",
     tool: "Checkov／Trivy",
     policy: "advisory",
-    confirm: "可達性不明時先警示；G5 若能打到中繼資料就升級為阻擋。",
+    confirm: "可達性不明時先警示，L3 直接阻擋；G5 若能打到中繼資料也升級為阻擋。",
   },
   {
     id: "bola",
@@ -567,6 +673,17 @@ export const MAP_ROWS: MapRow[] = [
     confirm: "對照 CVE-2025-29927：只靠 middleware 的路徑要在資料層再驗一次。",
   },
   {
+    id: "pii",
+    risk: "個資未分級與用戶端外溢",
+    gate: "G4",
+    pair: "G0",
+    track: "設計＋白箱",
+    asvs: "V14.1.1、V14.3.3",
+    tool: "資料分級＋架構審查",
+    policy: "block",
+    confirm: "個資欄位先在 G0 分級，G4 再確認瀏覽器儲存只留工作階段權杖。",
+  },
+  {
     id: "tri",
     risk: "致命三要素",
     gate: "G0",
@@ -586,7 +703,7 @@ export const MAP_ROWS: MapRow[] = [
     asvs: "V8、V15",
     tool: "允許清單／人工核可",
     policy: "block",
-    confirm: "破壞性工具沒有人機核可，不因紅隊當次沒打中就放行。",
+    confirm: "破壞性工具沒有人工核可，不因紅隊當次沒打中就放行。沙箱不能取代人工核可。",
   },
   {
     id: "jwt",
@@ -598,6 +715,17 @@ export const MAP_ROWS: MapRow[] = [
     tool: "ZAP／Burp",
     policy: "block",
     confirm: "alg:none 或演算法混淆成立時，回查簽章驗證是不是只做在閘道。",
+  },
+  {
+    id: "mfa",
+    risk: "個資系統只有單一要素",
+    gate: "G5",
+    pair: "G4",
+    track: "黑箱 → 白箱",
+    asvs: "V6.3.3",
+    tool: "ZAP／Burp 登入流程",
+    policy: "block",
+    confirm: "L2 起要多重要素，L3 其中一個要素必須是硬體式驗證器。只憑帳密就能進個資頁，回查驗證設計。",
   },
   {
     id: "prompt",
@@ -841,7 +969,7 @@ export const INCIDENTS: Incident[] = [
 export const PRINCIPLES = [
   {
     title: "分層阻擋",
-    text: "高確定性的發現直接擋下 pull request：金鑰、幻覺套件、明確未參數化的查詢。需要判斷可達性的項目先警示，避免誤報讓人關掉整個閘門。",
+    text: "高確定性的發現直接擋下 pull request：金鑰、幻覺套件、明確未參數化的查詢。需要判斷可達性的項目先警示，避免誤報讓人關掉整個閘門。L3 例外：縱深防禦本身就是 L3 的要求，縱深警示直接升級為阻擋。",
   },
   {
     title: "SARIF 匯總",
@@ -853,29 +981,35 @@ export const PRINCIPLES = [
   },
 ];
 
+/** ASVS 5.0.0 共 345 項要求；count 是該等級新增的項數，cumulative 是累計需覆蓋的比例。 */
+export const ASVS_TOTAL = 345;
+
 export const LEVEL_META: Record<
   Level,
-  { name: string; share: string; cumulative: string; aim: string; who: string }
+  { name: string; count: number; cumulative: number; aim: string; who: string; harness: string }
 > = {
   L1: {
     name: "第一道防線",
-    share: "約 20%",
-    cumulative: "約 70 項",
+    count: 70,
+    cumulative: 20,
     aim: "先擋住不需要前置條件就能打的常見攻擊。門檻要低，否則團隊不會開始。",
     who: "早期產品、只碰有限敏感資料、剛導入標準的團隊。",
+    harness: "Harness 用開源基線工具；縱深項只警示。",
   },
   L2: {
     name: "標準實踐",
-    share: "另約 50%",
-    cumulative: "累計約 70%",
+    count: 183,
+    cumulative: 73,
     aim: "覆蓋較少見的攻擊，以及需要前置條件的常見漏洞。多數對外系統應以此為目標。",
-    who: "商業應用、處理一般個人或業務資料的系統。",
+    who: "商業應用、只在內部處理個資或一般業務資料的系統，以及任何含 LLM 的系統。",
+    harness: "Harness 換成跨檔污點與雙帳號 DAST；縱深項仍只警示。",
   },
   L3: {
     name: "高保證",
-    share: "最後約 30%",
-    cumulative: "累計 100%",
+    count: 92,
+    cumulative: 100,
     aim: "縱深防禦與難做的控制。用來對使用者證明最高保證，而不是日常起步。",
-    who: "金流、醫療核心、關鍵基礎設施，以及能改正式資料的 Agent。",
+    who: "對外個資、金流、醫療核心、關鍵基礎設施，以及能改正式資料的 Agent。",
+    harness: "未文件化的威脅模型與所有縱深項一律阻擋。",
   },
 };

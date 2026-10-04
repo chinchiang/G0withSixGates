@@ -51,7 +51,7 @@ export function ToolsView() {
         <ol className="space-y-3 text-sm leading-6">
           <li>
             <span className="font-semibold">阻擋與警示分開。</span>
-            <span className="text-muted"> 金鑰、幻覺套件、已證實的注入與越權擋 PR。可達性不明的 IaC 先警示。</span>
+            <span className="text-muted"> 金鑰、幻覺套件、已證實的注入與越權擋 PR。可達性不明的 IaC 先警示，L3 則直接阻擋。</span>
           </li>
           <li>
             <span className="font-semibold">輸出收成 SARIF。</span>
