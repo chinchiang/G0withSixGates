@@ -1,4 +1,14 @@
-import { ASVS_TOTAL, INCIDENTS, LEVEL_META, PRINCIPLES, SYMPTOMS, GATES, GATE_NAME, type Level } from "@/data/model";
+import {
+  ASVS_TOTAL,
+  GATES,
+  GATE_NAME,
+  GATE_TRACK,
+  INCIDENTS,
+  LEVEL_META,
+  PRINCIPLES,
+  SYMPTOMS,
+  type Level,
+} from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
 
@@ -83,7 +93,7 @@ export function Overview() {
                 <span className="w-8 font-mono text-sm text-accent">{gate}</span>
                 <span className="text-sm">{GATE_NAME[gate]}</span>
                 <span className="ml-auto font-mono text-xs text-faint">
-                  {gate === "G0" ? "設計" : gate < "G5" ? "白箱" : "黑箱"}
+                  {GATE_TRACK[gate]}
                 </span>
               </button>
             </li>

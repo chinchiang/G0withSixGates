@@ -1,4 +1,4 @@
-import { GATE_DOCS, GATES, MAESTRO, GATE_NAME } from "@/data/model";
+import { GATE_DOCS, GATES, GATE_TRACK, MAESTRO, GATE_NAME } from "@/data/model";
 import { caughtBy } from "@/data/engine";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
@@ -44,7 +44,7 @@ export function GatesView() {
       </nav>
 
       <Panel
-        eyebrow={`${doc.id} · ${doc.track}`}
+        eyebrow={`${doc.id} · ${GATE_TRACK[doc.id]}`}
         title={doc.name}
         action={
           <span className="font-mono text-xs text-muted tabular-nums">

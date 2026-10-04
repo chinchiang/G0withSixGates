@@ -5,6 +5,7 @@ import {
   GATES,
   GATE_DOCS,
   GATE_NAME,
+  GATE_TRACK,
   MITIGATION_LABEL,
   SENSITIVITY_LABEL,
   type GateId,
@@ -12,6 +13,7 @@ import {
   type Level,
   type Profile,
   type Severity,
+  type Track,
 } from "./model.ts";
 
 export interface Finding {
@@ -29,7 +31,7 @@ export interface Finding {
 
 export interface GateStep {
   gate: GateId;
-  track: "設計期" | "白箱" | "黑箱";
+  track: Track;
   status: GateStatus;
   logs: string[];
   findings: Finding[];
@@ -55,16 +57,6 @@ export const STATUS_LABEL: Record<GateStatus, string> = {
 
 export const DEMO_NOTICE =
   "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。";
-
-const TRACK: Record<GateId, GateStep["track"]> = {
-  G0: "設計期",
-  G1: "白箱",
-  G2: "白箱",
-  G3: "白箱",
-  G4: "白箱",
-  G5: "黑箱",
-  G6: "黑箱",
-};
 
 export function webSurface(p: Profile): boolean {
   return p.api || p.exposure !== "internal" || p.llm;
@@ -118,14 +110,14 @@ export function recommendLevel(p: Profile): { level: Level; reasons: string[] } 
 
 function step(gate: GateId, logs: string[], findings: Finding[], na?: string): GateStep {
   if (na) {
-    return { gate, track: TRACK[gate], status: "na", logs: [...logs, na], findings: [] };
+    return { gate, track: GATE_TRACK[gate], status: "na", logs: [...logs, na], findings: [] };
   }
   const status: GateStatus = findings.some((f) => f.severity === "block")
     ? "block"
     : findings.some((f) => f.severity === "advisory")
       ? "advisory"
       : "pass";
-  return { gate, track: TRACK[gate], status, logs, findings };
+  return { gate, track: GATE_TRACK[gate], status, logs, findings };
 }
 
 function f(
