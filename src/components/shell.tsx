@@ -54,7 +54,7 @@ function Frame() {
 
       <div className="mx-auto flex max-w-6xl">
         <aside className="sticky top-20 hidden w-52 shrink-0 self-start border-r border-line px-3 py-4 md:block">
-          <nav className="flex flex-col gap-1">
+          <nav aria-label="主要導覽" className="flex flex-col gap-1">
             {NAV.map((item) => (
               <NavButton key={item.id} item={item} active={view === item.id} onClick={() => setView(item.id)} />
             ))}
@@ -73,7 +73,10 @@ function Frame() {
         </main>
       </div>
 
-      <nav className="dock fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg-raised md:hidden">
+      <nav
+        aria-label="主要導覽"
+        className="dock fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg-raised md:hidden"
+      >
         <ul className="grid grid-cols-6">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -82,6 +85,7 @@ function Frame() {
               <li key={item.id}>
                 <button
                   type="button"
+                  aria-current={active ? "page" : undefined}
                   onClick={() => setView(item.id)}
                   className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 text-xs ${
                     active ? "text-accent" : "text-muted"
@@ -112,6 +116,7 @@ function NavButton({
   return (
     <button
       type="button"
+      aria-current={active ? "page" : undefined}
       onClick={onClick}
       className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${
         active ? "bg-accent/15 text-fg" : "text-muted hover:text-fg"
