@@ -1,7 +1,9 @@
 import {
   DEFECT_LABEL,
   EXPOSURE_LABEL,
+  FINDING_CONTROLS,
   GATES,
+  GATE_DOCS,
   GATE_NAME,
   MITIGATION_LABEL,
   SENSITIVITY_LABEL,
@@ -604,9 +606,60 @@ export function buildPlan(p: Profile): RunPlan {
   return { level, reasons, trifectaOpen: open, steps, release, blockCount, advisoryCount, headline };
 }
 
+export interface ControlRef {
+  id: string;
+  gate: GateId;
+  text: string;
+}
+
+const CONTROLS: Record<string, ControlRef> = Object.fromEntries(
+  GATE_DOCS.flatMap((doc) =>
+    doc.controls.map((item): [string, ControlRef] => [item.id, { ...item, gate: doc.id }]),
+  ),
+);
+
+/** 攔得下這個發現的控制項。 */
+export function catchingControls(findingId: string): ControlRef[] {
+  return (FINDING_CONTROLS[findingId] ?? []).map((id) => CONTROLS[id]);
+}
+
+export interface Coverage {
+  finding: Finding;
+  controls: (ControlRef & { checked: boolean })[];
+  /** 任一個攔得下的控制項已勾選，就算你們的管線涵蓋。 */
+  caught: boolean;
+}
+
+/** 用閘門頁的勾選（你們真實的管線）對照這次 Harness 的發現。 */
+export function coverage(plan: RunPlan, checks: Record<string, boolean>): Coverage[] {
+  return plan.steps.flatMap((s) =>
+    s.findings.map((finding) => {
+      const controls = catchingControls(finding.id).map((item) => ({
+        ...item,
+        checked: Boolean(checks[item.id]),
+      }));
+      return { finding, controls, caught: controls.some((item) => item.checked) };
+    }),
+  );
+}
+
+/** 這次 Harness 裡，這個控制項攔得下哪些發現。 */
+export function caughtBy(plan: RunPlan, controlId: string): Finding[] {
+  return plan.steps
+    .flatMap((s) => s.findings)
+    .filter((finding) => FINDING_CONTROLS[finding.id]?.includes(controlId));
+}
+
 const yesNo = (value: boolean) => (value ? "是" : "否");
 
-export function reportMarkdown(p: Profile, plan: RunPlan, at: Date): string {
+export function reportMarkdown(
+  p: Profile,
+  plan: RunPlan,
+  at: Date,
+  checks: Record<string, boolean>,
+): string {
+  const covered = new Map(coverage(plan, checks).map((item) => [item.finding.id, item]));
+  const missed = [...covered.values()].filter((item) => !item.caught);
   const lines: string[] = [
     `# 六道閘門放行紀錄`,
     ``,
@@ -640,9 +693,28 @@ export function reportMarkdown(p: Profile, plan: RunPlan, at: Date): string {
       lines.push(`  - 證據：${item.evidence}`);
       lines.push(`  - 修正：${item.fix}`);
       lines.push(`  - ${item.tool}｜${item.asvs}｜${item.cwe}`);
+      const cov = covered.get(item.id);
+      if (cov) {
+        const marks = cov.controls.map((c) => `${c.checked ? "✓" : "✗"} ${c.gate} ${c.text}`).join("；");
+        lines.push(`  - 你們的管線：${cov.caught ? "已涵蓋" : "會漏掉"}（${marks}）`);
+      }
     }
     lines.push("");
   }
+  lines.push(`## 你們的管線缺口`);
+  lines.push(`依閘門頁的勾選估算。勾選代表你們真實的管線已有該控制，任一項攔得下就算涵蓋。`);
+  lines.push("");
+  if (covered.size === 0) {
+    lines.push("- 本次沒有發現項。");
+  } else if (missed.length === 0) {
+    lines.push(`- 本次 ${covered.size} 個發現，你們的管線都攔得下。`);
+  } else {
+    lines.push(`- 本次 ${covered.size} 個發現中，有 ${missed.length} 個可能會漏掉：`);
+    for (const item of missed) {
+      lines.push(`  - ${item.finding.gate} ${item.finding.title}：缺 ${item.controls.map((c) => c.text).join("／")}`);
+    }
+  }
+  lines.push("");
   lines.push("ASVS 對照到章節。CWE／LLM Top 10 是營運交叉引用，不是 ASVS 5.0 的正式對應表。");
   return lines.join("\n");
 }

@@ -123,6 +123,7 @@ export function ProfileForm() {
         />
         <ToggleRow
           label="已完成威脅建模"
+          hint="指受測系統本身；管線是否要求，在閘門頁勾選"
           on={profile.threatModel}
           onChange={(threatModel) => patchProfile({ threatModel })}
         />
