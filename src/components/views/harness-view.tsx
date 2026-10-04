@@ -46,6 +46,21 @@ export function HarnessView() {
   const stale = phase === "done" && JSON.stringify(run?.profile) !== JSON.stringify(profile);
   const activeIndex = phase === "running" ? visible : -1;
 
+  // 閘門依序亮起時，螢幕閱讀器逐道聽到結果，最後聽到裁決。回到這頁時不重唸：初始內容不會被宣讀。
+  const lastStep = plan && visible > 0 ? plan.steps[visible - 1] : null;
+  const announcement =
+    phase === "running"
+      ? lastStep
+        ? `${lastStep.gate} ${GATE_NAME[lastStep.gate]}：${STATUS_LABEL[lastStep.status]}`
+        : "Harness 開始執行。"
+      : phase === "done" && plan
+        ? [
+            `裁決：${RELEASE_LABEL[plan.release]}。${plan.level}，阻擋 ${plan.blockCount}、警示 ${plan.advisoryCount}。`,
+            missed.length > 0 ? `依閘門頁的勾選，你們的管線可能漏掉 ${missed.length} 項。` : "",
+            stale ? "設定已改，這份裁決對不上目前的系統。" : "",
+          ].join("")
+        : "";
+
   function start() {
     startRun();
     setVisible(0);
@@ -124,6 +139,9 @@ export function HarnessView() {
           ref={resultsRef}
           className={`scroll-mt-20 space-y-3 ${phase === "idle" ? "" : "min-h-[calc(100svh-5rem)] lg:min-h-0"}`}
         >
+          <p role="status" className="sr-only">
+            {announcement}
+          </p>
           {phase === "done" && plan && (
             <div
               className={`rounded-lg border px-4 py-3 ${
