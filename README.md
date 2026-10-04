@@ -43,6 +43,14 @@ npm run build      # 產出 .vercel/output（不進版控）
 
 `npm test` 由 `scripts/run-tests.mjs` 執行：每組測試各自跑，任何一組失敗就回傳非 0；`src/**/*.test.ts` 會自動被找到。
 
+## 安全標頭
+
+正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
+
+- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
+- **先觀察**：腳本、樣式、連線等來源限制以 `Content-Security-Policy-Report-Only` 送出，因為 Grok 標章腳本的內容無法事先檢視。上線後確認「Created with Grok」標章正常、瀏覽器 console 沒有 CSP 報告，再把 `ENFORCE_RESOURCE_POLICY` 改成 `true`。
+- `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
+
 ## 專案結構
 
 | 路徑 | 用途 |
