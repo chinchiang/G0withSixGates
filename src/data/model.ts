@@ -290,10 +290,11 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g3-taint", text: "SAST 具備跨檔、跨函式污點追蹤，來源包含模型輸出" },
       { id: "g3-param", text: "SQL、OS 指令與 HTML 匯點使用參數化或上下文編碼" },
       { id: "g3-iac", text: "IMDSv2 為 required，CORS 不對任意來源加憑證" },
+      { id: "g3-csp", text: "CSP 等瀏覽器安全標頭已強制，不停在 report-only" },
       { id: "g3-diff", text: "PR 只掃差異以控制在數分鐘內；全量留給夜間 CodeQL" },
     ],
     tools: ["Semgrep", "CodeQL", "Checkov / Trivy"],
-    asvs: ["V1.2 注入防範", "v5.0.0-1.2.5 作業系統指令", "V13 組態"],
+    asvs: ["V1.2 注入防範", "v5.0.0-1.2.5 作業系統指令", "V3.4 瀏覽器安全標頭", "V13 組態"],
     fails: "來源在路由、匯點在另一個資料庫模組時，只掃單檔的工具會放行。",
   },
   {
@@ -308,11 +309,13 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g4-owner", text: "查詢綁定當前主體，例如 owner 條件，而不是只靠前端隱藏" },
       { id: "g4-rls", text: "Supabase／Firebase 一類的列層安全性已開啟並用測試驗證" },
       { id: "g4-depth", text: "授權在資料層再做一次，不只有框架 middleware" },
+      { id: "g4-pii", text: "個資欄位已分級，瀏覽器儲存只留工作階段權杖" },
       { id: "g4-allow", text: "Agent 工具為允許清單，delete 與任意 SQL 不對通用助手開放" },
-      { id: "g4-hitl", text: "高影響動作有人工核可；規則檔已掃隱形字元" },
+      { id: "g4-hitl", text: "高影響動作有人工核可" },
+      { id: "g4-rules", text: "代理會讀的規則檔與 Markdown 已掃隱形字元" },
     ],
     tools: ["架構審查", "RLS 測試", "規則檔掃描"],
-    asvs: ["V8 授權", "V6 身分驗證", "V15.1 文件化決策"],
+    asvs: ["V8 授權", "V6 身分驗證", "V14 資料保護", "V15.1 文件化決策"],
     fails: "Wiz 指出 Base44 兩個未驗證端點只靠公開 app_id。Next.js CVE-2025-29927（CVSS 9.1）用 x-middleware-subrequest 跳過單一中介層。",
   },
   {
@@ -326,11 +329,13 @@ export const GATE_DOCS: GateDoc[] = [
     controls: [
       { id: "g5-bola", text: "雙帳號實測：B 不能讀寫 A 的物件識別碼" },
       { id: "g5-jwt", text: "拒絕 alg:none，並防範 RS256／HS256 演算法混淆" },
+      { id: "g5-mfa", text: "存取個資的角色要求多重要素，並實測登入流程" },
       { id: "g5-ssrf", text: "網址匯入不會打到雲端中繼資料或內部網段" },
+      { id: "g5-rate", text: "登入與重設密碼等敏感流程套用同一套速率限制" },
       { id: "g5-debug", text: "預備與正式環境已關閉 Swagger、introspection、堆疊追蹤" },
     ],
     tools: ["OWASP ZAP", "Burp Suite + AuthMatrix", "Nuclei", "Schemathesis"],
-    asvs: ["V8 授權", "V9.1 權杖完整性", "V13.4 非預期資訊外洩", "V2.4 防自動化"],
+    asvs: ["V8 授權", "V9.1 權杖完整性", "V6.3.3 多重要素", "V13.4 非預期資訊外洩", "V2.4 防自動化"],
     fails: "白箱說查詢有綁定擁有者，若黑箱仍能用另一個帳號讀到，就代表映射斷了，不能放行。",
   },
   {
@@ -352,6 +357,35 @@ export const GATE_DOCS: GateDoc[] = [
     fails: "護欄是執行期控制，不是數學保證。沒有紅隊測試的護欄不能當成閘門通過。",
   },
 ];
+
+/**
+ * Harness 每個發現由哪些控制項攔得下。任一項已在閘門頁勾選，就算你們的管線涵蓋。
+ * 跨閘門的配對（例如 G5 雙帳號測試也攔得下 G4 的越權）照對照表列入。
+ */
+export const FINDING_CONTROLS: Record<string, string[]> = {
+  "g0-tri": ["g0-tri", "g0-maestro"],
+  "g0-model": ["g0-dfd", "g0-stride"],
+  "g1-slop": ["g1-exist", "g1-typo"],
+  "g1-hook": ["g1-hook", "g1-cool"],
+  "g1-cool": ["g1-cool", "g1-typo"],
+  "g2-key": ["g2-hook", "g2-push"],
+  "g2-hist": ["g2-hist"],
+  "g3-xss": ["g3-taint", "g6-xss"],
+  "g3-cmd": ["g3-param"],
+  "g3-imds": ["g3-iac"],
+  "g3-csp": ["g3-csp"],
+  "g4-bola": ["g4-owner", "g4-rls", "g5-bola"],
+  "g4-pii": ["g4-pii"],
+  "g4-tool": ["g4-allow", "g4-hitl"],
+  "g4-rules": ["g4-rules"],
+  "g5-idor": ["g5-bola", "g5-jwt"],
+  "g5-mfa": ["g5-mfa"],
+  "g5-debug": ["g5-debug"],
+  "g5-rate": ["g5-rate"],
+  "g6-pi": ["g6-direct", "g6-indirect"],
+  "g6-dow": ["g6-dow"],
+  "g6-tri": ["g6-indirect", "g0-tri"],
+};
 
 export interface MaestroRow {
   layer: string;

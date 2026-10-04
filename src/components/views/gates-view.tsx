@@ -1,4 +1,5 @@
 import { GATE_DOCS, GATES, MAESTRO, GATE_NAME } from "@/data/model";
+import { caughtBy } from "@/data/engine";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
@@ -11,7 +12,7 @@ const LAYERS = [
 ];
 
 export function GatesView() {
-  const { gate, openGate, checks, toggleCheck } = useApp();
+  const { gate, openGate, checks, toggleCheck, run, plan, setView } = useApp();
   const doc = GATE_DOCS.find((item) => item.id === gate) ?? GATE_DOCS[0];
   const done = doc.controls.filter((item) => checks[item.id]).length;
 
@@ -21,7 +22,8 @@ export function GatesView() {
         <p className="font-mono text-xs tracking-widest text-accent">G0–G6</p>
         <h1 className="mt-1 text-2xl font-semibold">閘門怎麼落地</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          G0 是設計期的前置關卡，G1 到 G6 是六道閘門。勾選會留在這台裝置，用來對照你們自己的管線，不會上傳。它不是掃描結果。
+          G0 是設計期的前置關卡，G1 到 G6 是六道閘門。勾選代表你們真實的管線已有這個控制，Harness
+          會用它估算哪些發現在你們那裡可能漏掉。勾選只留在這台裝置，不會上傳，也不是掃描結果。
         </p>
       </div>
 
@@ -77,6 +79,7 @@ export function GatesView() {
         <ul className="space-y-2">
           {doc.controls.map((item) => {
             const on = Boolean(checks[item.id]);
+            const caught = plan ? caughtBy(plan, item.id) : [];
             return (
               <li key={item.id}>
                 <button
@@ -93,13 +96,34 @@ export function GatesView() {
                   >
                     {on ? <Check className="size-3.5" strokeWidth={2.5} /> : null}
                   </span>
-                  <span className="text-sm leading-6">{item.text}</span>
+                  <span className="text-sm leading-6">
+                    {item.text}
+                    {caught.length > 0 && (
+                      <span className="mt-1 block text-xs leading-5 text-muted">
+                        本次 Harness 會攔下：{caught.map((finding) => finding.title).join("、")}
+                      </span>
+                    )}
+                  </span>
                 </button>
               </li>
             );
           })}
         </ul>
         <p className="mt-3 text-xs text-faint">工具：{doc.tools.join("、")}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+          <span>
+            {run
+              ? `對照的是最近一次 Harness：「${run.profile.name}」。`
+              : "跑一次 Harness，這裡會標出每個控制項在示範中攔下哪些發現。"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setView("harness")}
+            className="min-h-11 text-accent"
+          >
+            {run ? "回到 Harness 結果" : "去執行 Harness"}
+          </button>
+        </div>
       </Panel>
 
       {doc.id === "G1" && (

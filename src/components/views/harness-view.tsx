@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Play, Square } from "lucide-react";
-import { GATE_NAME } from "@/data/model";
-import { DEMO_NOTICE, RELEASE_LABEL, STATUS_LABEL, buildPlan, reportMarkdown } from "@/data/engine";
+import { Check, Download, Play, Square, X } from "lucide-react";
+import { GATE_NAME, type GateId } from "@/data/model";
+import {
+  DEMO_NOTICE,
+  RELEASE_LABEL,
+  STATUS_LABEL,
+  coverage,
+  reportMarkdown,
+  type Coverage,
+} from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 
 export function HarnessView() {
-  const { profile, run, startRun, clearRun } = useApp();
-  const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
+  const { profile, run, plan, startRun, clearRun, checks, openGate } = useApp();
+  // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。
+  const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
+  const coverageById = useMemo(() => new Map(covered.map((item) => [item.finding.id, item])), [covered]);
+  const missed = covered.filter((item) => !item.caught);
   // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。
   const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
   const [running, setRunning] = useState(false);
@@ -49,7 +59,7 @@ export function HarnessView() {
 
   function download() {
     if (!plan || !run) return;
-    const blob = new Blob([reportMarkdown(run.profile, plan, run.at)], {
+    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -115,6 +125,11 @@ export function HarnessView() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6">{plan.headline}</p>
+              {missed.length > 0 && (
+                <p className="mt-2 text-xs text-muted">
+                  依閘門頁的勾選，你們的管線可能漏掉其中 {missed.length} 項，見下方缺口。
+                </p>
+              )}
               {stale && (
                 <p className="mt-2 text-xs text-accent">設定已改，這份裁決對不上目前的系統。請再跑一次。</p>
               )}
@@ -161,42 +176,134 @@ export function HarnessView() {
                           <li key={line}>{line}</li>
                         ))}
                       </ul>
-                      {item.findings.map((finding) => {
-                        const expanded = openId === finding.id;
-                        return (
-                          <button
-                            key={finding.id}
-                            type="button"
-                            onClick={() => setOpenId(expanded ? null : finding.id)}
-                            className="w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
-                          >
-                            <span className="flex items-start gap-2">
-                              <Badge tone={finding.severity}>
-                                {finding.severity === "block" ? "阻擋" : "警示"}
-                              </Badge>
-                              <span className="text-sm">{finding.title}</span>
-                            </span>
-                            {expanded && (
-                              <span className="mt-2 block space-y-2 text-sm leading-6 text-muted">
-                                <span className="block">{finding.detail}</span>
-                                <span className="block break-all font-mono text-xs text-fg">{finding.evidence}</span>
-                                <span className="block">修正：{finding.fix}</span>
-                                <span className="block font-mono text-xs text-faint">
-                                  {finding.tool} · {finding.asvs} · {finding.cwe}
-                                </span>
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                      {item.findings.map((finding) => (
+                        <FindingCard
+                          key={finding.id}
+                          cov={coverageById.get(finding.id)!}
+                          expanded={openId === finding.id}
+                          onToggle={() => setOpenId(openId === finding.id ? null : finding.id)}
+                          onOpenGate={openGate}
+                        />
+                      ))}
                     </div>
                   )}
                 </li>
               );
             })}
           </ol>
+
+          {phase === "done" && <GapPanel covered={covered} missed={missed} onOpenGate={openGate} />}
         </div>
       </div>
     </div>
+  );
+}
+
+function FindingCard({
+  cov,
+  expanded,
+  onToggle,
+  onOpenGate,
+}: {
+  cov: Coverage;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpenGate: (gate: GateId) => void;
+}) {
+  const { finding } = cov;
+  return (
+    <div className="rounded-md border border-line bg-bg">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className="flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left"
+      >
+        <Badge tone={finding.severity}>{STATUS_LABEL[finding.severity]}</Badge>
+        <span className="text-sm">{finding.title}</span>
+        <span className={`ml-auto shrink-0 pt-0.5 text-xs ${cov.caught ? "text-muted" : "text-accent"}`}>
+          {cov.caught ? "管線已涵蓋" : "管線會漏掉"}
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-2 border-t border-line px-3 py-2 text-sm leading-6 text-muted">
+          <p>{finding.detail}</p>
+          <p className="break-all font-mono text-xs text-fg">{finding.evidence}</p>
+          <p>修正：{finding.fix}</p>
+          <p className="font-mono text-xs text-faint">
+            {finding.tool} · {finding.asvs} · {finding.cwe}
+          </p>
+          <div>
+            <p className="text-xs text-muted">攔下它的控制項（任一項已勾就算涵蓋）</p>
+            <ul className="mt-1">
+              {cov.controls.map((control) => (
+                <li key={control.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenGate(control.gate)}
+                    className="flex min-h-11 w-full items-start gap-2 py-1 text-left text-fg"
+                  >
+                    {control.checked ? (
+                      <Check className="mt-1 size-4 shrink-0 text-accent" strokeWidth={2.5} aria-hidden="true" />
+                    ) : (
+                      <X className="mt-1 size-4 shrink-0 text-signal" strokeWidth={2.5} aria-hidden="true" />
+                    )}
+                    <span>
+                      <span className="font-mono text-xs text-accent">{control.gate}</span> {control.text}
+                      <span className="sr-only">{control.checked ? "（已勾選）" : "（未勾選）"}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GapPanel({
+  covered,
+  missed,
+  onOpenGate,
+}: {
+  covered: Coverage[];
+  missed: Coverage[];
+  onOpenGate: (gate: GateId) => void;
+}) {
+  const title =
+    covered.length === 0
+      ? "本次沒有發現項"
+      : missed.length === 0
+        ? `本次 ${covered.length} 個發現，你們的管線都攔得下`
+        : `本次 ${covered.length} 個發現中，有 ${missed.length} 個可能會漏掉`;
+  return (
+    <Panel eyebrow="你們的管線缺口" title={title}>
+      {missed.length > 0 && (
+        <ul className="space-y-2">
+          {missed.map(({ finding, controls }) => (
+            <li key={finding.id}>
+              <button
+                type="button"
+                onClick={() => onOpenGate(controls[0].gate)}
+                className="w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
+              >
+                <span className="flex items-start gap-2 text-sm">
+                  <span className="font-mono text-accent">{finding.gate}</span>
+                  {finding.title}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted">
+                  缺：{controls.map((item) => item.text).join("／")}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className={`text-xs leading-5 text-muted ${missed.length > 0 ? "mt-3" : ""}`}>
+        依閘門頁的勾選估算：勾選代表你們真實的管線已有該控制。點一項就會打開對應的閘門清單。
+      </p>
+    </Panel>
   );
 }

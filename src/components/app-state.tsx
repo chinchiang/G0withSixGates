@@ -8,6 +8,7 @@ import {
   type Profile,
   type ViewId,
 } from "@/data/model";
+import { buildPlan, type RunPlan } from "@/data/engine";
 
 const PROFILE_KEY = "vibegate-profile-v1";
 const CHECK_KEY = "vibegate-checks-v1";
@@ -31,6 +32,8 @@ interface AppState {
   toggleCheck: (id: string) => void;
   checkProgress: { done: number; total: number };
   run: HarnessRun | null;
+  /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 */
+  plan: RunPlan | null;
   startRun: () => void;
   clearRun: () => void;
 }
@@ -46,6 +49,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [run, setRun] = useState<HarnessRun | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
 
   useEffect(() => {
     try {
@@ -90,10 +94,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       checkProgress: { done, total },
       run,
+      plan,
       startRun: () => setRun({ profile, at: new Date() }),
       clearRun: () => setRun(null),
     };
-  }, [view, gate, navigate, profile, checks, run]);
+  }, [view, gate, navigate, profile, checks, run, plan]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
