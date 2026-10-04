@@ -1,19 +1,14 @@
-import { useEffect, useState } from "react";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { ASVS_TOTAL, INCIDENTS, LEVEL_META, PRINCIPLES, SYMPTOMS, GATES, GATE_NAME } from "@/data/model";
+import { ASVS_TOTAL, INCIDENTS, LEVEL_META, PRINCIPLES, SYMPTOMS, GATES, GATE_NAME, type Level } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
 
-const LEVELS = [
-  { name: "L1", pct: LEVEL_META.L1.cumulative },
-  { name: "L2 累計", pct: LEVEL_META.L2.cumulative },
-  { name: "L3 累計", pct: LEVEL_META.L3.cumulative },
-];
+const LEVELS = (["L1", "L2", "L3"] as Level[]).map((level) => ({
+  name: level === "L1" ? level : `${level} 累計`,
+  pct: LEVEL_META[level].cumulative,
+}));
 
 export function Overview() {
   const { openGate, setView, checkProgress } = useApp();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   return (
     <div className="space-y-4">
@@ -103,27 +98,19 @@ export function Overview() {
             {LEVEL_META.L2.count} 項、L3 再加 {LEVEL_META.L3.count} 項。達到 L2 要做完 L1 加 L2，約整份標準的{" "}
             {LEVEL_META.L2.cumulative}%。
           </p>
-          <div className="mt-4 h-44">
-            {mounted ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={LEVELS} layout="vertical" margin={{ left: 8, right: 8 }}>
-                  <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={72}
-                    tick={{ fill: "var(--color-muted)", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Bar dataKey="pct" fill="var(--color-accent)" radius={4} barSize={18} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full rounded-md bg-bg" />
-            )}
-          </div>
-          <p className="text-xs text-faint">橫軸是累計需覆蓋的要求比例，不是漏洞數量。</p>
+          {/* 每列是一個量表：底軌是 100%，填色是累計需覆蓋的比例。數值直接寫在旁邊，長條本身只是視覺輔助。 */}
+          <ul aria-label="各等級累計需覆蓋的要求比例" className="mt-4 space-y-3">
+            {LEVELS.map((item) => (
+              <li key={item.name} className="grid grid-cols-[4.5rem_minmax(0,1fr)_2.75rem] items-center gap-3">
+                <span className="text-xs text-muted">{item.name}</span>
+                <span className="h-4 rounded-r-[4px] bg-accent/15" aria-hidden="true">
+                  <span className="block h-full rounded-r-[4px] bg-accent" style={{ width: `${item.pct}%` }} />
+                </span>
+                <span className="text-right font-mono text-xs text-fg tabular-nums">{item.pct}%</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-faint">長條是累計需覆蓋的要求比例，滿格為 100%，不是漏洞數量。</p>
         </Panel>
 
         <Panel eyebrow="管線原則" title="快，但不能關掉閘門">

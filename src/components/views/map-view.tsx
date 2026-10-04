@@ -40,9 +40,10 @@ export function MapView() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div role="group" aria-label="檢視方式" className="flex flex-wrap gap-2">
         <button
           type="button"
+          aria-pressed={tab === "cross"}
           onClick={() => setTab("cross")}
           className={`min-h-11 rounded-md border px-3 text-sm ${tab === "cross" ? "border-accent bg-accent/15" : "border-line"}`}
         >
@@ -50,6 +51,7 @@ export function MapView() {
         </button>
         <button
           type="button"
+          aria-pressed={tab === "chapters"}
           onClick={() => setTab("chapters")}
           className={`min-h-11 rounded-md border px-3 text-sm ${tab === "chapters" ? "border-accent bg-accent/15" : "border-line"}`}
         >
@@ -67,7 +69,7 @@ export function MapView() {
         />
       </label>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div role="group" aria-label="依閘門篩選" className="flex gap-2 overflow-x-auto pb-1">
         <FilterChip active={gate === "all"} onClick={() => setGate("all")} label="全部" />
         {GATES.map((id) => (
           <FilterChip
@@ -147,6 +149,7 @@ function FilterChip({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={`min-h-11 shrink-0 rounded-md border px-3 font-mono text-xs ${
         active ? "border-accent bg-accent/15 text-fg" : "border-line text-muted"
