@@ -43,6 +43,19 @@ export function parseSearch(search: Record<string, unknown>): AppSearch {
   return { view: view === "overview" ? undefined : view, gate };
 }
 
+export type Track = "設計期" | "白箱" | "黑箱";
+
+/** 每道閘門屬於哪一段：設計期在寫程式前，白箱看原始碼，黑箱打運行中的系統。 */
+export const GATE_TRACK: Record<GateId, Track> = {
+  G0: "設計期",
+  G1: "白箱",
+  G2: "白箱",
+  G3: "白箱",
+  G4: "白箱",
+  G5: "黑箱",
+  G6: "黑箱",
+};
+
 export const GATE_NAME: Record<GateId, string> = {
   G0: "威脅建模",
   G1: "供應鏈",
@@ -211,7 +224,6 @@ export interface GateControl {
 export interface GateDoc {
   id: GateId;
   name: string;
-  track: "設計期" | "白箱" | "黑箱";
   when: string;
   cause: string;
   summary: string;
@@ -225,7 +237,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G0",
     name: "威脅建模",
-    track: "設計期",
     when: "新系統、重大架構變更，或導入 Agent 之前。不掃既有程式碼。",
     cause: "上下文破碎與過度代理。架構一開始就錯，會被 AI 用生成速度複製。",
     summary:
@@ -244,7 +255,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G1",
     name: "相依性與供應鏈",
-    track: "白箱",
     when: "每次提交、套件變動時。必須在安裝之前，因為 postinstall 會在當下執行。",
     cause: "模型統計性地發明不存在的套件名稱。教材引用 USENIX Security 2025：約 19.7% 推薦套件不存在，且約 58% 幻覺名稱會重複，可被搶註。",
     summary:
@@ -263,7 +273,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G2",
     name: "機密與金鑰",
-    track: "白箱",
     when: "pre-commit 與每次推送。PR 可只掃差異，夜間仍要掃完整歷史。",
     cause: "啟用程式碼助手的儲存庫較容易把金鑰寫死，也常忘記 .gitignore。教材引用 GitGuardian：此類儲存庫約 6.4% 含外洩金鑰，約高出四成。",
     summary:
@@ -281,7 +290,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G3",
     name: "靜態分析與 IaC",
-    track: "白箱",
     when: "每次 pull request。單檔規則不夠，因為模型常把來源與匯點拆到不同檔案。",
     cause: "訓練資料讓模型傾向拼接字串，而不是參數化查詢。教材引用 Veracode：AI 生成程式對 XSS 的防禦率約 14%，而 CWE-79 是 MITRE 2025 Top 25 的第一名。",
     summary:
@@ -300,7 +308,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G4",
     name: "架構與存取控制",
-    track: "白箱",
     when: "重大變更與模型生成模組上線前。自動化規則加人工審查，不能只看前端畫面。",
     cause: "授權被做在隱藏按鈕上，後端沒有工作階段或物件層級檢查。Agent 則把刪除與執行直接暴露成工具。",
     summary:
@@ -321,7 +328,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G5",
     name: "動態應用測試",
-    track: "黑箱",
     when: "部署到預備環境之後、上線之前。從外面看真實運行的系統，不看原始碼。",
     cause: "便利設定外溢：Swagger、GraphQL introspection、堆疊追蹤、除錯模式留在正式路徑。授權繞過也只有打到運行中的 API 才算數。",
     summary:
@@ -341,7 +347,6 @@ export const GATE_DOCS: GateDoc[] = [
   {
     id: "G6",
     name: "LLM／Agent 紅隊",
-    track: "黑箱",
     when: "含模型或 Agent 的系統上線前，以及定期複測。傳統 DAST 看不懂自然語言。",
     cause: "直接與間接提示詞注入、模型輸出造成的儲存型 XSS、以及沒有配額時的荷包阻斷。",
     summary:
