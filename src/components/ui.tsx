@@ -112,11 +112,13 @@ export function ToggleRow({
         {hint && <span className="mt-0.5 block text-xs text-muted">{hint}</span>}
       </span>
       <span
-        className={`relative h-6 w-11 shrink-0 rounded-full ${on ? "bg-accent" : "bg-surface-2"}`}
+        className={`relative h-6 w-11 shrink-0 rounded-full ${
+          on ? "bg-accent" : "bg-surface-2 inset-ring inset-ring-line-strong"
+        }`}
         aria-hidden="true"
       >
         <span
-          className={`absolute top-0.5 size-5 rounded-full bg-bg ${on ? "left-5" : "left-0.5"}`}
+          className={`absolute top-0.5 size-5 rounded-full ${on ? "left-5 bg-bg" : "left-0.5 bg-muted"}`}
         />
       </span>
     </button>

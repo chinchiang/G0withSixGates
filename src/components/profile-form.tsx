@@ -45,7 +45,7 @@ export function ProfileForm() {
         <input
           value={profile.name}
           onChange={(event) => patchProfile({ name: event.target.value })}
-          className="mt-1 min-h-11 w-full rounded-md border border-line bg-bg px-3 text-fg"
+          className="mt-1 min-h-11 w-full rounded-md border border-line-strong bg-bg px-3 text-fg"
         />
       </label>
 
