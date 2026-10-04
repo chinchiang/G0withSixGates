@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { getRouteApi } from "@tanstack/react-router";
 import {
   DEFAULT_PROFILE,
   GATE_DOCS,
+  parseProfile,
   type GateId,
   type Profile,
   type ViewId,
@@ -9,6 +11,13 @@ import {
 
 const PROFILE_KEY = "vibegate-profile-v1";
 const CHECK_KEY = "vibegate-checks-v1";
+
+const route = getRouteApi("/");
+
+export interface HarnessRun {
+  profile: Profile;
+  at: Date;
+}
 
 interface AppState {
   view: ViewId;
@@ -21,24 +30,27 @@ interface AppState {
   checks: Record<string, boolean>;
   toggleCheck: (id: string) => void;
   checkProgress: { done: number; total: number };
+  run: HarnessRun | null;
+  startRun: () => void;
+  clearRun: () => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<ViewId>("overview");
-  const [gate, setGate] = useState<GateId>("G0");
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const view = search.view ?? "overview";
+  const gate = search.gate ?? "G0";
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const [run, setRun] = useState<HarnessRun | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Profile>;
-        setProfileState({ ...DEFAULT_PROFILE, ...parsed });
-      }
+      if (raw) setProfileState(parseProfile(JSON.parse(raw)));
       const saved = localStorage.getItem(CHECK_KEY);
       if (saved) setChecks(JSON.parse(saved) as Record<string, boolean>);
     } catch {
@@ -65,12 +77,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
     return {
       view,
-      setView,
+      // gate 留在網址裡，回到閘門頁時仍是上次看的那一道。
+      setView: (next) =>
+        navigate({ search: (prev) => ({ ...prev, view: next === "overview" ? undefined : next }) }),
       gate,
-      openGate: (next) => {
-        setGate(next);
-        setView("gates");
-      },
+      openGate: (next) => navigate({ search: (prev) => ({ ...prev, view: "gates", gate: next }) }),
       profile,
       setProfile: setProfileState,
       patchProfile: (partial) =>
@@ -78,8 +89,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       checks,
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       checkProgress: { done, total },
+      run,
+      startRun: () => setRun({ profile, at: new Date() }),
+      clearRun: () => setRun(null),
     };
-  }, [view, gate, profile, checks]);
+  }, [view, gate, navigate, profile, checks, run]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

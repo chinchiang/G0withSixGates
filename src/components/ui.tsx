@@ -71,6 +71,7 @@ export function Choice({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
         active
@@ -87,11 +88,13 @@ export function ToggleRow({
   label,
   hint,
   on,
+  disabled,
   onChange,
 }: {
   label: string;
   hint?: string;
   on: boolean;
+  disabled?: boolean;
   onChange: (next: boolean) => void;
 }) {
   return (
@@ -99,8 +102,9 @@ export function ToggleRow({
       type="button"
       role="switch"
       aria-checked={on}
+      disabled={disabled}
       onClick={() => onChange(!on)}
-      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line bg-bg-raised px-3 py-2 text-left"
+      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line bg-bg-raised px-3 py-2 text-left disabled:opacity-60"
     >
       <span>
         <span className="block text-sm text-fg">{label}</span>

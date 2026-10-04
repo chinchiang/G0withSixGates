@@ -1,0 +1,243 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import {
+  agencyOpen,
+  buildPlan,
+  recommendLevel,
+  reportMarkdown,
+  trifectaOpen,
+  webSurface,
+  type RunPlan,
+} from "./engine.ts";
+import {
+  DEFECT_STATES,
+  MITIGATIONS,
+  PRESETS,
+  parseProfile,
+  type Exposure,
+  type Mitigation,
+  type Profile,
+  type Sensitivity,
+} from "./model.ts";
+
+const ids = (plan: RunPlan) => plan.steps.flatMap((s) => s.findings.map((item) => item.id));
+const status = (plan: RunPlan, gate: string) => plan.steps.find((s) => s.gate === gate)?.status;
+
+/** 已整治的高權限平台：切斷三要素、破壞性工具改人工核可、所有缺陷修完。 */
+const fixedPlatform: Profile = {
+  ...PRESETS.platform,
+  mitigations: ["egress-list", "hitl"],
+  threatModel: true,
+  diffOnly: false,
+  defects: "none",
+};
+
+function* everyProfile(): Generator<Profile> {
+  const exposures: Exposure[] = ["internal", "partner", "public"];
+  const sensitivities: Sensitivity[] = ["low", "business", "pii"];
+  const subsets: Mitigation[][] = Array.from({ length: 1 << MITIGATIONS.length }, (_, mask) =>
+    MITIGATIONS.filter((_, i) => mask & (1 << i)),
+  );
+  const flags = [
+    "api",
+    "llm",
+    "agent",
+    "privateData",
+    "untrusted",
+    "egress",
+    "destructive",
+    "threatModel",
+    "diffOnly",
+  ] as const;
+  for (const exposure of exposures)
+    for (const sensitivity of sensitivities)
+      for (const mitigations of subsets)
+        for (const defects of DEFECT_STATES)
+          for (let mask = 0; mask < 1 << flags.length; mask++) {
+            const profile: Profile = {
+              ...PRESETS.script,
+              preset: "custom",
+              exposure,
+              sensitivity,
+              mitigations,
+              defects,
+            };
+            flags.forEach((flag, i) => (profile[flag] = Boolean(mask & (1 << i))));
+            yield profile;
+          }
+}
+
+describe("presets", () => {
+  it("keeps the four teaching verdicts", () => {
+    const verdicts = Object.fromEntries(
+      Object.entries(PRESETS).map(([id, p]) => {
+        const plan = buildPlan(p);
+        return [id, `${plan.level}:${plan.release}`];
+      }),
+    );
+    assert.deepEqual(verdicts, {
+      script: "L1:block",
+      kb: "L2:block",
+      platform: "L3:block",
+      hardened: "L2:conditional",
+    });
+  });
+
+  it("hardened only carries depth advisories, and passes once they are fixed", () => {
+    assert.deepEqual(ids(buildPlan(PRESETS.hardened)), ["g3-csp", "g5-rate"]);
+    const plan = buildPlan({ ...PRESETS.hardened, defects: "none" });
+    assert.equal(plan.release, "pass");
+    assert.equal(plan.blockCount + plan.advisoryCount, 0);
+  });
+
+  it("lets a fully remediated high-privilege platform pass at L3", () => {
+    const plan = buildPlan(fixedPlatform);
+    assert.equal(plan.level, "L3");
+    assert.equal(plan.release, "pass", ids(plan).join(","));
+  });
+});
+
+describe("design-time mitigations", () => {
+  it("a sandbox cuts the trifecta but does not replace human approval", () => {
+    const p: Profile = { ...fixedPlatform, mitigations: ["sandbox"] };
+    assert.equal(trifectaOpen(p), false);
+    assert.equal(agencyOpen(p), true);
+    assert.equal(recommendLevel(p).level, "L3");
+    assert.ok(ids(buildPlan(p)).includes("g4-tool"));
+  });
+
+  it("human approval alone does not cut the trifecta", () => {
+    const p: Profile = { ...fixedPlatform, mitigations: ["hitl"] };
+    assert.equal(agencyOpen(p), false);
+    assert.equal(trifectaOpen(p), true);
+    const found = ids(buildPlan(p));
+    assert.ok(found.includes("g0-tri"));
+    assert.ok(found.includes("g6-tri"));
+    assert.ok(!found.includes("g4-tool"));
+  });
+
+  it("the trifecta needs a model or agent", () => {
+    const p: Profile = {
+      ...PRESETS.script,
+      exposure: "public",
+      privateData: true,
+      untrusted: true,
+      egress: true,
+    };
+    assert.equal(trifectaOpen(p), false);
+    assert.equal(recommendLevel(p).level, "L2");
+    assert.ok(!ids(buildPlan(p)).includes("g0-tri"));
+  });
+});
+
+describe("surface and level", () => {
+  it("an internal HTTP API still runs G4 and G5 at L1", () => {
+    const p: Profile = { ...PRESETS.script, api: true };
+    const plan = buildPlan(p);
+    assert.equal(plan.level, "L1");
+    assert.equal(status(plan, "G4"), "block");
+    assert.equal(status(plan, "G5"), "block");
+    const idor = plan.steps.flatMap((s) => s.findings).find((item) => item.id === "g5-idor");
+    assert.match(idor?.tool ?? "", /ZAP/);
+  });
+
+  it("an internal batch job with no API skips G4 and G5", () => {
+    const plan = buildPlan(PRESETS.script);
+    assert.equal(status(plan, "G4"), "na");
+    assert.equal(status(plan, "G5"), "na");
+  });
+
+  it("L3 escalates depth items that L2 only warns about", () => {
+    const l2 = buildPlan(PRESETS.hardened);
+    const l3 = buildPlan({ ...PRESETS.hardened, sensitivity: "pii" });
+    assert.equal(l2.level, "L2");
+    assert.equal(l3.level, "L3");
+    assert.deepEqual(
+      l2.steps.flatMap((s) => s.findings.map((item) => item.severity)),
+      ["advisory", "advisory"],
+    );
+    assert.deepEqual(
+      l3.steps.flatMap((s) => s.findings.map((item) => item.severity)),
+      ["block", "block"],
+    );
+  });
+
+  it("personal data brings in data protection and MFA findings", () => {
+    const found = ids(buildPlan({ ...PRESETS.kb, exposure: "partner", sensitivity: "pii" }));
+    assert.ok(found.includes("g4-pii"));
+    assert.ok(found.includes("g5-mfa"));
+  });
+});
+
+describe("invariants over every profile", () => {
+  it("holds for all combinations", () => {
+    const DEPTH = new Set(["g3-imds", "g3-csp", "g4-rules", "g5-rate", "g6-dow"]);
+    let count = 0;
+    let passWithModel = 0;
+    for (const p of everyProfile()) {
+      count++;
+      const plan = buildPlan(p);
+      const findings = plan.steps.flatMap((s) => s.findings);
+      const label = JSON.stringify(p);
+
+      if (agencyOpen(p)) assert.equal(status(plan, "G4"), "block", label);
+      if (trifectaOpen(p)) {
+        assert.equal(status(plan, "G0"), "block", label);
+        assert.equal(status(plan, "G6"), "block", label);
+      }
+      if (webSurface(p)) {
+        assert.notEqual(status(plan, "G4"), "na", label);
+        assert.notEqual(status(plan, "G5"), "na", label);
+      }
+      if (plan.level === "L3") {
+        for (const item of findings) {
+          if (DEPTH.has(item.id)) assert.equal(item.severity, "block", `${item.id} ${label}`);
+        }
+      }
+      for (const s of plan.steps) {
+        if (s.status === "na") assert.equal(s.findings.length, 0, label);
+        assert.ok(s.logs.length > 0, `${s.gate} has no log ${label}`);
+      }
+      assert.equal(plan.release === "pass", plan.blockCount + plan.advisoryCount === 0, label);
+      if (plan.release === "pass" && p.llm && p.exposure === "public") passWithModel++;
+    }
+    assert.equal(count, 3 * 3 * 8 * 3 * 512);
+    assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
+  });
+});
+
+describe("parseProfile", () => {
+  it("round-trips every preset", () => {
+    for (const p of Object.values(PRESETS)) assert.deepEqual(parseProfile(JSON.parse(JSON.stringify(p))), p);
+  });
+
+  it("migrates the v1 single mitigation and boolean defects", () => {
+    const legacy = { ...PRESETS.platform, mitigations: undefined, mitigation: "sandbox", defects: false };
+    const p = parseProfile(legacy);
+    assert.deepEqual(p.mitigations, ["sandbox"]);
+    assert.equal(p.defects, "depth");
+    assert.equal(parseProfile({ ...legacy, mitigation: "none", defects: true }).defects, "vibe");
+    assert.deepEqual(parseProfile({ ...legacy, mitigation: "none" }).mitigations, []);
+  });
+
+  it("falls back to defaults for broken data", () => {
+    assert.deepEqual(parseProfile(null), PRESETS.kb);
+    const p = parseProfile({ exposure: "galaxy", llm: "yes", mitigations: ["hitl", "magic"] });
+    assert.equal(p.exposure, PRESETS.kb.exposure);
+    assert.equal(p.llm, PRESETS.kb.llm);
+    assert.deepEqual(p.mitigations, ["hitl"]);
+  });
+});
+
+describe("reportMarkdown", () => {
+  it("records the demo notice, run time, inputs and localized statuses", () => {
+    const at = new Date("2026-10-04T02:00:00.000Z");
+    const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at);
+    assert.match(md, /示範模擬/);
+    assert.match(md, /執行時間：2026-10-04T02:00:00\.000Z/);
+    assert.match(md, /設計期緩解：出向 Allow-list/);
+    assert.match(md, /程式狀態：剩縱深項/);
+    assert.match(md, /## G3 靜態分析（白箱／警示）/);
+    assert.doesNotMatch(md, /／(pass|block|advisory|na)）/);
+  });
+});

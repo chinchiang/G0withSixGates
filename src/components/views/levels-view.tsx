@@ -1,4 +1,4 @@
-import { LEVEL_META, STACKS, type Level } from "@/data/model";
+import { ASVS_TOTAL, LEVEL_META, STACKS, type Level } from "@/data/model";
 import { recommendLevel } from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
@@ -35,11 +35,13 @@ export function LevelsView() {
                 <span className="text-sm text-muted">{meta.name}</span>
                 {active && <Badge tone="accent">目前建議</Badge>}
               </div>
-              <p className="mt-2 font-mono text-xs text-faint">
-                {meta.share} · {meta.cumulative}
+              <p className="mt-2 font-mono text-xs text-muted tabular-nums">
+                {level === "L1" ? "" : "再加 "}
+                {meta.count} 項 · 累計 {meta.cumulative}%（共 {ASVS_TOTAL} 項）
               </p>
               <p className="mt-2 text-sm leading-6">{meta.aim}</p>
               <p className="mt-1 text-sm leading-6 text-muted">{meta.who}</p>
+              <p className="mt-2 text-sm leading-6 text-accent">{meta.harness}</p>
             </article>
           );
         })}
