@@ -53,7 +53,7 @@ npm run build      # 產出 .vercel/output（不進版控）
 | `src/components/app-state.tsx` | 共用狀態：網址參數、本機存檔、最近一次執行 |
 | `src/components/views/` | 六個畫面 |
 | `src/styles.css` | 色彩 tokens；`src/styles.test.ts` 檢查文字與元件對比度 |
-| `attachments/` | 參考資料：ASVS 5.0 原文、課程筆記、心智圖 |
+| `attachments/` | 參考資料：ASVS 5.0 原文（docx）與心智圖。兩份課程筆記 PDF 與威脅模型圖 GIF 只留在本機，不進版控 |
 
 ## 平台檔案
 

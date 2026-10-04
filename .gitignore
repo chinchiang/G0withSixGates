@@ -19,3 +19,7 @@ dist/
 # QA 截圖與驗證結果（browser-smoke 會寫到這裡），只保留目錄
 screenshots/*
 !screenshots/.gitkeep
+
+# 大型參考附件（課程筆記 PDF、威脅模型圖）只留在本機；ASVS 原文 docx 與心智圖仍在版控
+attachments/*.pdf
+attachments/*.gif
