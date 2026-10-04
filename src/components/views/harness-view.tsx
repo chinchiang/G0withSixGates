@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Download, Play, Square, X } from "lucide-react";
 import { GATE_NAME, type GateId } from "@/data/model";
 import {
@@ -24,6 +24,8 @@ export function HarnessView() {
   const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reduced, setReduced] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [revealTick, setRevealTick] = useState(0);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -49,7 +51,16 @@ export function HarnessView() {
     setVisible(0);
     setOpenId(null);
     setRunning(true);
+    setRevealTick((value) => value + 1);
   }
+
+  // 單欄版面（手機）的結果在長表單下方，按下執行後帶使用者過去；並排時結果本來就看得到，不捲動。
+  // 要等這次渲染把閘門列表放進去才捲，否則頁面還不夠高，捲動會被截在底部。
+  useEffect(() => {
+    const el = resultsRef.current;
+    if (!revealTick || !el || el.getBoundingClientRect().top <= window.innerHeight / 2) return;
+    el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  }, [revealTick, reduced]);
 
   function stop() {
     clearRun();
@@ -109,7 +120,10 @@ export function HarnessView() {
           </div>
         </Panel>
 
-        <div className="space-y-3">
+        <div
+          ref={resultsRef}
+          className={`scroll-mt-20 space-y-3 ${phase === "idle" ? "" : "min-h-[calc(100svh-5rem)] lg:min-h-0"}`}
+        >
           {phase === "done" && plan && (
             <div
               className={`rounded-lg border px-4 py-3 ${
@@ -219,7 +233,9 @@ function FindingCard({
         onClick={onToggle}
         className="flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left"
       >
-        <Badge tone={finding.severity}>{STATUS_LABEL[finding.severity]}</Badge>
+        <span className="shrink-0">
+          <Badge tone={finding.severity}>{STATUS_LABEL[finding.severity]}</Badge>
+        </span>
         <span className="text-sm">{finding.title}</span>
         <span className={`ml-auto shrink-0 pt-0.5 text-xs ${cov.caught ? "text-muted" : "text-accent"}`}>
           {cov.caught ? "管線已涵蓋" : "管線會漏掉"}
