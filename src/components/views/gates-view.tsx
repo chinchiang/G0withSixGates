@@ -27,11 +27,12 @@ export function GatesView() {
         </p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <nav aria-label="閘門" className="flex gap-2 overflow-x-auto pb-1">
         {GATES.map((id) => (
           <button
             key={id}
             type="button"
+            aria-current={id === doc.id ? "page" : undefined}
             onClick={() => openGate(id)}
             className={`min-h-11 shrink-0 rounded-md border px-3 font-mono text-sm ${
               id === doc.id ? "border-accent bg-accent/15 text-fg" : "border-line text-muted"
@@ -40,7 +41,7 @@ export function GatesView() {
             {id} {GATE_NAME[id]}
           </button>
         ))}
-      </div>
+      </nav>
 
       <Panel
         eyebrow={`${doc.id} · ${doc.track}`}
