@@ -1,4 +1,4 @@
-# 六扇門（VibeGate）
+# 六扇門（Six-Gate for Vibe Code）
 
 把 Vibe Coding 的資安測試整理成「G0 威脅建模 + G1–G6 六道閘門」的互動教學工具，對齊 OWASP ASVS 5.0.0。設計期、白箱、黑箱與 AI 紅隊各有一道關卡，Harness 把它們串成一次放行裁決。
 
