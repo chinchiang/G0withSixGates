@@ -1,4 +1,11 @@
 /**
+ * 正式建置的安全標頭。
+ * `vite.config.ts` 把 `vercelHeaderRoute()` 放到 Vercel 輸出設定最前面，所有回應（含靜態資源）都套用，
+ * 開發伺服器與 Grok 即時預覽不受影響。兩個 CSP 標頭是刻意的：`Content-Security-Policy` 只強制
+ * 不影響資源載入的結構性指令；資源限制走 `Content-Security-Policy-Report-Only`，因為 Grok 標章腳本
+ * 的內容無法事先檢視。上線後確認標章正常、console 沒有 CSP 報告，再把 `ENFORCE_RESOURCE_POLICY` 改成 true。
+ * `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁不同，無法用雜湊放行。
+ *
  * Security headers for the production build.
  *
  * `vite.config.ts` prepends `vercelHeaderRoute()` to the Vercel build output

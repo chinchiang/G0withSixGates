@@ -40,6 +40,9 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "off",
+      // 平台檔案 src/lib/app-data/client.server.ts 有空的 catch；不改平台檔案，改規則。
+      // The platform file src/lib/app-data/client.server.ts has an empty catch; adjust the rule, not the platform file.
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
   // Disable rules that conflict with Prettier formatting.

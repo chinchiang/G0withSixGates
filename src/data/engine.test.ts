@@ -7,6 +7,7 @@ import {
   caughtBy,
   coverage,
   recommendLevel,
+  reportFileName,
   reportMarkdown,
   trifectaOpen,
   webSurface,
@@ -28,7 +29,10 @@ import {
 const ids = (plan: RunPlan) => plan.steps.flatMap((s) => s.findings.map((item) => item.id));
 const status = (plan: RunPlan, gate: string) => plan.steps.find((s) => s.gate === gate)?.status;
 
-/** 已整治的高權限平台：切斷三要素、破壞性工具改人工核可、所有缺陷修完。 */
+/**
+ * 已整治的高權限平台：切斷三要素、破壞性工具改人工核可、所有缺陷修完。
+ * A remediated high-privilege platform: trifecta cut, destructive tools behind human approval, every defect fixed.
+ */
 const fixedPlatform: Profile = {
   ...PRESETS.platform,
   mitigations: ["egress-list", "hitl"],
@@ -143,7 +147,7 @@ describe("surface and level", () => {
     assert.equal(status(plan, "G4"), "block");
     assert.equal(status(plan, "G5"), "block");
     const idor = plan.steps.flatMap((s) => s.findings).find((item) => item.id === "g5-idor");
-    assert.match(idor?.tool ?? "", /ZAP/);
+    assert.match(idor?.tool.en ?? "", /ZAP/);
   });
 
   it("an internal batch job with no API skips G4 and G5", () => {
@@ -212,11 +216,13 @@ describe("invariants over every profile", () => {
     assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
 
     // 每個可能出現的發現都有控制項攔得下，對照表也沒有過期的條目。
+    // Every finding that can appear has a catching control, and the map carries no stale entries.
     const controlIds = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
     for (const id of produced) {
       const controls = catchingControls(id);
       assert.ok(controls.length > 0, `${id} has no catching control`);
-      for (const item of controls) assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
+      for (const item of controls)
+        assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
     }
     assert.deepEqual(Object.keys(FINDING_CONTROLS).sort(), [...produced].sort());
   });
@@ -232,30 +238,44 @@ describe("pipeline coverage", () => {
   });
 
   it("any one checked control covers a finding, including cross-gate pairs", () => {
-    const byId = new Map(coverage(plan, { "g2-push": true, "g5-bola": true }).map((c) => [c.finding.id, c]));
+    const byId = new Map(
+      coverage(plan, { "g2-push": true, "g5-bola": true }).map((c) => [c.finding.id, c]),
+    );
     assert.equal(byId.get("g2-key")?.caught, true);
     assert.equal(byId.get("g4-bola")?.caught, true);
     assert.equal(byId.get("g5-idor")?.caught, true);
     assert.equal(byId.get("g3-xss")?.caught, false);
     assert.deepEqual(
       byId.get("g2-key")?.controls.map((c) => [c.id, c.checked]),
-      [["g2-hook", false], ["g2-push", true]],
+      [
+        ["g2-hook", false],
+        ["g2-push", true],
+      ],
     );
   });
 
   it("finds what a control catches in the run", () => {
-    assert.deepEqual(caughtBy(plan, "g5-bola").map((f) => f.id), ["g4-bola", "g5-idor"]);
+    assert.deepEqual(
+      caughtBy(plan, "g5-bola").map((f) => f.id),
+      ["g4-bola", "g5-idor"],
+    );
     assert.deepEqual(caughtBy(plan, "g1-sbom"), []);
   });
 });
 
 describe("parseProfile", () => {
   it("round-trips every preset", () => {
-    for (const p of Object.values(PRESETS)) assert.deepEqual(parseProfile(JSON.parse(JSON.stringify(p))), p);
+    for (const p of Object.values(PRESETS))
+      assert.deepEqual(parseProfile(JSON.parse(JSON.stringify(p))), p);
   });
 
   it("migrates the v1 single mitigation and boolean defects", () => {
-    const legacy = { ...PRESETS.platform, mitigations: undefined, mitigation: "sandbox", defects: false };
+    const legacy = {
+      ...PRESETS.platform,
+      mitigations: undefined,
+      mitigation: "sandbox",
+      defects: false,
+    };
     const p = parseProfile(legacy);
     assert.deepEqual(p.mitigations, ["sandbox"]);
     assert.equal(p.defects, "depth");
@@ -273,9 +293,14 @@ describe("parseProfile", () => {
 });
 
 describe("reportMarkdown", () => {
+  const at = new Date("2026-10-04T02:00:00.000Z");
+
   it("records the demo notice, run time, inputs and localized statuses", () => {
-    const at = new Date("2026-10-04T02:00:00.000Z");
-    const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at, { "g3-csp": true });
+    const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at, {
+      "g3-csp": true,
+    });
+    assert.match(md, /^# 六扇門放行紀錄/);
+    assert.doesNotMatch(md, /六道閘門|VIBEGATE|vibegate/i);
     assert.match(md, /示範模擬/);
     assert.match(md, /執行時間：2026-10-04T02:00:00\.000Z/);
     assert.match(md, /設計期緩解：出向 Allow-list/);
@@ -286,5 +311,35 @@ describe("reportMarkdown", () => {
     assert.match(md, /你們的管線：會漏掉（✗ G5 /);
     assert.match(md, /## 你們的管線缺口/);
     assert.match(md, /本次 2 個發現中，有 1 個可能會漏掉/);
+  });
+
+  it("writes the whole record in English when asked", () => {
+    const md = reportMarkdown(
+      PRESETS.hardened,
+      buildPlan(PRESETS.hardened),
+      at,
+      { "g3-csp": true },
+      "en",
+    );
+    assert.match(md, /^# Six-Gate release record/);
+    assert.match(md, /Demo simulation/);
+    assert.match(md, /- System: Remediated support knowledge base/);
+    assert.match(md, /Design-time mitigations: Egress allow-list/);
+    assert.match(md, /## G3 Static analysis \(White-box \/ Advisory\)/);
+    assert.match(md, /Your pipeline: covered \(✓ G3 CSP/);
+    assert.match(md, /1 of the 2 findings this run may slip through/);
+    // 沒有殘留的中文。 No Chinese left over.
+    assert.doesNotMatch(md, /[\u4e00-\u9fff]/);
+  });
+
+  it("prints the trifecta fields as not applicable when there is no model or agent", () => {
+    const md = reportMarkdown(PRESETS.script, buildPlan(PRESETS.script), at, {});
+    assert.match(md, /私有資料：不適用；不受信任內容：不適用；對外通訊：不適用/);
+    const en = reportMarkdown(PRESETS.script, buildPlan(PRESETS.script), at, {}, "en");
+    assert.match(en, /Private data: n\/a; Untrusted content: n\/a; Egress: n\/a/);
+  });
+
+  it("names the download after the project and the run date", () => {
+    assert.equal(reportFileName(at), "six-gate-release-2026-10-04.md");
   });
 });

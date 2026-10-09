@@ -49,7 +49,8 @@
   --color-muted: #93a196;
   --color-faint: #7f8f85;
   --color-line: #314038;
-  /* 輸入框、核取方塊與關閉狀態開關的邊界：對所有底色至少 3:1（WCAG 1.4.11）。 */
+  /* 輸入框、核取方塊與關閉狀態開關的邊界：對所有底色至少 3:1（WCAG 1.4.11）。
+     Borders of inputs, checkboxes and the off-state switch: at least 3:1 on every background (WCAG 1.4.11). */
   --color-line-strong: #63746b;
   --color-accent: #e8b86d;
   --color-accent-ink: #1a1408;
@@ -81,6 +82,11 @@
   }
   p {
     text-wrap: pretty;
+  }
+  /* 瀏覽器預設 fieldset 的 min-inline-size 是 min-content，長英文選項會把手機版撐出橫向捲軸。
+     Browsers default fieldset to min-inline-size: min-content; long English options would force a horizontal scroll on phones. */
+  fieldset {
+    min-inline-size: 0;
   }
 }
 
