@@ -1,21 +1,23 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { APP_DESCRIPTION, APP_TITLE } from "@/brand";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "六道閘門";
-
+/**
+ * 文件殼：head、樣式、<PreviewHostBridge />、<AuthProvider>。
+ * `lang` 在伺服器端固定為 zh-Hant，切換語系後由 AppStateProvider 在瀏覽器端改寫。
+ *
+ * Document shell: head, styles, <PreviewHostBridge />, <AuthProvider>.
+ * `lang` is zh-Hant on the server; AppStateProvider rewrites it in the browser when the locale changes.
+ */
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: APP_NAME },
-      {
-        name: "description",
-        content:
-          "Vibe Coding 白箱、黑箱與 AI 紅隊的六道資安閘門。Harness 包住 G0 到 G6，對齊 OWASP ASVS 5.0。",
-      },
+      { title: APP_TITLE },
+      { name: "description", content: `${APP_DESCRIPTION.zh} ${APP_DESCRIPTION.en}` },
       { name: "theme-color", content: "#101410" },
     ],
     links: [

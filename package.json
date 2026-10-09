@@ -1,6 +1,11 @@
 {
-  "name": "app-builder-workspace",
+  "name": "six-gate-for-vibe-code",
+  "version": "1.0.0",
+  "description": "六扇門 Six-Gate for Vibe Code: G0 threat modeling plus six security gates (G1-G6) for vibe-coded software, with a demo Harness aligned with OWASP ASVS 5.0.0.",
   "private": true,
+  "engines": {
+    "node": ">=22.6"
+  },
   "sideEffects": [
     "./src/zod-jitless.ts"
   ],

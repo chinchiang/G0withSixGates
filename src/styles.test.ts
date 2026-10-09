@@ -15,7 +15,10 @@ function color(name: string): Rgb {
   return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
 }
 
-/** Tailwind 的 bg-x/10、bg-x/15 是帶透明度的顏色；瀏覽器在 sRGB 疊色。 */
+/**
+ * Tailwind 的 bg-x/10、bg-x/15 是帶透明度的顏色；瀏覽器在 sRGB 疊色。
+ * Tailwind's bg-x/10 and bg-x/15 are translucent colours; browsers composite them in sRGB.
+ */
 function over(top: Rgb, alpha: number, base: Rgb): Rgb {
   return top.map((v, i) => alpha * v + (1 - alpha) * base[i]) as Rgb;
 }
@@ -41,7 +44,10 @@ const signal = color("signal");
 const accentBanner = over(accent, 0.1, bg);
 const signalBanner = over(signal, 0.1, bg);
 
-/** 介面上實際出現的文字色與底色組合（含疊色）。新增組合時一起補在這裡。 */
+/**
+ * 介面上實際出現的文字色與底色組合（含疊色）。新增組合時一起補在這裡。
+ * Every text/background pair that actually appears in the UI (tints included). Add new pairs here as they appear.
+ */
 const PAIRS: [string, Rgb, Rgb][] = [
   ...(["fg", "muted", "faint", "accent"] as const).flatMap((text) =>
     (
@@ -84,7 +90,10 @@ describe("text contrast", () => {
   });
 });
 
-/** 元件邊界與狀態指示（WCAG 1.4.11）：至少 3:1。 */
+/**
+ * 元件邊界與狀態指示（WCAG 1.4.11）：至少 3:1。
+ * Component boundaries and state indicators (WCAG 1.4.11): at least 3:1.
+ */
 const COMPONENT_PAIRS: [string, Rgb, Rgb][] = [
   ["輸入框邊框 on bg", color("line-strong"), bg],
   ["輸入框邊框 on surface", color("line-strong"), surface],

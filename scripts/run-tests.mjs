@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 /**
+ * 跑完所有測試組，任何一組失敗就以非 0 結束。
+ * 各組獨立執行，一組失敗不會蓋掉另一組。以前用 `&&` 串接會停在第一個失敗的組，
+ * `src/` 下的 TypeScript 測試就靜靜地從沒跑過。
+ * `scripts/grok-pwa-plugin.test.mjs` 會讀工作目錄的 `src/lib/og/site.json` 與 `public/og.*`
+ * 並斷言模板預設值；有自訂標題或分享卡片的 app 會讓它失敗，所以改在空目錄執行。
+ * 該檔是平台檔案，這裡不改它。`src/` 下新增的 `*.test.ts` 會自動被找到，不用動 package.json。
+ *
  * Run every test suite and exit non-zero if any of them fails.
  *
  * Suites run independently, so a failure in one never hides another. Chaining

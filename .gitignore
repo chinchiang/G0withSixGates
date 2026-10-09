@@ -5,21 +5,25 @@ node_modules/
 .env.*
 
 # 建置輸出：部署時平台會重新執行 npm run build
+# Build output: the platform reruns npm run build on deploy
 .vercel/
 .output/
 .nitro/
 dist/
 
 # 本機與沙箱的執行期產物
+# Local and sandbox runtime artifacts
 .node_modules.lock
 .grok/preview.log
 .grok/status
 .grok/og-pending
 
 # QA 截圖與驗證結果（browser-smoke 會寫到這裡），只保留目錄
+# QA screenshots and verdicts (browser-smoke writes here); keep only the directory
 screenshots/*
 !screenshots/.gitkeep
 
 # 大型參考附件（課程筆記 PDF、威脅模型圖）只留在本機；ASVS 原文 docx 與心智圖仍在版控
+# Large reference attachments (course PDFs, threat-model GIF) stay local; the ASVS docx and mind map are tracked
 attachments/*.pdf
 attachments/*.gif

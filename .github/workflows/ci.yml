@@ -1,0 +1,25 @@
+# 持續整合：型別檢查、lint、測試、建置。平台部署另外在 Vercel 執行 npm run build。
+# Continuous integration: typecheck, lint, tests, build. The platform deploy runs npm run build on Vercel separately.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # 建置會接著跑 db:migrate；沒有 DATABASE_URL 時 migrate 腳本會略過。
+      # build chains db:migrate; without DATABASE_URL the migrate script skips.
+      - run: npm run build

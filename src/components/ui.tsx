@@ -1,6 +1,12 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { GateStatus, Severity } from "@/data/model";
 
+/**
+ * 基礎元件：Panel、Badge、Choice、ToggleRow 與兩種按鈕。不含任何文字，文字由呼叫端依語系傳入。
+ * Base components: Panel, Badge, Choice, ToggleRow and two buttons. They carry no text of their own;
+ * callers pass localized strings.
+ */
+
 export function Panel({
   eyebrow,
   title,
@@ -33,7 +39,7 @@ export function Panel({
 }
 
 const TONE: Record<string, string> = {
-  // 底色只疊 10%：疊 15% 會讓紅字在卡片上低於 4.5:1。
+  // 底色只疊 10%：疊 15% 會讓紅字在卡片上低於 4.5:1。 Only a 10% tint: 15% drops the red text below 4.5:1 on cards.
   block: "bg-signal/10 text-signal border-signal/40",
   advisory: "bg-accent/15 text-accent border-accent/40",
   pass: "bg-surface-2 text-fg border-line",
