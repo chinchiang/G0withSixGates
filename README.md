@@ -13,81 +13,94 @@ An interactive teaching tool that organizes security testing for vibe coding int
 
 ## 🏛️ 系統架構與流程 / Architecture Overview
 
-整個系統跑在瀏覽器裡：TanStack Start 負責殼與路由，`app-state.tsx` 管狀態，`model.ts` 放內容，`engine.ts` 是 Harness 的純函式規則引擎。沒有自己的 API、沒有模型呼叫、不掃描任何真實系統；部署時由 Nitro 做伺服器端渲染，並載入平台的 PWA 中介層（`server/`）。
+整個 App 在瀏覽器裡執行：伺服器端只負責 SSR 與平台的 PWA 中介層，沒有自己的 API、沒有模型呼叫，也不掃描任何真實系統。下圖由上而下是一次請求經過的五層，灰色是平台元件，米色是資料與輸出。
 
-Everything runs in the browser: TanStack Start provides the shell and routing, `app-state.tsx` holds state, `model.ts` holds content and `engine.ts` is the Harness's pure-function rule engine. There is no API of its own, no model call and no real scanning; on deploy Nitro renders server-side and loads the platform's PWA middleware (`server/`).
+The app runs in the browser: the server side only does SSR plus the platform's PWA middleware. There is no API of its own, no model call and no real scanning. Top to bottom, the diagram shows the five layers a request passes through; grey boxes are platform components, beige boxes are data and output.
 
 ```mermaid
-flowchart TD
-    ROOT["文件殼 Document shell<br/>src/routes/__root.tsx（PreviewHostBridge、AuthProvider）"] --> IDX["首頁路由 Index route<br/>src/routes/index.tsx（?view=&amp;gate=&amp;lang= 由 parseSearch 驗證）"]
-    IDX --> SHELL["AppShell：側欄／底部導覽切換六個畫面，標頭切換語言<br/>src/components/shell.tsx"]
+flowchart TB
+    USER(["使用者瀏覽器<br/>User browser"])
 
-    subgraph STATE ["共用狀態 Shared state：src/components/app-state.tsx + storage.ts"]
-        URL["網址 search<br/>view、gate、lang"]
-        LS["localStorage<br/>six-gate-profile-v1（受測系統）<br/>six-gate-checks-v1（閘門勾選）<br/>six-gate-locale（語系）<br/>首次載入自動搬移舊的 vibegate-* 鍵"]
-        RUN["最近一次執行 run<br/>plan = buildPlan(run.profile)"]
+    subgraph DEPLOY["① 部署 Deploy"]
+        direction LR
+        HDR["安全標頭 Security headers<br/>scripts/security-headers.mjs<br/>（Vercel 路由，只在正式建置）"]
+        NITRO["Vercel＋Nitro SSR<br/>vite build＋vercel preset"]
+        PWA["平台中介層 Platform middleware<br/>server/middleware/grok-pwa.ts<br/>PWA／OG／manifest"]
+        HDR --> NITRO --> PWA
     end
 
-    subgraph I18N ["雙語 Bilingual：src/i18n/"]
-        BI["Bi = { zh, en }<br/>bi()、pick()、joinList()"]
-        CTX["LocaleProvider／useT()"]
+    subgraph ROUTE["② 路由 Routing"]
+        direction LR
+        ROUTER["src/router.tsx<br/>getRouter()<br/>錯誤／找不到畫面"]
+        ROOT["src/routes/__root.tsx<br/>head（brand.ts）<br/>PreviewHostBridge"]
+        INDEX["src/routes/index.tsx<br/>parseSearch：view／gate／lang"]
+        ROUTER --> ROOT --> INDEX
     end
 
-    subgraph VIEWS ["六個畫面 Six views：src/components/views/"]
-        OV["總覽 Overview overview.tsx"]
-        HV["管線 Pipeline harness-view.tsx<br/>ProfileForm → 執行 Harness → 逐道閘門亮起 → 裁決與缺口"]
-        GV["閘門 Gates gates-view.tsx<br/>G0–G6 控制項勾選、MAESTRO、G1 四層"]
-        LV["分級 Levels levels-view.tsx"]
-        MV["對照 Map map-view.tsx<br/>白箱／黑箱雙向對照、ASVS 十七章"]
-        TV["工具 Tools tools-view.tsx"]
+    subgraph STATE["③ 狀態 State"]
+        direction LR
+        APP["AppStateProvider<br/>app-state.tsx<br/>（只在瀏覽器 browser only）"]
+        URLS[("網址 URL<br/>?view ?gate ?lang")]
+        STORE[("localStorage<br/>storage.ts<br/>six-gate-profile／checks／locale<br/>舊 vibegate-* 自動搬移")]
+        LOC["LocaleProvider／useT()<br/>src/i18n/context.tsx"]
+        URLS <--> APP
+        APP <--> STORE
+        APP --> LOC
     end
 
-    SHELL --> VIEWS
-    VIEWS <--> STATE
-    VIEWS --> CTX
-
-    subgraph MODEL ["內容與資料 Content：src/data/model.ts（全部 Bi）"]
-        PRESET["預設情境 PRESETS／PRESET_NAME"]
-        DOCS["閘門文件 GATE_DOCS"]
-        FC["FINDING_CONTROLS<br/>發現 → 攔得下它的控制項"]
-        REF["CHAPTERS／MAP_ROWS／工具卡／LEVEL_META／MAESTRO"]
+    subgraph UI["④ 介面 UI"]
+        direction LR
+        SHELL["AppShell<br/>shell.tsx<br/>導覽＋中文／EN 切換"]
+        FORM["ProfileForm<br/>受測系統設定"]
+        VIEWS["六個畫面 Six views<br/>總覽・管線・閘門・分級・對照・工具"]
+        SHELL --> VIEWS
+        VIEWS --> FORM
     end
 
-    subgraph ENGINE ["Harness 規則引擎 Rule engine：src/data/engine.ts（示範模擬，純函式）"]
-        LVL["分級 recommendLevel"]
-        PLAN["buildPlan：依序產生七個 GateStep"]
-        VERDICT["裁決 release<br/>放行／有條件放行／阻擋合併"]
-        COV["coverage／caughtBy<br/>對照閘門頁勾選 → 你們的管線缺口"]
-        REPORT["reportMarkdown(…, locale)<br/>six-gate-release-YYYY-MM-DD.md"]
-        LVL --> PLAN --> VERDICT
-        VERDICT --> COV
-        VERDICT --> REPORT
+    subgraph DOMAIN["⑤ 規則 Rules"]
+        direction LR
+        MODEL["model.ts<br/>閘門・控制項・ASVS・預設情境<br/>全部 Bi＝{ zh, en }"]
+        ENGINE["engine.ts（純函式示範模擬）<br/>recommendLevel → buildPlan<br/>→ 裁決 verdict → coverage"]
+        BI["src/i18n/locale.ts<br/>bi()・pick()・joinList()"]
+        BI --> MODEL --> ENGINE
     end
 
-    PRESET --> HV
-    DOCS --> GV
-    MODEL --> ENGINE
-    BI --> MODEL
-    BI --> ENGINE
-    RUN -- "profile" --> LVL
-    LS -- "checks" --> COV
-    FC --> COV
-    COV --> HV
-    COV --> GV
-    REPORT -- "下載紀錄 Download" --> HV
+    OUT[/"放行紀錄 Release record<br/>six-gate-release-YYYY-MM-DD.md<br/>中文或英文 zh／en"/]
 
-    subgraph BUILD ["建置、測試與部署 Build, test, deploy"]
-        VITE["vite.config.ts<br/>TanStack Start、Tailwind v4、grokPwaPlugin，build 時加 Nitro vercel preset"]
-        HDR["scripts/security-headers.mjs<br/>CSP 強制結構性政策＋Report-Only 資源政策"]
-        OUT["npm run build → .vercel/output → Vercel（接著跑 db:migrate）"]
-        TEST["npm test → scripts/run-tests.mjs<br/>engine／model／storage／locale／styles 測試＋scripts/*.test.mjs＋src/lib 平台測試"]
-        CI[".github/workflows/ci.yml<br/>typecheck → lint → test → build"]
-        VITE --> OUT
-        HDR --> OUT
-    end
+    USER -- "HTTPS 請求 request" --> DEPLOY
+    DEPLOY -- "HTML＋JS" --> ROUTE
+    INDEX --> APP
+    LOC --> SHELL
+    APP -- "profile・checks・plan" --> UI
+    FORM -- "執行 Harness Run" --> APP
+    APP -- "buildPlan(profile)" --> ENGINE
+    ENGINE -- "steps・findings・coverage" --> VIEWS
+    VIEWS -- "reportMarkdown(…, locale)" --> OUT
 
-    ENGINE -. 測試 tests .-> TEST
+    classDef platform fill:#eef0f2,stroke:#8a949c,color:#333
+    classDef store fill:#fff6e0,stroke:#c9a14a,color:#333
+    class HDR,NITRO,PWA platform
+    class URLS,STORE,OUT store
 ```
+
+**流程 / Flow**
+
+1. **部署 Deploy**：Vercel 回應前先套用安全標頭（只在正式建置），Nitro 做 SSR，平台中介層注入 PWA 與分享卡片標記。
+   Vercel applies the security headers (production builds only), Nitro renders server-side, and the platform middleware injects PWA and share-card tags.
+2. **路由 Routing**：`getRouter()` 掛上錯誤與找不到畫面；`__root.tsx` 輸出 head 與 `PreviewHostBridge`；`index.tsx` 以 `parseSearch` 只留下合法的 `view`、`gate`、`lang`。
+   `getRouter()` wires the error and not-found screens; `__root.tsx` renders the head and `PreviewHostBridge`; `index.tsx` keeps only valid `view`, `gate` and `lang` via `parseSearch`.
+3. **狀態 State**：`AppStateProvider` 讀寫網址參數，經 `storage.ts` 安全讀寫 localStorage（含舊 `vibegate-*` 鍵搬移），並決定語系交給 `LocaleProvider`。
+   `AppStateProvider` reads and writes the URL params, persists to localStorage through `storage.ts` (including the `vibegate-*` migration), and hands the locale to `LocaleProvider`.
+4. **介面 UI**：`AppShell` 提供導覽與中文／EN 切換；在「管線」畫面按下執行 Harness，`ProfileForm` 的設定交回狀態層。
+   `AppShell` provides navigation and the 中文 / EN switch; pressing Run on the Pipeline view sends the `ProfileForm` settings back to state.
+5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決，`coverage` 對照閘門頁勾選算出管線缺口；內容全部來自 `model.ts` 的雙語 `Bi`。
+   `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict, and `coverage` compares them with the gates-page checks to find pipeline gaps; all content is bilingual `Bi` from `model.ts`.
+6. **輸出 Output**：`reportMarkdown(…, locale)` 依目前語系產生 `six-gate-release-YYYY-MM-DD.md` 供下載。
+   `reportMarkdown(…, locale)` writes `six-gate-release-YYYY-MM-DD.md` in the current locale for download.
+
+> Harness 的發現項與證據是依情境產生的教學範例，實際放行要接你們自己的 SAST、SCA、DAST 與紅隊結果。
+>
+> Harness findings and evidence are teaching examples; a real release plugs in your own SAST, SCA, DAST and red-team results.
 
 ## 畫面 / Views
 
@@ -134,79 +147,100 @@ The rules live in `src/data/engine.ts`:
 
 ## 📦 目錄結構 / Directory layout
 
-儲存庫名稱仍是 `G0withSixGates`，產品名稱是「六扇門 Six-Gate for Vibe Code」（`package.json` 的 name 為 `six-gate-for-vibe-code`）。
+儲存庫名稱仍是 `G0withSixGates`，產品名稱是「六扇門 Six-Gate for Vibe Code」（`package.json` 的 name 為 `six-gate-for-vibe-code`）。下圖米色是本專案自己的程式，灰色是 Grok App Builder 平台檔案（不要刪改）。
 
-The repository is still called `G0withSixGates`; the product is "六扇門 Six-Gate for Vibe Code" (`package.json` name `six-gate-for-vibe-code`).
+The repository is still called `G0withSixGates`; the product is "六扇門 Six-Gate for Vibe Code" (`package.json` name `six-gate-for-vibe-code`). Beige boxes are this project's own code; grey boxes are Grok App Builder platform files (do not delete or rewrite them).
+
+```mermaid
+flowchart LR
+    ROOT["G0withSixGates/"]
+
+    ROOT --> SRC["src/<br/>應用程式 App"]
+    ROOT --> SCRIPTS["scripts/<br/>建置・測試・工具"]
+    ROOT --> PUBLIC["public/<br/>靜態資源"]
+    ROOT --> SERVER["server/<br/>Nitro 中介層"]
+    ROOT --> CFG["根目錄設定 Root config<br/>package.json・vite.config.ts<br/>tsconfig.json・vercel.json<br/>eslint.config.mjs・.prettierrc"]
+    ROOT --> META["專案資料 Project files<br/>README.md・.github/workflows/ci.yml<br/>attachments/・screenshots/"]
+    ROOT --> GROK["平台 Platform<br/>AGENTS.md・.grok/<br/>startup.sh・migrations/"]
+
+    SRC --> ROUTES["routes/<br/>__root.tsx・index.tsx"]
+    SRC --> COMP["components/<br/>shell・app-state・storage<br/>profile-form・ui<br/>preview-host-bridge（平台）"]
+    COMP --> VIEWSD["views/<br/>overview・harness-view・gates-view<br/>levels-view・map-view・tools-view"]
+    SRC --> DATA["data/<br/>model.ts・engine.ts<br/>＋測試 tests"]
+    SRC --> I18N["i18n/<br/>locale.ts・context.tsx"]
+    SRC --> LIBA["lib/（本專案 app）<br/>error-component.tsx<br/>not-found-component.tsx<br/>og/site.json"]
+    SRC --> LIBP["lib/（平台 platform）<br/>auth/・app-data/・multiplayer/<br/>db.ts・env.server.ts<br/>preview-host-bridge.ts・preview-embedder-origin.ts"]
+    SRC --> SRCROOT["brand.ts・router.tsx<br/>styles.css・styles.test.ts<br/>routeTree.gen.ts・zod-jitless.ts"]
+
+    SCRIPTS --> SAPP["本專案 App<br/>run-tests.mjs<br/>security-headers.mjs<br/>og-card.mjs"]
+    SCRIPTS --> SPLAT["平台 Platform<br/>grok-pwa-plugin・grok-pwa-shared<br/>with-app-env・app-env-plugin<br/>browser-smoke・browser-guard・preview<br/>migrate・migration-plan・brand-check<br/>check-auth-invariant・sign-out-plan・write-atomic"]
+
+    PUBLIC --> PUB1["favicon.svg・og.jpg<br/>fonts/（IBM Plex）"]
+    PUBLIC --> PUB2["__grok/（平台 platform）"]
+
+    SERVER --> SRV1["middleware/grok-pwa.ts<br/>virtual-grok-og-identity.d.ts"]
+
+    classDef platform fill:#eef0f2,stroke:#8a949c,color:#333
+    classDef app fill:#fff6e0,stroke:#c9a14a,color:#333
+    class GROK,LIBP,SPLAT,PUB2,SERVER,SRV1 platform
+    class ROUTES,COMP,VIEWSD,DATA,I18N,LIBA,SRCROOT,SAPP,PUB1 app
+```
+
+<details>
+<summary>完整檔案清單 / Full file list</summary>
 
 ```text
 G0withSixGates/
-├── src/
-│   ├── brand.ts                    # 專案名稱與一句話說明 / project name and one-line description
-│   ├── i18n/
-│   │   ├── locale.ts               # Bi 型別、bi()、pick()、joinList() 等 / Bi type and helpers
-│   │   ├── locale.test.ts
-│   │   └── context.tsx             # LocaleProvider、useLocale()、useT()
-│   ├── routes/
-│   │   ├── __root.tsx              # 文件殼 / document shell：head、樣式、<PreviewHostBridge />、<AuthProvider>
-│   │   └── index.tsx               # 唯一頁面 / the single page；parseSearch 驗證 ?view=&gate=&lang=
-│   ├── components/
-│   │   ├── shell.tsx               # AppShell：標頭、語言切換、側欄與底部導覽 / header, language switch, nav
-│   │   ├── app-state.tsx           # 共用狀態 / shared state：網址參數、localStorage、最近一次執行與 plan
-│   │   ├── storage.ts(.test.ts)    # 安全的 localStorage 讀寫與 vibegate-* → six-gate-* 搬移 / safe storage + migration
-│   │   ├── profile-form.tsx        # 受測系統設定表單 / system-under-test form
-│   │   ├── ui.tsx                  # Panel、Badge、按鈕、Choice、ToggleRow
-│   │   ├── preview-host-bridge.tsx # 平台 platform：Grok 即時預覽的 postMessage 橋接
-│   │   └── views/                  # 六個畫面 / six views
-│   │       ├── overview.tsx        #   總覽 Overview
-│   │       ├── harness-view.tsx    #   管線 Pipeline：執行 Harness、裁決、缺口、下載紀錄
-│   │       ├── gates-view.tsx      #   閘門 Gates：G0–G6 控制項勾選、MAESTRO、G1 四層
-│   │       ├── levels-view.tsx     #   分級 Levels
-│   │       ├── map-view.tsx        #   對照 Map
-│   │       └── tools-view.tsx      #   工具 Tools
-│   ├── data/
-│   │   ├── model.ts                # 內容與資料（全部 Bi）/ content and data (all Bi)
-│   │   ├── model.test.ts           # 雙語完整性、控制項 id、parseSearch、displayName
-│   │   ├── engine.ts               # Harness 規則 / rules：分級、發現、裁決、管線涵蓋、放行紀錄
-│   │   └── engine.test.ts          # 規則測試，含所有設定組合的不變條件 / invariants over every profile
-│   ├── lib/
-│   │   ├── error-component.tsx     # 錯誤畫面（雙語，含重新整理）/ error screen (bilingual, with reload)
-│   │   ├── not-found-component.tsx # 找不到頁面 / not-found screen
-│   │   ├── og/site.json            # 分享卡片設定 / share-card settings
-│   │   ├── auth/、app-data/、db.ts、env.server.ts、multiplayer/、preview-*.ts
-│   │   │                           # 平台預置助手 / platform helpers：本 app 未啟用 auth 與 db
-│   ├── styles.css                  # Tailwind v4 與色彩 tokens
-│   ├── styles.test.ts              # 文字與元件對比度 / contrast tests
-│   ├── router.tsx                  # getRouter()，掛上錯誤與找不到頁面 / error + not-found components
-│   ├── routeTree.gen.ts            # TanStack Router 自動產生 / generated
-│   └── zod-jitless.ts              # 平台 platform：zod 設定
-├── scripts/
-│   ├── run-tests.mjs               # npm test：scripts/*.test.mjs 與 src/**/*.test.ts
-│   ├── security-headers.mjs        # 正式建置的安全標頭 / production security headers（含測試）
-│   ├── og-card.mjs                 # 重製 public/og.jpg / regenerate the share card
-│   ├── with-app-env.mjs、app-env-plugin.mjs   # 平台 platform：把 .grok/app-env.json 帶進 Vite
-│   ├── browser-smoke.mjs、browser-smoke-verdict.mjs、browser-guard.mjs、preview.mjs、preview-thumbnail.mjs
-│   │                               # 平台 platform：渲染檢查與預覽伺服器 / smoke checks and preview server
-│   ├── migrate.mjs、migration-plan.mjs        # 平台 platform：建置後套用 migrations
-│   ├── brand-check.mjs、check-auth-invariant.mjs、sign-out-plan.mjs、write-atomic.mjs
-│   ├── grok-pwa-plugin.mjs、grok-pwa-shared.mjs、install-page.html   # 平台 platform：PWA 與「Created with Grok」標章
-│   └── *.test.mjs                  # 以上腳本的測試 / tests for the scripts above
-├── server/
-│   ├── middleware/grok-pwa.ts      # 平台 platform：Nitro 中介層（PWA 安裝頁、manifest）
-│   └── virtual-grok-og-identity.d.ts
-├── public/
-│   ├── favicon.svg、og.jpg         # 圖示與分享卡片 / icon and share card
-│   ├── fonts/                      # IBM Plex Sans／Mono
-│   └── __grok/                     # 平台 platform：PWA 圖示與安裝教學
-├── migrations/auth/0001_auth.sql   # 平台 platform：Better Auth 資料表（本 app 未使用）
-├── attachments/                    # 參考資料 / references：ASVS 5.0.0 原文（docx）與心智圖；PDF 與 GIF 不進版控
-├── screenshots/                    # browser-smoke 的截圖輸出，只保留目錄 / smoke screenshots, directory only
-├── .github/workflows/ci.yml        # CI：typecheck、lint、test、build
+├── .github/workflows/ci.yml        # CI：typecheck → lint → test → build
 ├── .grok/                          # 平台 platform：app-env.json、references/、skills/
-├── AGENTS.md                       # 平台 platform：Grok App Builder 的工作合約
-├── startup.sh                      # 平台 platform：Grok 沙箱重啟腳本（路徑固定為 /workspace）
-├── vite.config.ts、vercel.json、eslint.config.mjs、.prettierrc、tsconfig.json
-└── package.json                    # Node ≥ 22.6；dev／build／test／typecheck／lint
+├── AGENTS.md                       # 平台 platform：Grok App Builder 工作合約
+├── README.md
+├── attachments/                    # ASVS 5.0.0 原文 docx、心智圖 JSON（PDF、GIF 不進版控）
+├── migrations/auth/0001_auth.sql   # 平台 platform：Better Auth 資料表（本 app 未使用）
+├── public/
+│   ├── favicon.svg
+│   ├── og.jpg                      # 分享卡片，由 scripts/og-card.mjs 產生 / share card
+│   ├── fonts/                      # IBM Plex Sans 400/500/600、Mono 400/500
+│   └── __grok/                     # 平台 platform：PWA 圖示與安裝教學
+├── screenshots/.gitkeep            # browser-smoke 截圖輸出，只保留目錄
+├── scripts/
+│   ├── run-tests.mjs               # 本專案 app：npm test
+│   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
+│   ├── og-card.mjs                 # 本專案 app：重製 public/og.jpg
+│   ├── app-env-plugin.mjs、with-app-env.mjs(.test.mjs)          # 平台 platform
+│   ├── browser-smoke.mjs、browser-smoke-verdict.mjs(.test.mjs)、browser-guard.mjs
+│   ├── preview.mjs(.test.mjs)、preview-thumbnail.mjs
+│   ├── migrate.mjs、migration-plan.mjs(.test.mjs)
+│   ├── brand-check.mjs(.test.mjs)、check-auth-invariant.mjs(.test.mjs)
+│   ├── sign-out-plan.mjs(.test.mjs)、write-atomic.mjs(.test.mjs)
+│   └── grok-pwa-plugin.mjs(.test.mjs)、grok-pwa-shared.mjs、grok-pwa-shared.d.mts、install-page.html
+├── server/                         # 平台 platform
+│   ├── middleware/grok-pwa.ts      # Nitro 中介層：PWA 安裝頁、manifest、OG 標記
+│   └── virtual-grok-og-identity.d.ts
+├── src/
+│   ├── brand.ts                    # 專案名稱與說明 / name and description
+│   ├── router.tsx                  # getRouter()：錯誤與找不到畫面
+│   ├── routeTree.gen.ts            # TanStack Router 自動產生 / generated
+│   ├── styles.css、styles.test.ts  # Tailwind v4 色彩 tokens、對比度測試
+│   ├── zod-jitless.ts              # 關閉 zod JIT（CSP 不允許 eval）
+│   ├── routes/__root.tsx、index.tsx
+│   ├── i18n/locale.ts(.test.ts)、context.tsx
+│   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)
+│   ├── components/
+│   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx
+│   │   ├── storage.ts(.test.ts)
+│   │   ├── preview-host-bridge.tsx # 平台 platform
+│   │   └── views/overview.tsx、harness-view.tsx、gates-view.tsx、levels-view.tsx、map-view.tsx、tools-view.tsx
+│   └── lib/
+│       ├── error-component.tsx、not-found-component.tsx、og/site.json   # 本專案 app
+│       └── auth/、app-data/、multiplayer/、db.ts、env.server.ts、preview-host-bridge.ts、preview-embedder-origin.ts   # 平台 platform
+├── startup.sh                      # 平台 platform：沙箱重啟腳本（/workspace）
+├── package.json、package-lock.json # Node ≥ 22.6
+├── vite.config.ts、tsconfig.json、vercel.json、eslint.config.mjs、.prettierrc
+└── .gitignore
 ```
+
+</details>
 
 ## 開發 / Development
 
