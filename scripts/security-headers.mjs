@@ -1,9 +1,10 @@
 /**
  * 正式建置的安全標頭。
  * `vite.config.ts` 把 `vercelHeaderRoute()` 放到 Vercel 輸出設定最前面，所有回應（含靜態資源）都套用，
- * 開發伺服器與 Grok 即時預覽不受影響。兩個 CSP 標頭是刻意的：`Content-Security-Policy` 只強制
- * 不影響資源載入的結構性指令；資源限制走 `Content-Security-Policy-Report-Only`，因為 Grok 標章腳本
- * 的內容無法事先檢視。上線後確認標章正常、console 沒有 CSP 報告，再把 `ENFORCE_RESOURCE_POLICY` 改成 true。
+ * 開發伺服器與 Grok 即時預覽不受影響。`ENFORCE_RESOURCE_POLICY` 現在是 true：腳本、樣式、連線等資源限制
+ * 與結構性指令合併成一個強制的 `Content-Security-Policy`。設成 false 會退回「結構性指令強制、資源限制只
+ * 以 `Content-Security-Policy-Report-Only` 回報」的觀察模式。Grok 標章腳本的內容無法事先檢視，所以每次
+ * 部署後都要確認標章正常、console 沒有 CSP 違規；若標章被擋，把旗標改回 false 即可回復。
  * `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁不同，無法用雜湊放行。
  *
  * Security headers for the production build.
@@ -15,16 +16,17 @@
  * rules without `continue: true`, and a `/(.*)` route that does not continue stops
  * Vercel's routing before the `/__server` fallback that renders every page.
  *
- * Two CSP headers, on purpose:
+ * Two modes, switched by `ENFORCE_RESOURCE_POLICY` (now true):
  *
- * - `Content-Security-Policy` is enforced and only holds directives that cannot
- *   affect what a page loads: who may frame us, plugins, `<base>`, form targets.
- * - The resource limits (`script-src`, `connect-src`, ...) ship as
+ * - true: the resource limits (`script-src`, `connect-src`, ...) and the structural
+ *   directives (who may frame us, plugins, `<base>`, form targets) ship together as
+ *   one enforced `Content-Security-Policy`.
+ * - false: only the structural directives are enforced; the resource limits ship as
  *   `Content-Security-Policy-Report-Only`. The "Created with Grok" script comes
  *   from https://grok.com and its contents cannot be inspected from here
  *   (Cloudflare serves a challenge page), and the platform contract forbids a CSP
- *   that blocks it. Once the deployed site shows the badge with no CSP reports
- *   in the console, set `ENFORCE_RESOURCE_POLICY` to true.
+ *   that blocks it. If a deploy ever shows the badge blocked or CSP violations in
+ *   the console, set the flag back to false to return to observation mode.
  *
  * `'unsafe-inline'` stays in `script-src`: TanStack Start's hydration script
  * differs on every page, so hashes cannot cover it, and a per-request nonce would
@@ -34,7 +36,7 @@
  * `style-src`.
  */
 
-export const ENFORCE_RESOURCE_POLICY = false;
+export const ENFORCE_RESOURCE_POLICY = true;
 
 /** Same origins `isGrokEmbedderOrigin` trusts as embedders (minus localhost). */
 const GROK = ["https://grok.com", "https://*.grok.com"];

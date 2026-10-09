@@ -272,19 +272,15 @@ Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth
 
 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
 
-- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
-- **先觀察**：腳本、樣式、連線等來源限制以 `Content-Security-Policy-Report-Only` 送出，因為 Grok 標章腳本的內容無法事先檢視。
+- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許自己與 Grok），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
 - `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
-
-**待辦**：上線後確認「Created with Grok」標章正常、瀏覽器 console 沒有 CSP 報告，再把 `ENFORCE_RESOURCE_POLICY` 改成 `true`。
+- `ENFORCE_RESOURCE_POLICY` 已設為 `true`。Grok 標章腳本的內容無法事先檢視，所以**每次部署後請確認「Created with Grok」標章正常、瀏覽器 console 沒有 CSP 違規**；若標章被擋，把旗標改回 `false` 就會退回觀察模式（資源限制改以 `Content-Security-Policy-Report-Only` 回報）。
 
 The production build adds security headers to the Vercel output config (`scripts/security-headers.mjs`); the dev server and the Grok live preview are unaffected.
 
-- **Enforced**: `frame-ancestors` (self and Grok only), `object-src 'none'`, `base-uri`, `form-action`, plus `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
-- **Report-only first**: script, style and connection sources ship as `Content-Security-Policy-Report-Only`, because the Grok badge script cannot be inspected in advance.
+- **Enforced**: `frame-ancestors` (self and Grok only), `object-src 'none'`, `base-uri`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self and Grok only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
 - `script-src` keeps `'unsafe-inline'`: TanStack Start's hydration script differs on every page, so hashes cannot cover it.
-
-**To do**: once the deployed site shows the "Created with Grok" badge with no CSP reports in the console, set `ENFORCE_RESOURCE_POLICY` to `true`.
+- `ENFORCE_RESOURCE_POLICY` is now `true`. The Grok badge script cannot be inspected in advance, so **after every deploy check that the "Created with Grok" badge works and the browser console shows no CSP violations**; if the badge is blocked, set the flag back to `false` to return to observation mode (the resource limits go back to `Content-Security-Policy-Report-Only`).
 
 ## 平台檔案 / Platform files
 
