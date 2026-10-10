@@ -159,8 +159,8 @@ flowchart LR
     ROOT --> SCRIPTS["scripts/<br/>建置・測試・工具"]
     ROOT --> PUBLIC["public/<br/>靜態資源"]
     ROOT --> SERVER["server/<br/>Nitro 中介層"]
-    ROOT --> CFG["根目錄設定 Root config<br/>package.json・vite.config.ts<br/>tsconfig.json・vercel.json<br/>eslint.config.mjs・.prettierrc"]
-    ROOT --> META["專案資料 Project files<br/>README.md・.github/workflows/ci.yml<br/>attachments/・screenshots/"]
+    ROOT --> CFG["根目錄設定 Root config<br/>package.json・vite.config.ts<br/>tsconfig.json・vercel.json<br/>eslint.config.mjs・.prettierrc<br/>stryker.config.json"]
+    ROOT --> META["專案資料 Project files<br/>README.md<br/>.github/workflows/ci.yml・mutation.yml<br/>attachments/・screenshots/"]
     ROOT --> GROK["平台 Platform<br/>AGENTS.md・.grok/<br/>startup.sh・migrations/"]
 
     SRC --> ROUTES["routes/<br/>__root.tsx・index.tsx"]
@@ -172,7 +172,7 @@ flowchart LR
     SRC --> LIBP["lib/（平台 platform）<br/>auth/・app-data/・multiplayer/<br/>db.ts・env.server.ts<br/>preview-host-bridge.ts・preview-embedder-origin.ts"]
     SRC --> SRCROOT["brand.ts・router.tsx<br/>styles.css・styles.test.ts<br/>routeTree.gen.ts・zod-jitless.ts"]
 
-    SCRIPTS --> SAPP["本專案 App<br/>run-tests.mjs<br/>security-headers.mjs<br/>og-card.mjs"]
+    SCRIPTS --> SAPP["本專案 App<br/>run-tests.mjs<br/>security-headers.mjs<br/>og-card.mjs<br/>stryker-ignore-bi.mjs"]
     SCRIPTS --> SPLAT["平台 Platform<br/>grok-pwa-plugin・grok-pwa-shared<br/>with-app-env・app-env-plugin<br/>browser-smoke・browser-guard・preview<br/>migrate・migration-plan・brand-check<br/>check-auth-invariant・sign-out-plan・write-atomic"]
 
     PUBLIC --> PUB1["favicon.svg・og.jpg<br/>fonts/（IBM Plex）"]
@@ -192,6 +192,7 @@ flowchart LR
 ```text
 G0withSixGates/
 ├── .github/workflows/ci.yml        # CI：typecheck → lint → test → build
+├── .github/workflows/mutation.yml  # 突變測試，只在手動觸發時執行 / mutation testing, manual trigger only
 ├── .grok/                          # 平台 platform：app-env.json、references/、skills/
 ├── AGENTS.md                       # 平台 platform：Grok App Builder 工作合約
 ├── README.md
@@ -207,6 +208,7 @@ G0withSixGates/
 │   ├── run-tests.mjs               # 本專案 app：npm test
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── og-card.mjs                 # 本專案 app：重製 public/og.jpg
+│   ├── stryker-ignore-bi.mjs       # 本專案 app：突變測試忽略 bi() 內的內容字串 / mutation ignore plugin
 │   ├── app-env-plugin.mjs、with-app-env.mjs(.test.mjs)          # 平台 platform
 │   ├── browser-smoke.mjs、browser-smoke-verdict.mjs(.test.mjs)、browser-guard.mjs
 │   ├── preview.mjs(.test.mjs)、preview-thumbnail.mjs
@@ -237,6 +239,7 @@ G0withSixGates/
 ├── startup.sh                      # 平台 platform：沙箱重啟腳本（/workspace）
 ├── package.json、package-lock.json # Node ≥ 22.6
 ├── vite.config.ts、tsconfig.json、vercel.json、eslint.config.mjs、.prettierrc
+├── stryker.config.json             # 突變測試設定（預設不跑）/ mutation-testing config (off by default)
 └── .gitignore
 ```
 
@@ -258,11 +261,30 @@ npm run build            # 產出 .vercel/output（不進版控），接著跑 d
 npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the production build
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
 node scripts/og-card.mjs         # 重製分享卡片 public/og.jpg / regenerate the share card
+npm run test:mutation            # 突變測試，預設不跑，見下節 / mutation testing, off by default, see below
 ```
 
 其他 scripts：`build:dev`、`preview`、`preview:stop`、`db:migrate`、`check:auth`、`format`。
 
 Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth`, `format`.
+
+### 突變測試 / Mutation testing
+
+**預設關閉。** `npm test` 與每次 PR 的 CI 都不跑突變測試；要跑有兩種方式：本機執行 `npm run test:mutation`，或在 GitHub 的 Actions 分頁手動觸發「Mutation testing」工作流程（報告會上傳成 artifact）。
+
+- 工具是 [StrykerJS](https://stryker-mutator.io/)，完全在本機執行，不需要外部服務或金鑰。
+- 只突變純函式邏輯：`src/data/engine.ts`（規則引擎）、`src/components/storage.ts`（儲存搬移）、`src/i18n/locale.ts`（雙語工具）。`model.ts` 幾乎全是內容資料，不列入。
+- `scripts/stryker-ignore-bi.mjs` 會跳過 `bi("中文", "English")` 裡的顯示文字；測試不該逐句斷言文案，留著只會灌水存活突變體。其他字串（例如 `=== "public"`）照常突變。
+- 每個突變體都要重跑一次邏輯測試（約 2 秒），七百多個突變體以 4 個並行約需十幾分鐘，所以不放進每次 PR 的流程。
+- 設定在 `stryker.config.json`；`thresholds.break` 為 `null`，分數低不會讓指令失敗，報告在 `reports/mutation/index.html`（不進版控）。存活的突變體就是測試沒有鎖住的行為，依此補測試或接受它。
+
+**Off by default.** Neither `npm test` nor the per-PR CI runs mutation testing. Run it locally with `npm run test:mutation`, or trigger the "Mutation testing" workflow by hand from the Actions tab on GitHub (the report is uploaded as an artifact).
+
+- The tool is [StrykerJS](https://stryker-mutator.io/); it runs entirely locally with no external service or key.
+- Only pure logic is mutated: `src/data/engine.ts` (rule engine), `src/components/storage.ts` (storage migration), `src/i18n/locale.ts` (locale helpers). `model.ts` is almost all content data and is left out.
+- `scripts/stryker-ignore-bi.mjs` skips the display text inside `bi("中文", "English")`; tests should not assert on every sentence, and keeping those mutants only inflates the survivor count. Other strings (such as `=== "public"`) are still mutated.
+- Every mutant reruns the logic tests (about 2 seconds); seven hundred-odd mutants at 4-way concurrency take ten-plus minutes, so it stays out of the per-PR pipeline.
+- Configuration lives in `stryker.config.json`; `thresholds.break` is `null`, so a low score never fails the command, and the report lands in `reports/mutation/index.html` (not tracked). Surviving mutants are behaviour the tests do not pin down: add a test or accept them.
 
 `npm test` 由 `scripts/run-tests.mjs` 執行：`scripts/*.test.mjs` 與 `src/**/*.test.ts`（含 `src/lib` 下的平台測試）合跑一次，`grok-pwa-plugin.test.mjs` 另外在空目錄跑一次；任何一組失敗就回傳非 0。新增的 `*.test.ts` 會自動被找到。
 

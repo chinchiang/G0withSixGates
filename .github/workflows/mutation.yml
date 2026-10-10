@@ -1,0 +1,30 @@
+# 突變測試：預設關閉，只在手動觸發時執行（Actions 分頁 → Mutation testing → Run workflow）。
+# 每個突變體都要重跑一次測試，耗時數分鐘到十幾分鐘，所以不放進每次 PR 的 CI。
+# 結果以 HTML 報告上傳為 artifact；突變分數低於門檻不會讓工作流程失敗（thresholds.break 為 null）。
+#
+# Mutation testing: off by default, runs only when triggered by hand
+# (Actions tab → Mutation testing → Run workflow). Every mutant reruns the tests,
+# which takes minutes, so it stays out of the per-PR CI. The HTML report is
+# uploaded as an artifact; a low score does not fail the workflow (thresholds.break is null).
+name: Mutation testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mutation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation
