@@ -27,3 +27,8 @@ screenshots/*
 # Large reference attachments (course PDFs, threat-model GIF) stay local; the ASVS docx and mind map are tracked
 attachments/*.pdf
 attachments/*.gif
+
+# 突變測試（npm run test:mutation）的暫存與報告
+# Mutation-testing scratch and reports (npm run test:mutation)
+.stryker-tmp/
+reports/

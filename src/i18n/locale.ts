@@ -87,8 +87,3 @@ export const YES_NO: Record<Locale, [string, string]> = {
 export function yesNo(locale: Locale, value: boolean): string {
   return YES_NO[locale][value ? 0 : 1];
 }
-
-/** 兩個 `Bi` 前後相接（各語言自行接）。 Concatenate two `Bi` values per language. */
-export function biConcat(...parts: readonly Bi[]): Bi {
-  return bi(parts.map((p) => p.zh).join(""), parts.map((p) => p.en).join(""));
-}

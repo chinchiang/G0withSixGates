@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node scripts/run-tests.mjs",
+    "test:mutation": "stryker run",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -86,6 +87,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
+    "@stryker-mutator/core": "^10.0.0",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.0",

@@ -15,6 +15,9 @@ export default tseslint.config(
       ".nitro/**",
       "node_modules/**",
       "src/routeTree.gen.ts",
+      // 突變測試的暫存副本與報告。 Mutation-testing sandbox copies and reports.
+      ".stryker-tmp/**",
+      "reports/**",
     ],
   },
   js.configs.recommended,

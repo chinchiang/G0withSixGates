@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "突變測試（StrykerJS）。預設關閉：不在 npm test 也不在每次 PR 的 CI 裡，手動 `npm run test:mutation` 才跑，或在 GitHub Actions 手動觸發 Mutation 工作流程。只突變純函式邏輯（規則引擎、儲存搬移、雙語工具）；model.ts 幾乎全是內容資料，不列入。 / Mutation testing (StrykerJS). Off by default: not part of npm test or the per-PR CI; run `npm run test:mutation` by hand or trigger the Mutation workflow manually. Only pure logic is mutated (rule engine, storage migration, locale helpers); model.ts is almost all content data and is left out.",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node --experimental-strip-types --test src/data/engine.test.ts src/data/model.test.ts src/components/storage.test.ts src/i18n/locale.test.ts"
+  },
+  "mutate": ["src/data/engine.ts", "src/components/storage.ts", "src/i18n/locale.ts"],
+  "ignorePatterns": [
+    ".vercel",
+    ".output",
+    ".nitro",
+    "dist",
+    "screenshots",
+    "attachments",
+    ".grok",
+    "public",
+    "reports",
+    "server",
+    "migrations"
+  ],
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "clearTextReporter": {
+    "allowColor": false,
+    "logTests": false,
+    "reportMutants": true
+  },
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
+  "concurrency": 4,
+  "timeoutMS": 15000,
+  "tempDirName": ".stryker-tmp",
+  "plugins": ["@stryker-mutator/*", "./scripts/stryker-ignore-bi.mjs"],
+  "ignorers": ["bi-content"]
+}
