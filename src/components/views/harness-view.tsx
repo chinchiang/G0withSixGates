@@ -6,7 +6,9 @@ import {
   RELEASE_LABEL,
   STATUS_LABEL,
   coverage,
+  localDate,
   reportMarkdown,
+  sameVerdictInputs,
   type Coverage,
 } from "@/data/engine";
 import { useApp } from "@/components/app-state";
@@ -19,8 +21,8 @@ export function HarnessView() {
   const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
   const coverageById = useMemo(() => new Map(covered.map((item) => [item.finding.id, item])), [covered]);
   const missed = covered.filter((item) => !item.caught);
-  // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。
-  const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
+  // 只有執行中才逐道亮起；換頁回來或重新整理後，上一次的結果直接全部顯示。
+  const [visible, setVisible] = useState(0);
   const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reduced, setReduced] = useState(false);
@@ -43,11 +45,12 @@ export function HarnessView() {
   }, [running, visible, plan, reduced]);
 
   const phase = !run ? "idle" : running ? "running" : "done";
-  const stale = phase === "done" && JSON.stringify(run?.profile) !== JSON.stringify(profile);
+  const stale = phase === "done" && !!run && !sameVerdictInputs(run.profile, profile);
+  const shown = phase === "running" ? visible : (plan?.steps.length ?? 0);
   const activeIndex = phase === "running" ? visible : -1;
 
   // 閘門依序亮起時，螢幕閱讀器逐道聽到結果，最後聽到裁決。回到這頁時不重唸：初始內容不會被宣讀。
-  const lastStep = plan && visible > 0 ? plan.steps[visible - 1] : null;
+  const lastStep = plan && shown > 0 ? plan.steps[shown - 1] : null;
   const announcement =
     phase === "running"
       ? lastStep
@@ -91,7 +94,7 @@ export function HarnessView() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `vibegate-release-${run.at.toISOString().slice(0, 10)}.md`;
+    link.download = `vibegate-release-${localDate(run.at)}.md`;
     link.click();
     // 立即撤銷會讓部分瀏覽器（Safari）取消下載。
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -178,7 +181,7 @@ export function HarnessView() {
 
           <ol className="space-y-2">
             {(plan?.steps ?? []).map((item, index) => {
-              const revealed = index < visible;
+              const revealed = index < shown;
               const current = index === activeIndex;
               return (
                 <li

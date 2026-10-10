@@ -216,9 +216,22 @@ export function parseProfile(raw: unknown): Profile {
   };
 }
 
+/** 讀回本機的勾選。只留已知控制項且值為 true 的條目，壞掉的資料（null、陣列、字串）當成沒勾。 */
+export function parseChecks(raw: unknown): Record<string, boolean> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const known = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>)
+      .filter(([id, value]) => known.has(id) && value === true)
+      .map(([id]) => [id, true]),
+  );
+}
+
 export interface GateControl {
   id: string;
   text: string;
+  /** 流程性控制項：管線該有，但 Harness 的示範發現不會因為它而被攔下。 */
+  process?: true;
 }
 
 export interface GateDoc {
@@ -246,7 +259,7 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g0-stride", text: "一般功能已用 STRIDE 盤點；含個資則補 LINDDUN" },
       { id: "g0-maestro", text: "含 Agent 的系統已用 MAESTRO 七層對到閘門" },
       { id: "g0-tri", text: "若致命三要素同時成立，已切斷至少一腳" },
-      { id: "g0-level", text: "已寫下 L1／L2／L3，並說明為何不是更低一級" },
+      { id: "g0-level", text: "已寫下 L1／L2／L3，並說明為何不是更低一級", process: true },
     ],
     tools: ["STRIDE", "LINDDUN", "MAESTRO", "資料流圖"],
     asvs: ["V15.1 文件化安全決策", "ASVS 5.0 等級定義"],
@@ -264,7 +277,7 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g1-typo", text: "已對熱門套件做字串距離比對，並掃描規則檔與 Markdown" },
       { id: "g1-hook", text: "postinstall／setup.py 已經靜態檢查，阻擋未授權外連與讀取憑證" },
       { id: "g1-cool", text: "發布未滿 7–14 天的版本會被拒絕或改走人工審查" },
-      { id: "g1-sbom", text: "已產出 CycloneDX 或 SPDX，並以 EPSS 與 CISA KEV 排修補順序" },
+      { id: "g1-sbom", text: "已產出 CycloneDX 或 SPDX，並以 EPSS 與 CISA KEV 排修補順序", process: true },
     ],
     tools: ["SlopCheck / DevSentinel", "Socket", "Syft", "Grype / Trivy"],
     asvs: ["V15.2 安全架構與相依"],
@@ -281,7 +294,7 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g2-hook", text: "本機 pre-commit 已掛上 gitleaks protect --staged" },
       { id: "g2-push", text: "遠端 Push Protection 會擋下金鑰，不能只靠事後掃描" },
       { id: "g2-hist", text: "夜間全歷史掃描仍在跑，不因 PR 差異模式而取消" },
-      { id: "g2-rotate", text: "命中後的處置是撤銷與輪替，不是只改掉那一行" },
+      { id: "g2-rotate", text: "命中後的處置是撤銷與輪替，不是只改掉那一行", process: true },
     ],
     tools: ["Gitleaks", "Push Protection"],
     asvs: ["V13.3 祕密管理"],
@@ -299,10 +312,10 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g3-param", text: "SQL、OS 指令與 HTML 匯點使用參數化或上下文編碼" },
       { id: "g3-iac", text: "IMDSv2 為 required，CORS 不對任意來源加憑證" },
       { id: "g3-csp", text: "CSP 等瀏覽器安全標頭已強制，不停在 report-only" },
-      { id: "g3-diff", text: "PR 只掃差異以控制在數分鐘內；全量留給夜間 CodeQL" },
+      { id: "g3-diff", text: "PR 只掃差異以控制在數分鐘內；全量留給夜間 CodeQL", process: true },
     ],
     tools: ["Semgrep", "CodeQL", "Checkov / Trivy"],
-    asvs: ["V1.2 注入防範", "v5.0.0-1.2.5 作業系統指令", "V3.4 瀏覽器安全標頭", "V13 組態"],
+    asvs: ["V1.2 注入防範", "V1.2.5 作業系統指令", "V3.4 瀏覽器安全標頭", "V13 組態"],
     fails: "來源在路由、匯點在另一個資料庫模組時，只掃單檔的工具會放行。",
   },
   {
@@ -336,12 +349,12 @@ export const GATE_DOCS: GateDoc[] = [
       { id: "g5-bola", text: "雙帳號實測：B 不能讀寫 A 的物件識別碼" },
       { id: "g5-jwt", text: "拒絕 alg:none，並防範 RS256／HS256 演算法混淆" },
       { id: "g5-mfa", text: "存取個資的角色要求多重要素，並實測登入流程" },
-      { id: "g5-ssrf", text: "網址匯入不會打到雲端中繼資料或內部網段" },
+      { id: "g5-ssrf", text: "網址匯入與模型的抓取工具不會打到雲端中繼資料或內部網段" },
       { id: "g5-rate", text: "登入與重設密碼等敏感流程套用同一套速率限制" },
       { id: "g5-debug", text: "預備與正式環境已關閉 Swagger、introspection、堆疊追蹤" },
     ],
     tools: ["OWASP ZAP", "Burp Suite + AuthMatrix", "Nuclei", "Schemathesis"],
-    asvs: ["V8 授權", "V9.1 權杖完整性", "V6.3.3 多重要素", "V13.4 非預期資訊外洩", "V2.4 防自動化"],
+    asvs: ["V8 授權", "V9.1 權杖完整性", "V1.3.6 SSRF", "V6.3.3 多重要素", "V13.4 非預期資訊外洩", "V2.4 防自動化"],
     fails: "白箱說查詢有綁定擁有者，若黑箱仍能用另一個帳號讀到，就代表映射斷了，不能放行。",
   },
   {
@@ -379,11 +392,13 @@ export const FINDING_CONTROLS: Record<string, string[]> = {
   "g3-cmd": ["g3-param"],
   "g3-imds": ["g3-iac"],
   "g3-csp": ["g3-csp"],
-  "g4-bola": ["g4-owner", "g4-rls", "g5-bola"],
+  "g4-bola": ["g4-owner", "g4-rls", "g4-depth", "g5-bola"],
   "g4-pii": ["g4-pii"],
   "g4-tool": ["g4-allow", "g4-hitl"],
   "g4-rules": ["g4-rules"],
-  "g5-idor": ["g5-bola", "g5-jwt"],
+  "g5-idor": ["g5-bola"],
+  "g5-jwt": ["g5-jwt"],
+  "g5-ssrf": ["g5-ssrf"],
   "g5-mfa": ["g5-mfa"],
   "g5-debug": ["g5-debug"],
   "g5-rate": ["g5-rate"],
@@ -651,7 +666,7 @@ export const MAP_ROWS: MapRow[] = [
     gate: "G3",
     pair: "G5",
     track: "白箱 → 黑箱",
-    asvs: "V1.2／v5.0.0-1.2.5",
+    asvs: "V1.2／V1.2.5",
     tool: "Semgrep Pro／CodeQL",
     policy: "block",
     confirm: "G3 的污點路徑必須在 G5 用對應 payload 複測，不能只留靜態警告。",

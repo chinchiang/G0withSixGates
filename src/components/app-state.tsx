@@ -3,6 +3,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import {
   DEFAULT_PROFILE,
   GATE_DOCS,
+  parseChecks,
   parseProfile,
   type GateId,
   type Profile,
@@ -12,6 +13,35 @@ import { buildPlan, type RunPlan } from "@/data/engine";
 
 const PROFILE_KEY = "vibegate-profile-v1";
 const CHECK_KEY = "vibegate-checks-v1";
+/** 最近一次執行只留在這個分頁：重新整理還在，關掉分頁就清掉。 */
+const RUN_KEY = "vibegate-run-v1";
+
+function readJson(storage: Storage, key: string): unknown {
+  try {
+    const raw = storage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 私密瀏覽或空間已滿時寫入會丟例外；存不下就只留在記憶體，不讓整頁壞掉。 */
+function writeJson(storage: Storage, key: string, value: unknown) {
+  try {
+    if (value === null) storage.removeItem(key);
+    else storage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function parseRun(raw: unknown): HarnessRun | null {
+  if (!raw || typeof raw !== "object") return null;
+  const { profile, at } = raw as Record<string, unknown>;
+  const time = typeof at === "string" ? new Date(at) : null;
+  if (!profile || !time || Number.isNaN(time.getTime())) return null;
+  return { profile: parseProfile(profile), at: time };
+}
 
 const route = getRouteApi("/");
 
@@ -54,26 +84,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
 
   useEffect(() => {
+    // 存取 localStorage 本身也可能丟例外（例如封鎖第三方儲存的嵌入頁）。
     try {
-      const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) setProfileState(parseProfile(JSON.parse(raw)));
-      const saved = localStorage.getItem(CHECK_KEY);
-      if (saved) setChecks(JSON.parse(saved) as Record<string, boolean>);
+      const saved = readJson(localStorage, PROFILE_KEY);
+      if (saved) setProfileState(parseProfile(saved));
+      setChecks(parseChecks(readJson(localStorage, CHECK_KEY)));
+      setRun(parseRun(readJson(sessionStorage, RUN_KEY)));
     } catch {
-      /* ignore broken local data */
+      /* storage unavailable */
     }
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  }, [profile, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(CHECK_KEY, JSON.stringify(checks));
-  }, [checks, hydrated]);
+    try {
+      writeJson(localStorage, PROFILE_KEY, profile);
+      writeJson(localStorage, CHECK_KEY, checks);
+      writeJson(sessionStorage, RUN_KEY, run && { profile: run.profile, at: run.at.toISOString() });
+    } catch {
+      /* storage unavailable */
+    }
+  }, [profile, checks, run, hydrated]);
 
   const value = useMemo<AppState>(() => {
     const total = GATE_DOCS.reduce((sum, doc) => sum + doc.controls.length, 0);
@@ -90,8 +122,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       openGate: (next) => navigate({ search: (prev) => ({ ...prev, view: "gates", gate: next }) }),
       profile,
       setProfile: setProfileState,
+      // 值沒有變（例如點已選中的選項）就不動，避免設定被誤標成自訂、裁決被誤判為過期。
       patchProfile: (partial) =>
-        setProfileState((current) => ({ ...current, ...partial, preset: "custom" })),
+        setProfileState((current) =>
+          (Object.keys(partial) as (keyof Profile)[]).every(
+            (key) => JSON.stringify(current[key]) === JSON.stringify(partial[key]),
+          )
+            ? current
+            : { ...current, ...partial, preset: "custom" },
+        ),
       checks,
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       replaceChecks: setChecks,
@@ -106,6 +145,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// Context 與它的 hook 放在一起；這個檔案改動時整頁重載是可以接受的。
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(): AppState {
   const value = useContext(Ctx);
   if (!value) throw new Error("AppState 尚未就緒");

@@ -6,8 +6,11 @@ import {
   catchingControls,
   caughtBy,
   coverage,
+  localDate,
+  localStamp,
   recommendLevel,
   reportMarkdown,
+  sameVerdictInputs,
   trifectaOpen,
   webSurface,
   type RunPlan,
@@ -18,12 +21,16 @@ import {
   GATE_DOCS,
   MITIGATIONS,
   PRESETS,
+  parseChecks,
   parseProfile,
   type Exposure,
   type Mitigation,
   type Profile,
   type Sensitivity,
 } from "./model.ts";
+
+// 時間相關的斷言固定在台灣時區，不受跑測試的機器影響。
+process.env.TZ = "Asia/Taipei";
 
 const ids = (plan: RunPlan) => plan.steps.flatMap((s) => s.findings.map((item) => item.id));
 const status = (plan: RunPlan, gate: string) => plan.steps.find((s) => s.gate === gate)?.status;
@@ -174,6 +181,54 @@ describe("surface and level", () => {
   });
 });
 
+describe("findings follow how the code was written", () => {
+  it("supply chain and secrets do not depend on whether the system has a model", () => {
+    const noModelApi: Profile = { ...PRESETS.kb, llm: false, agent: false };
+    const found = ids(buildPlan(noModelApi));
+    assert.ok(found.includes("g1-slop"));
+    assert.ok(found.includes("g1-hook"));
+    assert.ok(found.includes("g2-key"));
+    const script = ids(buildPlan(PRESETS.script));
+    assert.ok(script.includes("g1-cool"));
+    assert.ok(script.includes("g2-key"));
+    assert.ok(!script.includes("g1-slop"));
+  });
+
+  it("splits the IDOR and the alg:none token into separate findings", () => {
+    const plan = buildPlan(PRESETS.kb);
+    const byId = new Map(coverage(plan, { "g5-jwt": true }).map((c) => [c.finding.id, c]));
+    assert.equal(byId.get("g5-jwt")?.caught, true);
+    assert.equal(byId.get("g5-idor")?.caught, false, "a JWT test alone must not cover the IDOR");
+  });
+});
+
+describe("SSRF escalates the IMDSv2 gap", () => {
+  // 夥伴暴露面、無個資、能對外通訊但不讀私有資料：L2，三要素不成立。
+  const fetcher: Profile = {
+    ...PRESETS.kb,
+    exposure: "partner",
+    privateData: false,
+    egress: true,
+  };
+
+  it("blocks IMDSv2 at L2 once G5 reaches the metadata service", () => {
+    const plan = buildPlan(fetcher);
+    assert.equal(plan.level, "L2");
+    const findings = plan.steps.flatMap((s) => s.findings);
+    assert.ok(findings.some((item) => item.id === "g5-ssrf"));
+    assert.equal(findings.find((item) => item.id === "g3-imds")?.severity, "block");
+  });
+
+  it("an outbound allow-list or sandbox removes the SSRF and keeps IMDSv2 advisory", () => {
+    for (const mitigation of ["egress-list", "sandbox"] as const) {
+      const plan = buildPlan({ ...fetcher, mitigations: [mitigation] });
+      const findings = plan.steps.flatMap((s) => s.findings);
+      assert.ok(!findings.some((item) => item.id === "g5-ssrf"), mitigation);
+      assert.equal(findings.find((item) => item.id === "g3-imds")?.severity, "advisory", mitigation);
+    }
+  });
+});
+
 describe("invariants over every profile", () => {
   it("holds for all combinations", () => {
     const DEPTH = new Set(["g3-imds", "g3-csp", "g4-rules", "g5-rate", "g6-dow"]);
@@ -200,6 +255,9 @@ describe("invariants over every profile", () => {
           if (DEPTH.has(item.id)) assert.equal(item.severity, "block", `${item.id} ${label}`);
         }
       }
+      if (findings.some((item) => item.id === "g5-ssrf")) {
+        assert.equal(findings.find((item) => item.id === "g3-imds")?.severity, "block", label);
+      }
       for (const item of findings) produced.add(item.id);
       for (const s of plan.steps) {
         if (s.status === "na") assert.equal(s.findings.length, 0, label);
@@ -219,6 +277,14 @@ describe("invariants over every profile", () => {
       for (const item of controls) assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
     }
     assert.deepEqual(Object.keys(FINDING_CONTROLS).sort(), [...produced].sort());
+
+    // 每個控制項不是攔得下某個發現，就是明確標成流程性控制項；兩者不重疊。
+    const referenced = new Set(Object.values(FINDING_CONTROLS).flat());
+    for (const doc of GATE_DOCS) {
+      for (const item of doc.controls) {
+        assert.notEqual(referenced.has(item.id), Boolean(item.process), `${item.id} is orphaned or double-flagged`);
+      }
+    }
   });
 });
 
@@ -272,12 +338,36 @@ describe("parseProfile", () => {
   });
 });
 
+describe("local time", () => {
+  it("dates the report in the viewer's time zone, not UTC", () => {
+    // 台灣 07:30 還是 UTC 前一天 23:30；檔名要跟著當地日期。
+    const early = new Date("2026-10-03T23:30:00.000Z");
+    assert.equal(localDate(early), "2026-10-04");
+    assert.equal(localStamp(early), "2026-10-04 07:30:00（UTC+08:00）");
+  });
+});
+
+describe("stored state", () => {
+  it("ignores broken or unknown checks instead of crashing", () => {
+    for (const raw of [null, [], "x", 3, true]) assert.deepEqual(parseChecks(raw), {});
+    assert.deepEqual(parseChecks({ "g2-push": true, "g3-csp": false, "g9-made-up": true, "g5-bola": "yes" }), {
+      "g2-push": true,
+    });
+  });
+
+  it("only flags a verdict as stale when a rule input changed", () => {
+    const renamed: typeof PRESETS.kb = { ...PRESETS.kb, preset: "custom", name: "改過名字" };
+    assert.equal(sameVerdictInputs(PRESETS.kb, renamed), true);
+    assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, diffOnly: false }), false);
+  });
+});
+
 describe("reportMarkdown", () => {
   it("records the demo notice, run time, inputs and localized statuses", () => {
     const at = new Date("2026-10-04T02:00:00.000Z");
     const md = reportMarkdown(PRESETS.hardened, buildPlan(PRESETS.hardened), at, { "g3-csp": true });
     assert.match(md, /示範模擬/);
-    assert.match(md, /執行時間：2026-10-04T02:00:00\.000Z/);
+    assert.match(md, /執行時間：2026-10-04 10:00:00（UTC\+08:00）/);
     assert.match(md, /設計期緩解：出向 Allow-list/);
     assert.match(md, /程式狀態：剩縱深項/);
     assert.match(md, /## G3 靜態分析（白箱／警示）/);

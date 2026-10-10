@@ -123,6 +123,11 @@ export function GatesView() {
                   </span>
                   <span className="text-sm leading-6">
                     {item.text}
+                    {item.process && (
+                      <span className="mt-1 block text-xs leading-5 text-faint">
+                        流程性控制項：管線該有，但示範發現不會因為它被攔下。
+                      </span>
+                    )}
                     {caught.length > 0 && (
                       <span className="mt-1 block text-xs leading-5 text-muted">
                         本次 Harness 會攔下：{caught.map((finding) => finding.title).join("、")}
@@ -199,7 +204,12 @@ export function GatesView() {
                   <h3 className="text-sm font-semibold">
                     <span className="font-mono text-accent">{row.layer}</span> {row.name}
                   </h3>
-                  <button type="button" onClick={() => openGate(row.gate)} className="font-mono text-xs text-accent">
+                  <button
+                    type="button"
+                    onClick={() => openGate(row.gate)}
+                    aria-label={`前往 ${row.gate} ${GATE_NAME[row.gate]}`}
+                    className="-my-2 min-h-11 min-w-11 shrink-0 font-mono text-xs text-accent"
+                  >
                     {row.gate}
                   </button>
                 </div>

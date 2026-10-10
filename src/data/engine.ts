@@ -81,6 +81,12 @@ export function agencyOpen(p: Profile): boolean {
   return p.agent && p.destructive && !p.mitigations.includes("hitl");
 }
 
+/** 兩份設定是否會得到同一份裁決。預設情境標記與系統名稱不影響規則，不算改動。 */
+export function sameVerdictInputs(a: Profile, b: Profile): boolean {
+  const key = ({ preset: _preset, name: _name, ...rest }: Profile) => JSON.stringify(rest);
+  return key(a) === key(b);
+}
+
 export function recommendLevel(p: Profile): { level: Level; reasons: string[] } {
   const reasons: string[] = [];
   if (p.sensitivity === "pii" && p.exposure === "public") {
@@ -140,6 +146,8 @@ export function buildPlan(p: Profile): RunPlan {
   const web = webSurface(p);
   const pii = p.sensitivity === "pii";
   const cut = cutLabels(p).join("、");
+  // 模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 跟著升級。
+  const ssrf = vibe && web && (p.llm || p.agent) && p.egress && cutLabels(p).length === 0;
   const toolchain =
     level === "L1"
       ? "Semgrep 社群版、Trivy、Gitleaks、ZAP"
@@ -197,7 +205,8 @@ export function buildPlan(p: Profile): RunPlan {
 
   const g1: Finding[] = [];
   const g1logs = ["安裝前檢查：存在性、名稱距離、安裝腳本、冷卻期。"];
-  if (vibe && (p.llm || p.agent)) {
+  // 幻覺套件與惡意安裝腳本來自「用 AI 寫程式」，跟受測系統本身有沒有模型無關。
+  if (vibe && web) {
     g1logs.push("規則檔與套件清單出現模型推薦的名稱。");
     g1.push(
       f({
@@ -214,15 +223,13 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V15.2 架構與相依",
       }),
     );
-  }
-  if (vibe && p.agent && p.destructive) {
     g1.push(
       f({
         id: "g1-hook",
         gate: "G1",
         severity: "block",
         title: "安裝腳本會外連並讀取環境",
-        detail: "新依賴的 postinstall 在安裝當下執行，G2 的金鑰掃描來得太晚。",
+        detail: "模型補上的新依賴帶著 postinstall，在安裝當下就執行。G2 的金鑰掃描來得太晚。",
         evidence: "fast-json-safe@3.2.1 postinstall.js：fetch 外連，並讀取 process.env。發布 2 天。",
         fix: "拒絕此版本。冷卻期未滿且腳本行為異常，不進入人工例外。",
         tool: "腳本靜態檢查＋冷卻期",
@@ -230,7 +237,7 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V15.2",
       }),
     );
-  } else if (vibe && !p.llm && !p.agent) {
+  } else if (vibe) {
     g1.push(
       f({
         id: "g1-cool",
@@ -245,7 +252,7 @@ export function buildPlan(p: Profile): RunPlan {
         asvs: "V15.2",
       }),
     );
-  } else if (!vibe) {
+  } else {
     g1logs.push("套件均存在，下載量與冷卻期通過。Syft 已產出 CycloneDX。");
   }
 
@@ -255,15 +262,20 @@ export function buildPlan(p: Profile): RunPlan {
       ? "PR 模式：只掃本次差異。全歷史排入夜間，這不是省略。"
       : "全歷史模式：正則與熵值掃描所有提交。",
   ];
-  if (vibe && (p.llm || p.agent || p.exposure !== "internal")) {
+  if (vibe) {
+    const ai = p.llm || p.agent;
     g2.push(
       f({
         id: "g2-key",
         gate: "G2",
         severity: "block",
-        title: "差異中有硬編碼金鑰",
-        detail: "高熵字串符合供應商金鑰格式，且 .env 沒有被忽略規則排除。",
-        evidence: "src/lib/llm.ts:14  sk-ant-api03-……；.env 出現在暫存區。",
+        title: "差異中有硬編碼祕密",
+        detail: ai
+          ? "高熵字串符合供應商金鑰格式，且 .env 沒有被忽略規則排除。"
+          : "資料庫連線字串連同密碼寫在程式裡，且 .env 沒有被忽略規則排除。",
+        evidence: ai
+          ? "src/lib/llm.ts:14  sk-ant-api03-……；.env 出現在暫存區。"
+          : "config/settings.py:12  DATABASE_URL = \"postgres://admin:……@db.internal/prod\"；.env 出現在暫存區。",
         fix: "撤銷該金鑰，改走祕密管理，再用歷史清理移除。先擋下這次推送。",
         tool: "Gitleaks",
         cwe: "營運對照：CWE-798",
@@ -319,26 +331,27 @@ export function buildPlan(p: Profile): RunPlan {
         fix: "改為參數陣列，不要經過 shell。",
         tool: "Semgrep",
         cwe: "營運對照：CWE-78",
-        asvs: "v5.0.0-1.2.5",
+        asvs: "V1.2.5",
       }),
     );
   } else {
     g3logs.push("抽樣的查詢與指令皆為參數化。");
   }
-  if (vibe && p.exposure !== "internal") {
-    g3.push(
-      depth(level, {
-        id: "g3-imds",
-        gate: "G3",
-        title: "IMDSv2 未強制",
-        detail: "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前還沒有證實可達。",
-        evidence: "terraform/compute.tf：http_tokens = \"optional\"。",
-        fix: "改為 required。G5 若打得到 169.254.169.254，這項升級為阻擋。",
-        tool: "Checkov",
-        cwe: "營運對照：雲端中繼資料",
-        asvs: "V13 組態",
-      }),
-    );
+  if (vibe && (p.exposure !== "internal" || ssrf)) {
+    const imds: Omit<Finding, "severity"> = {
+      id: "g3-imds",
+      gate: "G3",
+      title: "IMDSv2 未強制",
+      detail: ssrf
+        ? "執行個體中繼資料仍接受舊版無權杖存取。G5 已證實 SSRF 打得到中繼資料，這項升級為阻擋。"
+        : "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前還沒有證實可達。",
+      evidence: "terraform/compute.tf：http_tokens = \"optional\"。",
+      fix: "改為 required。G5 若打得到 169.254.169.254，這項升級為阻擋。",
+      tool: "Checkov",
+      cwe: "營運對照：雲端中繼資料",
+      asvs: "V13 組態",
+    };
+    g3.push(ssrf ? { ...imds, severity: "block" } : depth(level, imds));
   }
   if (p.defects === "depth" && web) {
     g3.push(
@@ -444,14 +457,44 @@ export function buildPlan(p: Profile): RunPlan {
         gate: "G5",
         severity: "block",
         title: "雙帳號實測確認越權",
-        detail: "帳號 B 的權杖讀到帳號 A 的文件，並且權杖接受 alg:none。白箱的授權缺口已被黑箱證實。",
-        evidence: "GET /api/docs/18 → 200（主體為帳號 A）。JWT header alg＝none 亦被接受。",
-        fix: "先修 G4 的擁有者條件與簽章驗證，再重跑這兩項。",
+        detail: "帳號 B 的權杖讀到帳號 A 的文件。白箱的授權缺口已被黑箱證實。",
+        evidence: "GET /api/docs/18（帶帳號 B 的權杖）→ 200，回傳主體為帳號 A。",
+        fix: "先修 G4 的擁有者條件，再用兩個帳號重跑。",
         tool: level === "L1" ? "OWASP ZAP＋第二權杖" : "Burp AuthMatrix",
-        cwe: "營運對照：CWE-639／CWE-347",
-        asvs: "V8、V9.1",
+        cwe: "營運對照：CWE-639",
+        asvs: "V8",
+      }),
+      f({
+        id: "g5-jwt",
+        gate: "G5",
+        severity: "block",
+        title: "權杖接受 alg:none",
+        detail: "竄改過的 JWT 把演算法改成 none、拿掉簽章，伺服器照樣接受。任何人都能自己簽發權杖。",
+        evidence: "JWT header {\"alg\":\"none\"}，簽章欄位留空 → GET /api/me 200。",
+        fix: "伺服器端固定允許的演算法清單，拒絕 none，並分開 RS256 與 HS256 的金鑰。",
+        tool: level === "L1" ? "jwt_tool" : "Burp JWT Editor",
+        cwe: "營運對照：CWE-347",
+        asvs: "V9.1.1、V9.1.2",
       }),
     ];
+    if (ssrf) {
+      findings.push(
+        f({
+          id: "g5-ssrf",
+          gate: "G5",
+          severity: "block",
+          title: "抓取工具打得到雲端中繼資料",
+          detail:
+            "模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單。一段注入的網址就能讓它讀出執行個體憑證。",
+          evidence:
+            "fetch_url(\"http://169.254.169.254/latest/meta-data/iam/security-credentials/\") → 200，回應含角色名稱。",
+          fix: "工具層加出向允許清單，封鎖連結本機與私有網段，並把 IMDSv2 改為 required。",
+          tool: "Burp Collaborator＋SSRF 案例",
+          cwe: "營運對照：CWE-918",
+          asvs: "V1.3.6、V13.2.4",
+        }),
+      );
+    }
     if (pii) {
       findings.push(
         f({
@@ -643,6 +686,20 @@ export function caughtBy(plan: RunPlan, controlId: string): Finding[] {
 }
 
 const yesNo = (value: boolean) => (value ? "是" : "否");
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** 使用者所在時區的日期。toISOString 是 UTC，台灣早上八點前下載會變成前一天。 */
+export function localDate(at: Date): string {
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+/** 本地時間加上時區位移，例如 2026-10-04 10:00:00（UTC+08:00）。 */
+export function localStamp(at: Date): string {
+  const offset = -at.getTimezoneOffset();
+  const abs = Math.abs(offset);
+  const zone = `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  return `${localDate(at)} ${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}（${zone}）`;
+}
 
 export function reportMarkdown(
   p: Profile,
@@ -658,7 +715,7 @@ export function reportMarkdown(
     `> ${DEMO_NOTICE}`,
     ``,
     `- 系統：${p.name}`,
-    `- 執行時間：${at.toISOString()}`,
+    `- 執行時間：${localStamp(at)}`,
     `- 建議等級：${plan.level}`,
     `- 裁決：${RELEASE_LABEL[plan.release]}`,
     `- 阻擋 ${plan.blockCount}、警示 ${plan.advisoryCount}`,
