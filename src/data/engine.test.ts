@@ -10,6 +10,7 @@ import {
   reportFileName,
   reportMarkdown,
   trifectaOpen,
+  trifectaPresent,
   webSurface,
   type RunPlan,
 } from "./engine.ts";
@@ -175,6 +176,151 @@ describe("surface and level", () => {
     const found = ids(buildPlan({ ...PRESETS.kb, exposure: "partner", sensitivity: "pii" }));
     assert.ok(found.includes("g4-pii"));
     assert.ok(found.includes("g5-mfa"));
+  });
+});
+
+/**
+ * 突變測試（npm run test:mutation）找出的盲點：分級理由、各發現項的嚴重度與「不該出現」的發現，
+ * 之前只有間接覆蓋。這裡逐條鎖住。
+ * Gaps found by mutation testing: level reasons, finding severities and findings that must be
+ * absent were only covered indirectly. Pin each one down here.
+ */
+describe("gaps found by mutation testing", () => {
+  const find = (plan: RunPlan, id: string) =>
+    plan.steps.flatMap((s) => s.findings).find((f) => f.id === id);
+  const internal: Profile = { ...PRESETS.script, defects: "vibe" };
+
+  it("webSurface needs an API, a non-internal exposure or an LLM", () => {
+    assert.equal(webSurface(internal), false);
+    assert.equal(webSurface({ ...internal, api: true }), true);
+    assert.equal(webSurface({ ...internal, exposure: "partner" }), true);
+    assert.equal(webSurface({ ...internal, llm: true }), true);
+  });
+
+  it("trifectaPresent needs all three legs and a model or agent", () => {
+    const base: Profile = {
+      ...internal,
+      llm: true,
+      privateData: true,
+      untrusted: true,
+      egress: true,
+    };
+    assert.equal(trifectaPresent(base), true);
+    assert.equal(trifectaPresent({ ...base, llm: false, agent: true }), true);
+    assert.equal(trifectaPresent({ ...base, privateData: false }), false);
+    assert.equal(trifectaPresent({ ...base, untrusted: false }), false);
+    assert.equal(trifectaPresent({ ...base, egress: false }), false);
+    assert.equal(trifectaPresent({ ...base, llm: false }), false);
+  });
+
+  it("gives exactly one L2 reason per single trigger and two L3 reasons when two apply", () => {
+    const one = (p: Profile) => {
+      const advice = recommendLevel(p);
+      assert.equal(advice.level, "L2", JSON.stringify(p));
+      assert.equal(advice.reasons.length, 1, JSON.stringify(p));
+      return advice.reasons[0].en;
+    };
+    assert.match(one({ ...internal, sensitivity: "pii" }), /Personal data/);
+    assert.match(one({ ...internal, llm: true }), /natural-language/);
+    assert.match(one({ ...internal, exposure: "partner" }), /exposure/);
+    assert.match(one({ ...internal, agent: true }), /Tool calls/);
+    const l1 = recommendLevel(internal);
+    assert.equal(l1.level, "L1");
+    assert.equal(l1.reasons.length, 1);
+    const l3 = recommendLevel({ ...PRESETS.platform, mitigations: [] });
+    assert.equal(l3.level, "L3");
+    assert.equal(l3.reasons.length, 3);
+    assert.equal(
+      recommendLevel({ ...internal, sensitivity: "pii", exposure: "public" }).reasons.length,
+      1,
+    );
+  });
+
+  it("blocks an undocumented threat model only at L3", () => {
+    assert.equal(find(buildPlan(PRESETS.script), "g0-model")?.severity, "advisory");
+    assert.equal(find(buildPlan(PRESETS.kb), "g0-model")?.severity, "advisory");
+    assert.equal(find(buildPlan(PRESETS.platform), "g0-model")?.severity, "block");
+    assert.equal(find(buildPlan({ ...PRESETS.kb, threatModel: true }), "g0-model"), undefined);
+  });
+
+  it("raises the G1, G2, G4 and G5 findings only for their triggers, always as blocks", () => {
+    assert.equal(find(buildPlan(PRESETS.platform), "g1-hook")?.severity, "block");
+    assert.equal(
+      find(buildPlan({ ...PRESETS.platform, destructive: false }), "g1-hook"),
+      undefined,
+    );
+    assert.equal(
+      find(buildPlan({ ...PRESETS.platform, destructive: false }), "g1-slop")?.severity,
+      "block",
+    );
+    assert.equal(find(buildPlan(PRESETS.script), "g1-cool")?.severity, "block");
+    assert.equal(find(buildPlan({ ...PRESETS.script, defects: "none" }), "g1-cool"), undefined);
+
+    assert.equal(find(buildPlan(PRESETS.script), "g2-key"), undefined);
+    assert.equal(find(buildPlan({ ...PRESETS.script, agent: true }), "g2-key")?.severity, "block");
+    assert.equal(
+      find(buildPlan({ ...PRESETS.script, exposure: "partner" }), "g2-key")?.severity,
+      "block",
+    );
+    assert.equal(find(buildPlan({ ...PRESETS.kb, diffOnly: false }), "g2-hist"), undefined);
+
+    const pii = buildPlan({ ...PRESETS.kb, sensitivity: "pii" });
+    assert.equal(find(pii, "g4-pii")?.severity, "block");
+    assert.equal(find(pii, "g5-mfa")?.severity, "block");
+    assert.equal(find(buildPlan(PRESETS.kb), "g4-pii"), undefined);
+    assert.equal(find(buildPlan(PRESETS.kb), "g5-mfa"), undefined);
+    assert.equal(find(buildPlan({ ...PRESETS.kb, exposure: "partner" }), "g5-debug"), undefined);
+    assert.equal(find(buildPlan(PRESETS.kb), "g5-debug")?.severity, "advisory");
+  });
+
+  it("treats a missing quota as a block only on public systems", () => {
+    assert.equal(find(buildPlan(PRESETS.kb), "g6-dow")?.severity, "block");
+    const partner = buildPlan({ ...PRESETS.kb, exposure: "partner" });
+    assert.equal(partner.level, "L2");
+    assert.equal(find(partner, "g6-dow")?.severity, "advisory");
+    const partnerL3 = buildPlan({
+      ...PRESETS.kb,
+      exposure: "partner",
+      sensitivity: "pii",
+      agent: true,
+      destructive: true,
+    });
+    assert.equal(partnerL3.level, "L3");
+    assert.equal(find(partnerL3, "g6-dow")?.severity, "block");
+  });
+
+  it("picks the tool by level", () => {
+    assert.match(
+      find(buildPlan({ ...PRESETS.script, api: true }), "g5-idor")?.tool.en ?? "",
+      /ZAP/,
+    );
+    assert.match(find(buildPlan(PRESETS.kb), "g5-idor")?.tool.en ?? "", /Burp/);
+    assert.equal(find(buildPlan(PRESETS.kb), "g6-pi")?.tool.en, "promptfoo");
+    assert.equal(find(buildPlan(PRESETS.platform), "g6-pi")?.tool.en, "PyRIT");
+  });
+
+  it("ranks a gate by its worst finding", () => {
+    const script = buildPlan(PRESETS.script);
+    assert.equal(status(script, "G2"), "advisory");
+    assert.equal(status(script, "G1"), "block");
+    assert.equal(status(buildPlan({ ...PRESETS.hardened, defects: "none" }), "G3"), "pass");
+    const kb = buildPlan(PRESETS.kb);
+    assert.equal(status(kb, "G2"), "block");
+    assert.deepEqual(
+      kb.steps.find((s) => s.gate === "G2")?.findings.map((f) => f.severity),
+      ["block", "advisory"],
+    );
+  });
+
+  it("writes the English yes/no and the Chinese list separator in the report", () => {
+    const at = new Date("2026-10-04T02:00:00.000Z");
+    const zh = reportMarkdown(PRESETS.platform, buildPlan(PRESETS.platform), at, {});
+    assert.match(zh, /- 阻擋 \d+、警示 \d+/);
+    assert.match(zh, /HTTP API 或網頁：是；LLM：是；Agent：是；破壞性工具：是/);
+    const en = reportMarkdown(PRESETS.platform, buildPlan(PRESETS.platform), at, {}, "en");
+    assert.match(en, /- Blocks \d+, Advisories \d+/);
+    assert.match(en, /HTTP API or web: yes; LLM: yes; Agent: yes; Destructive tools: yes/);
+    assert.match(en, /- Recommended level: L3/);
   });
 });
 
