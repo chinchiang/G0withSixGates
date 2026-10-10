@@ -284,6 +284,10 @@ test("parseSmokeArgs defaults", () => {
   });
 });
 
+test("parseSmokeArgs puts the default screenshot under the given project root", () => {
+  assert.equal(parseSmokeArgs([], {}, "/home/me/app").outPng, "/home/me/app/screenshots/app-builder-preview.png");
+});
+
 test("parseSmokeArgs consumes --baseline without shifting positionals", () => {
   assert.deepEqual(
     parseSmokeArgs(
@@ -375,12 +379,15 @@ test("browser-smoke wires the guard and verdict helpers", () => {
   const src = readFileSync(join(TEMPLATE_ROOT, "scripts/browser-smoke.mjs"), "utf8");
   assert.match(src, /from "\.\/browser-guard\.mjs"/);
   assert.match(src, /from "\.\/browser-smoke-verdict\.mjs"/);
-  assert.match(src, /const args = parseSmokeArgs\(process\.argv\.slice\(2\), process\.env\)/);
+  // 輸出限制在專案根目錄底下；沙箱裡就是 /workspace，本機則是 clone 下來的目錄。
+  assert.match(src, /const ROOT = resolve\(dirname\(fileURLToPath\(import\.meta\.url\)\), "\.\."\)/);
+  assert.match(src, /const args = parseSmokeArgs\(process\.argv\.slice\(2\), process\.env, ROOT\)/);
   assert.match(src, /const url = checkedUrl\(args\.url\)/);
-  assert.match(src, /const outPng = checkedOutputPath\(args\.outPng, \["\/workspace"\]\)/);
-  assert.match(src, /const mobilePng = checkedOutputPath\(derived\.mobilePng, \["\/workspace"\]\)/);
-  assert.match(src, /const outJson = checkedOutputPath\(derived\.verdictJson, \["\/workspace"\]/);
-  assert.match(src, /checkedOutputPath\(realpathSync\(args\.baseline\), \["\/workspace"\]/);
+  assert.match(src, /const outPng = checkedOutputPath\(args\.outPng, \[ROOT\]\)/);
+  assert.match(src, /const mobilePng = checkedOutputPath\(derived\.mobilePng, \[ROOT\]\)/);
+  assert.match(src, /const outJson = checkedOutputPath\(derived\.verdictJson, \[ROOT\]/);
+  assert.match(src, /checkedOutputPath\(realpathSync\(args\.baseline\), \[ROOT\]/);
+  assert.doesNotMatch(src, /\["\/workspace"\]/);
   assert.match(src, /baselinePath === outJson/);
   assert.match(src, /normalizedBodyTextHash\(/);
   assert.match(src, /bodyTextPrefix\(/);

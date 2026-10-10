@@ -16,7 +16,7 @@ flowchart TD
     subgraph STATE ["共用狀態 src/components/app-state.tsx"]
         URL["網址 search<br/>view、gate"]
         LS["localStorage<br/>vibegate-profile-v1（受測系統）<br/>vibegate-checks-v1（閘門勾選）"]
-        RUN["最近一次執行 run<br/>plan = buildPlan(run.profile)"]
+        RUN["最近一次執行 run（sessionStorage vibegate-run-v1）<br/>plan = buildPlan(run.profile)"]
     end
 
     subgraph VIEWS ["六個畫面 src/components/views/"]
@@ -87,7 +87,7 @@ flowchart TD
 | 對照 | 白箱與黑箱的雙向對照，以及 ASVS 十七章 |
 | 工具 | SAST、SCA、DAST、AI 紅隊工具的定位與限制 |
 
-畫面與閘門寫在網址裡（例如 `?view=gates&gate=G3`），可以直接分享。受測系統設定與勾選只存在瀏覽器的 localStorage。
+畫面與閘門寫在網址裡（例如 `?view=gates&gate=G3`），可以直接分享。受測系統設定與勾選只存在瀏覽器的 localStorage；最近一次 Harness 結果存在 sessionStorage，重新整理還在，關掉分頁就清掉。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
 
 ## Harness 的規則
 
@@ -97,8 +97,11 @@ flowchart TD
 - **致命三要素**（私有資料、不受信任內容、對外通訊）只在有 LLM 或 Agent 時成立。沙箱或出向允許清單可以切斷一腳，人工核可不算。未切斷時 G0 與 G6 都阻擋。
 - **破壞性工具**只認人工核可，沙箱不能取代。
 - **示範程式的狀態**分三段：仍有缺陷、剩縱深項（只剩 CSP 強制、重設密碼限速這類警示）、已整治。
+- **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，Web 專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
 - **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、配額）一律升為阻擋；L1／L2 只警示。
-- **管線缺口**：每個發現都對到攔得下它的控制項（`FINDING_CONTROLS`），任一項在閘門頁已勾就算你們的管線涵蓋。
+- **SSRF 升級**：模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
+- **越權與 `alg:none` 是兩個發現**：只做 JWT 測試不算涵蓋雙帳號越權。
+- **管線缺口**：每個發現都對到攔得下它的控制項（`FINDING_CONTROLS`），任一項在閘門頁已勾就算你們的管線涵蓋。SBOM、金鑰輪替、差異掃描這類流程性控制項（`process: true`）不對應示範發現，測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
 ## 📦 目錄結構
 
@@ -107,7 +110,8 @@ G0withSixGates/
 ├── src/
 │   ├── routes/
 │   │   ├── __root.tsx              # 文件殼：head、樣式、<PreviewHostBridge />、<AuthProvider>
-│   │   └── index.tsx               # 唯一頁面；以 parseSearch 驗證 ?view=&gate=，掛上 AppShell
+│   │   ├── index.tsx               # 唯一頁面；以 parseSearch 驗證 ?view=&gate=，掛上 AppShell
+│   │   └── api/csp-report.ts       # CSP 違規回報端點：每筆摘要寫一行到部署日誌
 │   ├── components/
 │   │   ├── shell.tsx               # AppShell：標頭、側欄與底部導覽，依 view 切換畫面
 │   │   ├── app-state.tsx           # 共用狀態：網址參數、localStorage 存檔、最近一次執行與 plan
@@ -176,6 +180,10 @@ npm run lint
 npm run build      # 產出 .vercel/output（不進版控）
 ```
 
+推送到 `main` 與每個 pull request 都會由 GitHub Actions（`.github/workflows/ci.yml`）跑 lint、typecheck、test 與 build。
+
+渲染檢查：`npm run build && npm run preview:restart` 之後執行 `node scripts/browser-smoke.mjs http://127.0.0.1:8081/`，截圖與結果寫到專案的 `screenshots/`。在 Grok 以外執行時，「Created with Grok」標章腳本會被 grok.com 擋下，console 會出現一筆 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`，這是預期中的。
+
 `npm test` 由 `scripts/run-tests.mjs` 執行：每組測試各自跑，任何一組失敗就回傳非 0；`src/**/*.test.ts` 會自動被找到。
 
 ## 安全標頭
@@ -183,7 +191,8 @@ npm run build      # 產出 .vercel/output（不進版控）
 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
 
 - **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
-- **先觀察**：腳本、樣式、連線等來源限制以 `Content-Security-Policy-Report-Only` 送出，因為 Grok 標章腳本的內容無法事先檢視。上線後確認「Created with Grok」標章正常、瀏覽器 console 沒有 CSP 報告，再把 `ENFORCE_RESOURCE_POLICY` 改成 `true`。
+- **先觀察**：腳本、樣式、連線等來源限制以 `Content-Security-Policy-Report-Only` 送出，因為 Grok 標章腳本的內容無法事先檢視。上線後確認「Created with Grok」標章正常，部署日誌裡也沒有 `[csp]` 開頭的違規紀錄，再把 `ENFORCE_RESOURCE_POLICY` 改成 `true`。
+- **回報**：兩個 CSP 標頭都帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），並限制大小與筆數。
 - `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
 
 ## 平台檔案
