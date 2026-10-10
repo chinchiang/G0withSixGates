@@ -19,6 +19,11 @@
  *   that blocks it. Once the deployed site shows the badge with no CSP reports
  *   in the console, set `ENFORCE_RESOURCE_POLICY` to true.
  *
+ * Both headers report violations to `/api/csp-report` (`src/routes/api/csp-report.ts`),
+ * which logs a one-line summary per report to the deployment's function logs.
+ * Without a reporting endpoint the report-only policy is only visible in each
+ * visitor's own console, and nobody could tell when it is safe to enforce.
+ *
  * `'unsafe-inline'` stays in `script-src`: TanStack Start's hydration script
  * differs on every page, so hashes cannot cover it, and a per-request nonce would
  * mean editing the platform's `server/` middleware. The app renders no
@@ -44,6 +49,14 @@ export const STRUCTURAL_POLICY = policy({
   "form-action": ["'self'", ...GROK],
 });
 
+export const CSP_REPORT_PATH = "/api/csp-report";
+
+/** `report-uri` for browsers without the Reporting API (Firefox), `report-to` for the rest. */
+export const REPORTING = policy({
+  "report-uri": [CSP_REPORT_PATH],
+  "report-to": ["csp"],
+});
+
 export const RESOURCE_POLICY = policy({
   "default-src": ["'self'"],
   "script-src": ["'self'", "'unsafe-inline'", ...GROK],
@@ -64,9 +77,12 @@ export function vercelHeaderRoute() {
 export function securityHeaders(enforceResources = ENFORCE_RESOURCE_POLICY) {
   return {
     "Content-Security-Policy": enforceResources
-      ? `${RESOURCE_POLICY}; ${STRUCTURAL_POLICY}`
-      : STRUCTURAL_POLICY,
-    ...(enforceResources ? {} : { "Content-Security-Policy-Report-Only": RESOURCE_POLICY }),
+      ? `${RESOURCE_POLICY}; ${STRUCTURAL_POLICY}; ${REPORTING}`
+      : `${STRUCTURAL_POLICY}; ${REPORTING}`,
+    ...(enforceResources
+      ? {}
+      : { "Content-Security-Policy-Report-Only": `${RESOURCE_POLICY}; ${REPORTING}` }),
+    "Reporting-Endpoints": `csp="${CSP_REPORT_PATH}"`,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
