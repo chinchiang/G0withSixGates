@@ -48,17 +48,35 @@ export interface AppSearch {
   view?: ViewId;
   gate?: GateId;
   lang?: Locale;
+  /** 對照頁：分頁（預設風險對閘門）、閘門篩選與搜尋字。 Map view: tab (default: risks), gate filter and query. */
+  tab?: "chapters";
+  filter?: GateId;
+  q?: string;
 }
 
+/** 對照頁搜尋字的長度上限。 Maximum length of the map search query. */
+export const MAX_QUERY = 100;
+
 /**
- * 網址只留合法的 view、gate 與 lang，其他參數一律丟掉；預設值（總覽、中文）不寫進網址。
- * The URL keeps only valid view, gate and lang values; defaults (overview, Chinese) stay out of it.
+ * 網址只留合法的參數，其他一律丟掉；預設值（總覽、中文、風險對閘門）不寫進網址。
+ * 搜尋字可能被路由解析成數字，轉回字串並截短。
+ * The URL keeps only valid parameters; defaults (overview, Chinese, the risk tab) stay out of it.
+ * The router may parse a query as a number, so it is turned back into text and truncated.
  */
 export function parseSearch(search: Record<string, unknown>): AppSearch {
   const view = VIEWS.find((item) => item === search.view);
   const gate = GATES.find((item) => item === search.gate);
   const lang = isLocale(search.lang) && search.lang !== "zh" ? search.lang : undefined;
-  return { view: view === "overview" ? undefined : view, gate, lang };
+  const raw = typeof search.q === "string" || typeof search.q === "number" ? String(search.q) : "";
+  const q = raw.slice(0, MAX_QUERY);
+  return {
+    view: view === "overview" ? undefined : view,
+    gate,
+    lang,
+    tab: search.tab === "chapters" ? "chapters" : undefined,
+    filter: GATES.find((item) => item === search.filter),
+    q: q.trim() ? q : undefined,
+  };
 }
 
 export type Track = "design" | "whitebox" | "blackbox";

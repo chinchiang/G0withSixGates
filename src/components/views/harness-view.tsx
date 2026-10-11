@@ -8,9 +8,10 @@ import {
   coverage,
   reportFileName,
   reportMarkdown,
+  sameVerdictInputs,
   type Coverage,
 } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp, type HarnessRun } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 import { bi, joinAlt } from "@/i18n/locale";
@@ -78,7 +79,7 @@ const T = {
 };
 
 export function HarnessView() {
-  const { profile, run, plan, startRun, clearRun, checks, openGate, locale } = useApp();
+  const { profile, run, plan, startRun, restoreRun, checks, openGate, locale } = useApp();
   const t = useT();
   // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。 Checks are live: tick one on the gates page and the gaps update on return.
   const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
@@ -94,6 +95,9 @@ export function HarnessView() {
   const [reduced, setReduced] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [revealTick, setRevealTick] = useState(0);
+  // 停止是取消這一次，不是清掉一切：還原按下執行前的那份結果。
+  // Stop cancels this run rather than wiping everything: it puts back the result from before.
+  const previousRun = useRef<HarnessRun | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -111,7 +115,8 @@ export function HarnessView() {
   }, [running, visible, plan, reduced]);
 
   const phase = !run ? "idle" : running ? "running" : "done";
-  const stale = phase === "done" && JSON.stringify(run?.profile) !== JSON.stringify(profile);
+  // 只改名稱或預設情境標記不影響規則，不算過期。 Renaming or the preset tag does not change the rules, so it is not stale.
+  const stale = phase === "done" && !!run && !sameVerdictInputs(run.profile, profile);
   const activeIndex = phase === "running" ? visible : -1;
 
   // 閘門依序亮起時，螢幕閱讀器逐道聽到結果，最後聽到裁決。回到這頁時不重唸：初始內容不會被宣讀。
@@ -140,6 +145,7 @@ export function HarnessView() {
         : "";
 
   function start() {
+    previousRun.current = run;
     startRun();
     setVisible(0);
     setOpenId(null);
@@ -158,14 +164,14 @@ export function HarnessView() {
   }, [revealTick, reduced]);
 
   function stop() {
-    clearRun();
+    restoreRun(previousRun.current);
     setRunning(false);
     setVisible(0);
   }
 
   function download() {
     if (!plan || !run) return;
-    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks, locale)], {
+    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks, locale, stale)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);

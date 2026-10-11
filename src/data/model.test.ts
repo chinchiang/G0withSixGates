@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as model from "./model.ts";
-import { GATE_DOCS, PRESETS, displayName, parseSearch } from "./model.ts";
+import { GATE_DOCS, MAX_QUERY, PRESETS, displayName, parseSearch } from "./model.ts";
 
 /**
  * 遞迴找出物件裡所有 `{ zh, en }`，確認兩種語言都有字。
@@ -58,25 +58,41 @@ describe("bilingual content", () => {
 });
 
 describe("parseSearch", () => {
+  const NONE = {
+    view: undefined,
+    gate: undefined,
+    lang: undefined,
+    tab: undefined,
+    filter: undefined,
+    q: undefined,
+  };
+
   it("keeps only valid view, gate and lang values", () => {
     assert.deepEqual(parseSearch({ view: "gates", gate: "G3", lang: "en", junk: 1 }), {
+      ...NONE,
       view: "gates",
       gate: "G3",
       lang: "en",
     });
-    assert.deepEqual(parseSearch({ view: "nope", gate: "G9", lang: "fr" }), {
-      view: undefined,
-      gate: undefined,
-      lang: undefined,
+    assert.deepEqual(parseSearch({ view: "nope", gate: "G9", lang: "fr" }), NONE);
+  });
+
+  it("keeps the map tab, gate filter and query", () => {
+    assert.deepEqual(parseSearch({ view: "map", tab: "chapters", filter: "G5", q: "授權" }), {
+      ...NONE,
+      view: "map",
+      tab: "chapters",
+      filter: "G5",
+      q: "授權",
     });
+    assert.deepEqual(parseSearch({ tab: "cross", filter: "all", q: "   " }), NONE);
+    // 路由會把純數字的參數解析成數字。 The router parses an all-digit parameter as a number.
+    assert.equal(parseSearch({ q: 918 }).q, "918");
+    assert.equal(parseSearch({ q: "x".repeat(500) }).q?.length, MAX_QUERY);
   });
 
   it("drops the defaults so they stay out of the URL", () => {
-    assert.deepEqual(parseSearch({ view: "overview", lang: "zh" }), {
-      view: undefined,
-      gate: undefined,
-      lang: undefined,
-    });
+    assert.deepEqual(parseSearch({ view: "overview", lang: "zh" }), NONE);
   });
 });
 

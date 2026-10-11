@@ -78,7 +78,9 @@ export function ProfileForm() {
 
   return (
     <div className="space-y-4">
-      <div role="group" aria-label={t(T.presets)} className="flex gap-2 overflow-x-auto pb-1">
+      {/* 兩欄換行而不是橫向捲動：四個情境都要一眼看得到，教學提示會點名「已整治」。
+          Two wrapping columns instead of a sideways scroller: all four presets must be visible, and the teaching hint names the remediated one. */}
+      <div role="group" aria-label={t(T.presets)} className="grid grid-cols-2 gap-2">
         {PRESET_ORDER.map((id) => (
           <Choice
             key={id}
@@ -86,7 +88,6 @@ export function ProfileForm() {
             // 選預設情境時名稱跟著語系走；之後改任何欄位就變成自訂。
             // Picking a preset names it in the current locale; editing any field makes it custom.
             onClick={() => setProfile({ ...PRESETS[id], name: PRESET_NAME[id][locale] })}
-            className="shrink-0"
           >
             {t(PRESET_NAME[id])}
           </Choice>

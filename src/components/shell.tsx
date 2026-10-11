@@ -77,7 +77,7 @@ function Frame() {
                 <button
                   key={item}
                   type="button"
-                  lang={item === "zh" ? "zh-Hant" : "en"}
+                  lang={item === "zh" ? "zh-Hant-TW" : "en"}
                   aria-pressed={locale === item}
                   onClick={() => setLocale(item)}
                   className={`min-h-9 min-w-11 px-3 ${
