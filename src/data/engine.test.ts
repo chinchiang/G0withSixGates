@@ -23,6 +23,7 @@ import {
   PRESETS,
   parseChecks,
   parseProfile,
+  parseSearch,
   type Exposure,
   type Mitigation,
   type Profile,
@@ -51,6 +52,7 @@ function* everyProfile(): Generator<Profile> {
     MITIGATIONS.filter((_, i) => mask & (1 << i)),
   );
   const flags = [
+    "critical",
     "api",
     "llm",
     "agent",
@@ -174,6 +176,13 @@ describe("surface and level", () => {
     );
   });
 
+  it("a high-impact domain is L3 even when internal and low sensitivity", () => {
+    const advice = recommendLevel({ ...PRESETS.script, critical: true });
+    assert.equal(advice.level, "L3");
+    assert.match(advice.reasons.join(""), /金流/);
+    assert.equal(recommendLevel(PRESETS.script).level, "L1");
+  });
+
   it("personal data brings in data protection and MFA findings", () => {
     const found = ids(buildPlan({ ...PRESETS.kb, exposure: "partner", sensitivity: "pii" }));
     assert.ok(found.includes("g4-pii"));
@@ -266,7 +275,7 @@ describe("invariants over every profile", () => {
       assert.equal(plan.release === "pass", plan.blockCount + plan.advisoryCount === 0, label);
       if (plan.release === "pass" && p.llm && p.exposure === "public") passWithModel++;
     }
-    assert.equal(count, 3 * 3 * 8 * 3 * 512);
+    assert.equal(count, 3 * 3 * 8 * 3 * 1024);
     assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
 
     // 每個可能出現的發現都有控制項攔得下，對照表也沒有過期的條目。
@@ -329,6 +338,12 @@ describe("parseProfile", () => {
     assert.deepEqual(parseProfile({ ...legacy, mitigation: "none" }).mitigations, []);
   });
 
+  it("reads profiles saved before the high-impact flag as not high-impact", () => {
+    const { critical: _critical, ...legacy } = PRESETS.platform;
+    assert.equal(parseProfile(legacy).critical, false);
+    assert.equal(parseProfile({ ...legacy, critical: true }).critical, true);
+  });
+
   it("falls back to defaults for broken data", () => {
     assert.deepEqual(parseProfile(null), PRESETS.kb);
     const p = parseProfile({ exposure: "galaxy", llm: "yes", mitigations: ["hitl", "magic"] });
@@ -376,5 +391,54 @@ describe("reportMarkdown", () => {
     assert.match(md, /你們的管線：會漏掉（✗ G5 /);
     assert.match(md, /## 你們的管線缺口/);
     assert.match(md, /本次 2 個發現中，有 1 個可能會漏掉/);
+  });
+});
+
+describe("reportMarkdown inputs", () => {
+  const at = new Date("2026-10-04T02:00:00.000Z");
+
+  it("does not print trifecta legs that only count with a model or agent", () => {
+    // 先開 LLM 勾了三要素再關掉：值還存著，但三要素不成立。
+    const leftover: Profile = { ...PRESETS.script, privateData: true, untrusted: true, egress: true };
+    const md = reportMarkdown(leftover, buildPlan(leftover), at, {});
+    assert.match(md, /私有資料：否；不受信任內容：否；對外通訊：否/);
+    const withModel = { ...leftover, llm: true };
+    assert.match(reportMarkdown(withModel, buildPlan(withModel), at, {}), /私有資料：是；不受信任內容：是；對外通訊：是/);
+  });
+
+  it("warns when the settings changed after the run", () => {
+    const plan = buildPlan(PRESETS.kb);
+    assert.doesNotMatch(reportMarkdown(PRESETS.kb, plan, at, {}), /設定已經改過/);
+    assert.match(reportMarkdown(PRESETS.kb, plan, at, {}, true), /設定已經改過/);
+  });
+
+  it("records the high-impact flag", () => {
+    const p = { ...PRESETS.script, critical: true };
+    assert.match(reportMarkdown(p, buildPlan(p), at, {}), /高衝擊領域：是/);
+  });
+});
+
+describe("parseSearch", () => {
+  it("keeps only known views, gates and map parameters", () => {
+    assert.deepEqual(parseSearch({ view: "map", gate: "G3", tab: "chapters", filter: "G5", q: "SSRF", x: 1 }), {
+      view: "map",
+      gate: "G3",
+      tab: "chapters",
+      filter: "G5",
+      q: "SSRF",
+    });
+    assert.deepEqual(parseSearch({ view: "admin", gate: "G9", tab: "cross", filter: "all", q: "   " }), {
+      view: undefined,
+      gate: undefined,
+      tab: undefined,
+      filter: undefined,
+      q: undefined,
+    });
+  });
+
+  it("drops the default view and turns numeric queries back into text", () => {
+    assert.equal(parseSearch({ view: "overview" }).view, undefined);
+    assert.equal(parseSearch({ q: 918 }).q, "918");
+    assert.equal(parseSearch({ q: "x".repeat(500) }).q?.length, 100);
   });
 });

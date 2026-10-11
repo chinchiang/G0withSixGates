@@ -67,7 +67,8 @@ interface AppState {
   /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 */
   plan: RunPlan | null;
   startRun: () => void;
-  clearRun: () => void;
+  /** 換回指定的執行結果（停止時還原上一次，沒有就是 null）。 */
+  restoreRun: (run: HarnessRun | null) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -138,7 +139,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       run,
       plan,
       startRun: () => setRun({ profile, at: new Date() }),
-      clearRun: () => setRun(null),
+      restoreRun: setRun,
     };
   }, [view, gate, navigate, profile, checks, run, plan]);
 

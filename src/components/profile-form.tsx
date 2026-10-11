@@ -27,18 +27,17 @@ export function ProfileForm() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {PRESET_ORDER.map((id) => (
-          <Choice
-            key={id}
-            active={profile.preset === id}
-            onClick={() => setProfile(PRESETS[id])}
-            className="shrink-0"
-          >
-            {PRESETS[id].name}
-          </Choice>
-        ))}
-      </div>
+      {/* 兩欄換行而不是橫向捲動：四個情境都要一眼看得到，教學提示會點名「已整治」。 */}
+      <fieldset>
+        <legend className="mb-2 text-sm text-muted">預設情境</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {PRESET_ORDER.map((id) => (
+            <Choice key={id} active={profile.preset === id} onClick={() => setProfile(PRESETS[id])}>
+              {PRESETS[id].name}
+            </Choice>
+          ))}
+        </div>
+      </fieldset>
 
       <label className="block text-sm">
         <span className="text-muted">系統名稱</span>
@@ -80,6 +79,12 @@ export function ProfileForm() {
       </fieldset>
 
       <div className="grid gap-2">
+        <ToggleRow
+          label="高衝擊領域"
+          hint="金流、醫療核心、關鍵基礎設施；直接列為 L3"
+          on={profile.critical}
+          onChange={(critical) => patchProfile({ critical })}
+        />
         <ToggleRow
           label="有 HTTP API 或網頁介面"
           hint={apiImplied ? "對外或含 LLM 時一定有" : "內部 API 也要過 G4 與 G5"}

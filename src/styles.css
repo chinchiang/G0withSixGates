@@ -37,9 +37,10 @@
 }
 
 @theme {
-  --font-sans: "IBM Plex Sans", "PingFang TC", "Noto Sans TC", "WenQuanYi Zen Hei",
-    sans-serif;
-  --font-mono: "IBM Plex Mono", "WenQuanYi Zen Hei Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
+    "WenQuanYi Zen Hei", sans-serif;
+  --font-mono: "IBM Plex Mono", "PingFang TC", "Microsoft JhengHei", "WenQuanYi Zen Hei Mono",
+    ui-monospace, monospace;
 
   --color-bg: #101410;
   --color-bg-raised: #161c18;
@@ -69,6 +70,11 @@
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);
+  }
+  /* 鍵盤焦點統一用強調色外框：瀏覽器預設的焦點環在深色底上各家差很多。 */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {

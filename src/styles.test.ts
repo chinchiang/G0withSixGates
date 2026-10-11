@@ -94,9 +94,16 @@ const COMPONENT_PAIRS: [string, Rgb, Rgb][] = [
   ["開啟開關的軌道 on bg-raised", accent, raised],
   ["開啟開關的圓鈕 on 軌道", bg, accent],
   ["已勾選核取方塊 on bg", accent, bg],
+  ["焦點外框 on bg", accent, bg],
+  ["焦點外框 on bg-raised", accent, raised],
+  ["焦點外框 on surface", accent, surface],
 ];
 
 describe("component contrast", () => {
+  it("draws a keyboard focus ring in the accent color", () => {
+    assert.match(css, /:focus-visible\s*{\s*outline:\s*2px solid var\(--color-accent\)/);
+  });
+
   for (const [label, mark, base] of COMPONENT_PAIRS) {
     it(`${label} meets WCAG 1.4.11 3:1`, () => {
       const ratio = contrast(mark, base);

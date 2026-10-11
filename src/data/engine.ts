@@ -92,6 +92,7 @@ export function recommendLevel(p: Profile): { level: Level; reasons: string[] } 
   if (p.sensitivity === "pii" && p.exposure === "public") {
     reasons.push("對外系統處理個資，不適合停在第一道防線。");
   }
+  if (p.critical) reasons.push("屬於金流、醫療核心或關鍵基礎設施，不論暴露面都要高保證。");
   if (trifectaOpen(p)) {
     reasons.push("致命三要素同時成立，而且沒有切斷私有資料、不受信任內容或對外通訊。");
   }
@@ -706,7 +707,10 @@ export function reportMarkdown(
   plan: RunPlan,
   at: Date,
   checks: Record<string, boolean>,
+  /** 下載時的設定已經和這次執行不同（畫面上會顯示「設定已改」）。 */
+  stale = false,
 ): string {
+  const ai = p.llm || p.agent;
   const covered = new Map(coverage(plan, checks).map((item) => [item.finding.id, item]));
   const missed = [...covered.values()].filter((item) => !item.caught);
   const lines: string[] = [
@@ -714,6 +718,9 @@ export function reportMarkdown(
     ``,
     `> ${DEMO_NOTICE}`,
     ``,
+    ...(stale
+      ? [`> 注意：下載時畫面上的設定已經改過，這份裁決只代表下面列的執行當下設定。`, ``]
+      : []),
     `- 系統：${p.name}`,
     `- 執行時間：${localStamp(at)}`,
     `- 建議等級：${plan.level}`,
@@ -723,9 +730,10 @@ export function reportMarkdown(
     plan.headline,
     ``,
     `## 受測設定`,
-    `- 暴露面：${EXPOSURE_LABEL[p.exposure]}；資料敏感度：${SENSITIVITY_LABEL[p.sensitivity]}`,
+    `- 暴露面：${EXPOSURE_LABEL[p.exposure]}；資料敏感度：${SENSITIVITY_LABEL[p.sensitivity]}；高衝擊領域：${yesNo(p.critical)}`,
     `- HTTP API 或網頁：${yesNo(webSurface(p))}；LLM：${yesNo(p.llm)}；Agent：${yesNo(p.agent)}；破壞性工具：${yesNo(p.agent && p.destructive)}`,
-    `- 私有資料：${yesNo(p.privateData)}；不受信任內容：${yesNo(p.untrusted)}；對外通訊：${yesNo(p.egress)}`,
+    // 三要素只在有 LLM 或 Agent 時成立；表單會停用這三項，但先前存下的值還在，不能照印。
+    `- 私有資料：${yesNo(ai && p.privateData)}；不受信任內容：${yesNo(ai && p.untrusted)}；對外通訊：${yesNo(ai && p.egress)}`,
     `- 設計期緩解：${p.mitigations.map((item) => MITIGATION_LABEL[item]).join("、") || "無"}`,
     `- 威脅模型：${p.threatModel ? "已完成" : "未完成"}；PR 只掃差異：${yesNo(p.diffOnly)}；程式狀態：${DEFECT_LABEL[p.defects]}`,
     ``,

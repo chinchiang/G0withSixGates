@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_REPORT_BYTES, summarizeCspReports } from "./csp-report.ts";
+import { MAX_ENTRIES, MAX_REPORT_BYTES, readCapped, summarizeCspReports } from "./csp-report.ts";
 
 describe("summarizeCspReports", () => {
   it("reads the legacy report-uri format", () => {
@@ -47,8 +47,39 @@ describe("summarizeCspReports", () => {
       body: { effectiveDirective: "x".repeat(1000) },
     }));
     const out = summarizeCspReports(JSON.stringify(many));
-    assert.ok(out.length <= 20);
+    assert.ok(out.length <= MAX_ENTRIES);
     assert.ok(out.every((item) => item.directive.length <= 200));
     assert.deepEqual(summarizeCspReports(" ".repeat(MAX_REPORT_BYTES) + "{}"), []);
+  });
+});
+
+/** 模擬 chunked 本文：分成多塊送出，沒有 content-length。 */
+function chunked(parts: string[]): ReadableStream<Uint8Array> & { cancelled: boolean } {
+  const encoder = new TextEncoder();
+  let i = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i < parts.length) controller.enqueue(encoder.encode(parts[i++]));
+      else controller.close();
+    },
+    cancel() {
+      stream.cancelled = true;
+    },
+  }) as ReadableStream<Uint8Array> & { cancelled: boolean };
+  stream.cancelled = false;
+  return stream;
+}
+
+describe("readCapped", () => {
+  it("joins chunks, multi-byte characters included", async () => {
+    assert.equal(await readCapped(chunked(['{"a":', '"閘門"}']), 100), '{"a":"閘門"}');
+    assert.equal(await readCapped(null, 100), "");
+  });
+
+  it("stops reading once a chunked body passes the limit", async () => {
+    const parts = Array.from({ length: 50 }, () => "x".repeat(1024));
+    const stream = chunked(parts);
+    assert.equal(await readCapped(stream, MAX_REPORT_BYTES), null);
+    assert.equal(stream.cancelled, true);
   });
 });

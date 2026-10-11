@@ -30,3 +30,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # 渲染、版面、儲存、網址狀態與 CSP 端點要真的瀏覽器才測得到；對正式建置跑。
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run preview:restart
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: |
+            screenshots/
+            .grok/preview.log

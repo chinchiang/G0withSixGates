@@ -1,13 +1,31 @@
 import { useMemo, useState } from "react";
-import { CHAPTERS, GATES, GATE_NAME, MAP_ROWS, type GateId } from "@/data/model";
+import { getRouteApi } from "@tanstack/react-router";
+import { CHAPTERS, GATES, GATE_NAME, MAP_ROWS, MAX_QUERY, type AppSearch } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
 
+/** 閘門連結：文字小，但點擊範圍維持 44px，跟其他畫面一致。 */
+const GATE_LINK = "inline-flex min-h-11 items-center font-mono text-xs text-accent";
+
+const route = getRouteApi("/");
+
 export function MapView() {
   const { openGate } = useApp();
-  const [query, setQuery] = useState("");
-  const [gate, setGate] = useState<GateId | "all">("all");
-  const [tab, setTab] = useState<"cross" | "chapters">("cross");
+  // 分頁、篩選與搜尋寫在網址裡，跟其他畫面一樣可以直接分享。
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const tab = search.tab ?? "cross";
+  const gate = search.filter ?? "all";
+  // 輸入框用本地狀態：直接綁網址會打斷注音、倉頡等輸入法的選字。
+  const [query, setQueryState] = useState(search.q ?? "");
+  const setSearch = (patch: Partial<AppSearch>) =>
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  const setTab = (next: "cross" | "chapters") => setSearch({ tab: next === "chapters" ? next : undefined });
+  const setGate = (next: AppSearch["filter"] | "all") => setSearch({ filter: next === "all" ? undefined : next });
+  function setQuery(next: string) {
+    setQueryState(next);
+    setSearch({ q: next.trim() ? next : undefined });
+  }
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -64,6 +82,7 @@ export function MapView() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          maxLength={MAX_QUERY}
           placeholder="搜尋章節、工具或風險"
           className="min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 text-sm"
         />
@@ -89,16 +108,16 @@ export function MapView() {
                 <h2 className="text-sm font-semibold">{row.risk}</h2>
                 <Badge tone={row.policy}>{row.policy === "block" ? "預設阻擋" : "預設警示"}</Badge>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={() => openGate(row.gate)} className="font-mono text-xs text-accent">
+              <div className="mt-1 flex flex-wrap gap-x-3">
+                <button type="button" onClick={() => openGate(row.gate)} className={GATE_LINK}>
                   {row.gate} {GATE_NAME[row.gate]}
                 </button>
                 {row.pair && (
-                  <button type="button" onClick={() => openGate(row.pair!)} className="font-mono text-xs text-accent">
+                  <button type="button" onClick={() => openGate(row.pair!)} className={GATE_LINK}>
                     ↔ {row.pair} {GATE_NAME[row.pair]}
                   </button>
                 )}
-                <span className="font-mono text-xs text-faint">{row.track}</span>
+                <span className="self-center font-mono text-xs text-faint">{row.track}</span>
               </div>
               <p className="mt-2 text-sm leading-6 text-muted">{row.confirm}</p>
               <p className="mt-2 font-mono text-xs text-faint">
@@ -118,7 +137,13 @@ export function MapView() {
                 action={
                   <span className="flex flex-wrap justify-end gap-1">
                     {chapter.gates.map((id) => (
-                      <button key={id} type="button" onClick={() => openGate(id)}>
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => openGate(id)}
+                        aria-label={`前往 ${id} ${GATE_NAME[id]}`}
+                        className="-my-2 inline-flex min-h-11 min-w-11 items-center justify-center"
+                      >
                         <Badge tone="neutral">{id}</Badge>
                       </button>
                     ))}

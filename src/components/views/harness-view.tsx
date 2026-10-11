@@ -11,12 +11,12 @@ import {
   sameVerdictInputs,
   type Coverage,
 } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp, type HarnessRun } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 
 export function HarnessView() {
-  const { profile, run, plan, startRun, clearRun, checks, openGate } = useApp();
+  const { profile, run, plan, startRun, restoreRun, checks, openGate } = useApp();
   // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。
   const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
   const coverageById = useMemo(() => new Map(covered.map((item) => [item.finding.id, item])), [covered]);
@@ -28,6 +28,8 @@ export function HarnessView() {
   const [reduced, setReduced] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [revealTick, setRevealTick] = useState(0);
+  // 停止是取消這一次，不是清掉一切：還原按下執行前的那份結果。
+  const previousRun = useRef<HarnessRun | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -65,6 +67,7 @@ export function HarnessView() {
         : "";
 
   function start() {
+    previousRun.current = run;
     startRun();
     setVisible(0);
     setOpenId(null);
@@ -81,14 +84,14 @@ export function HarnessView() {
   }, [revealTick, reduced]);
 
   function stop() {
-    clearRun();
+    restoreRun(previousRun.current);
     setRunning(false);
     setVisible(0);
   }
 
   function download() {
     if (!plan || !run) return;
-    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks)], {
+    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks, stale)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);

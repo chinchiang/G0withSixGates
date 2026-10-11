@@ -14,7 +14,7 @@ flowchart TD
     IDX --> SHELL["AppShell：側欄／底部導覽切換六個畫面<br/>src/components/shell.tsx"]
 
     subgraph STATE ["共用狀態 src/components/app-state.tsx"]
-        URL["網址 search<br/>view、gate"]
+        URL["網址 search<br/>view、gate；對照頁的 tab、filter、q"]
         LS["localStorage<br/>vibegate-profile-v1（受測系統）<br/>vibegate-checks-v1（閘門勾選）"]
         RUN["最近一次執行 run（sessionStorage vibegate-run-v1）<br/>plan = buildPlan(run.profile)"]
     end
@@ -39,7 +39,7 @@ flowchart TD
     end
 
     subgraph ENGINE ["Harness 規則引擎 src/data/engine.ts（示範模擬，純函式）"]
-        LVL["分級 recommendLevel<br/>三要素未切斷／破壞性工具無人工核可／個資對外 → L3"]
+        LVL["分級 recommendLevel<br/>高衝擊領域／三要素未切斷／破壞性工具無人工核可／個資對外 → L3"]
         PLAN["buildPlan：依序產生七個 GateStep"]
         G0["設計期・G0 威脅建模"]
         WB["白箱・G1 供應鏈 → G2 金鑰 → G3 靜態分析 → G4 存取控制"]
@@ -63,12 +63,14 @@ flowchart TD
     REPORT -- "下載紀錄" --> HV
 
     subgraph BUILD ["建置、測試與部署"]
-        VITE["vite.config.ts<br/>TanStack Start、Tailwind v4、grokPwaPlugin，<br/>build 時加 Nitro vercel preset"]
+        VITE["vite.config.ts<br/>TanStack Start、Tailwind v4、grokPwaPlugin，<br/>build 與 preview 時加 Nitro vercel preset"]
         HDR["scripts/security-headers.mjs<br/>CSP 強制結構性政策＋Report-Only 資源政策"]
         OUT["npm run build → .vercel/output → Vercel"]
-        TEST["npm test → scripts/run-tests.mjs<br/>engine.test.ts（所有設定組合的不變條件）、styles.test.ts（對比度）、scripts/*.test.mjs"]
+        TEST["npm test → scripts/run-tests.mjs<br/>engine.test.ts（所有設定組合的不變條件）、styles.test.ts（對比度、焦點外框）、csp-report.test.ts、src/lib/**.test.ts、scripts/*.test.mjs"]
+        E2E["npm run test:e2e → scripts/e2e.mjs<br/>對正式建置操作每個畫面（Playwright）"]
         VITE --> OUT
         HDR --> OUT
+        OUT -. 預覽 .-> E2E
     end
 
     ENGINE -. 測試 .-> TEST
@@ -87,19 +89,19 @@ flowchart TD
 | 對照 | 白箱與黑箱的雙向對照，以及 ASVS 十七章 |
 | 工具 | SAST、SCA、DAST、AI 紅隊工具的定位與限制 |
 
-畫面與閘門寫在網址裡（例如 `?view=gates&gate=G3`），可以直接分享。受測系統設定與勾選只存在瀏覽器的 localStorage；最近一次 Harness 結果存在 sessionStorage，重新整理還在，關掉分頁就清掉。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
+畫面與閘門寫在網址裡（例如 `?view=gates&gate=G3`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享。受測系統設定與勾選只存在瀏覽器的 localStorage；最近一次 Harness 結果存在 sessionStorage，重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
 
 ## Harness 的規則
 
 規則都在 `src/data/engine.ts`，重點如下：
 
-- **分級**：對外且有個資、致命三要素未切斷、破壞性工具沒有人工核可，任一項成立就是 L3；有個資、有 LLM、超出內部使用或有 Agent 則是 L2；其餘 L1。
+- **分級**：高衝擊領域（金流、醫療核心、關鍵基礎設施）、對外且有個資、致命三要素未切斷、破壞性工具沒有人工核可，任一項成立就是 L3；有個資、有 LLM、超出內部使用或有 Agent 則是 L2；其餘 L1。
 - **致命三要素**（私有資料、不受信任內容、對外通訊）只在有 LLM 或 Agent 時成立。沙箱或出向允許清單可以切斷一腳，人工核可不算。未切斷時 G0 與 G6 都阻擋。
 - **破壞性工具**只認人工核可，沙箱不能取代。
-- **示範程式的狀態**分三段：仍有缺陷、剩縱深項（只剩 CSP 強制、重設密碼限速這類警示）、已整治。
+- **示範程式的狀態**分三段：仍有缺陷、剩縱深項（只剩 CSP 強制、重設密碼限速這類項目；L1／L2 警示，L3 阻擋）、已整治。
 - **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，Web 專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
 - **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、配額）一律升為阻擋；L1／L2 只警示。
-- **SSRF 升級**：模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
+- **SSRF 升級**：程式仍有缺陷、屬 Web 表面、有 LLM 或 Agent 且有對外通訊，又沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
 - **越權與 `alg:none` 是兩個發現**：只做 JWT 測試不算涵蓋雙帳號越權。
 - **管線缺口**：每個發現都對到攔得下它的控制項（`FINDING_CONTROLS`），任一項在閘門頁已勾就算你們的管線涵蓋。SBOM、金鑰輪替、差異掃描這類流程性控制項（`process: true`）不對應示範發現，測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
@@ -111,11 +113,14 @@ G0withSixGates/
 │   ├── routes/
 │   │   ├── __root.tsx              # 文件殼：head、樣式、<PreviewHostBridge />、<AuthProvider>
 │   │   ├── index.tsx               # 唯一頁面；以 parseSearch 驗證 ?view=&gate=，掛上 AppShell
-│   │   └── api/csp-report.ts       # CSP 違規回報端點：每筆摘要寫一行到部署日誌
+│   │   └── api/csp-report.ts       # CSP 違規回報端點：一個請求寫一行到部署日誌，GET 回 405
+│   ├── csp-report.ts           # 把 CSP 回報整理成摘要（去掉查詢字串、限制大小與筆數）
+│   ├── csp-report.test.ts      # 上一支的測試
 │   ├── components/
 │   │   ├── shell.tsx               # AppShell：標頭、側欄與底部導覽，依 view 切換畫面
 │   │   ├── app-state.tsx           # 共用狀態：網址參數、localStorage 存檔、最近一次執行與 plan
-│   │   ├── profile-form.tsx        # 受測系統設定表單（預設情境、暴露面、LLM／Agent、三要素、緩解）
+│   │   ├── profile-form.tsx        # 受測系統設定表單（預設情境、暴露面、高衝擊領域、LLM／Agent、三要素、緩解）
+│   │   ├── not-found.tsx           # 找不到網址時的 404 畫面
 │   │   ├── ui.tsx                  # Panel、Badge、按鈕、Choice、ToggleRow 等基礎元件
 │   │   ├── preview-host-bridge.tsx # 平台：Grok 即時預覽的 postMessage 橋接
 │   │   └── views/                  # 六個畫面
@@ -133,11 +138,13 @@ G0withSixGates/
 │   │   ├── auth/                   #   Better Auth 伺服端與用戶端、Grok 閘道登入
 │   │   ├── app-data/               #   檢視者連接器資料（app-data 技能）
 │   │   ├── db.ts、env.server.ts    #   資料庫與環境變數
+│   │   ├── error-component.tsx     #   路由錯誤畫面
+│   │   ├── preview-embedder-origin.ts、preview-host-bridge.ts # Grok 預覽嵌入來源與橋接協定
 │   │   ├── og/site.json            #   分享卡片設定
 │   │   └── multiplayer/            #   P2P 多人連線助手（未使用）
 │   ├── styles.css                  # Tailwind v4 與色彩 tokens
 │   ├── styles.test.ts              # 檢查文字與元件對比度
-│   ├── router.tsx                  # getRouter()，掛上錯誤畫面
+│   ├── router.tsx                  # getRouter()，掛上錯誤畫面與 404 畫面
 │   ├── routeTree.gen.ts            # TanStack Router 自動產生
 │   └── zod-jitless.ts              # 平台：zod 設定
 ├── scripts/
@@ -145,26 +152,33 @@ G0withSixGates/
 │   ├── security-headers.mjs        # 正式建置的安全標頭（CSP、HSTS 等），寫進 Vercel 輸出設定
 │   ├── with-app-env.mjs            # 讓 npm scripts 帶入 .grok/app-env.json 再啟動 Vite
 │   ├── browser-smoke.mjs           # 桌機與手機的渲染檢查（Playwright）
-│   ├── migrate.mjs、migration-plan.mjs # 建置後套用 migrations（本 app 只有平台的 auth 表）
-│   ├── grok-pwa-plugin.mjs、grok-pwa-shared.mjs # 平台：PWA head 與「Created with Grok」標章
+│   ├── e2e.mjs                     # npm run test:e2e：對執行中的伺服器操作每個畫面
+│   ├── migrate.mjs、migration-plan.mjs # 建置後套用 migrations/ 第一層的 .sql；有 DATABASE_URL 才執行，本 app 沒有可套用的檔案
+│   ├── preview.mjs、preview-thumbnail.mjs # preview:restart／stop 與預覽縮圖
+│   ├── browser-guard.mjs、browser-smoke-verdict.mjs # browser-smoke 的輔助與裁決
+│   ├── brand-check.mjs、check-auth-invariant.mjs # 平台：分享卡片與 auth 開關檢查
+│   ├── app-env-plugin.mjs、sign-out-plan.mjs、write-atomic.mjs # 平台：app-env 外掛與輔助
+│   ├── grok-pwa-plugin.mjs、grok-pwa-shared.mjs、install-page.html # 平台：PWA head 與「Created with Grok」標章
 │   └── *.test.mjs                  # 以上腳本的測試
 ├── server/
-│   └── middleware/grok-pwa.ts      # 平台：Nitro 中介層（PWA 安裝頁、manifest）
+│   ├── middleware/grok-pwa.ts      # 平台：Nitro 中介層（PWA 安裝頁、manifest）
+│   └── virtual-grok-og-identity.d.ts # 平台：型別宣告
 ├── public/
 │   ├── favicon.svg、og.jpg         # 圖示與分享卡片
 │   ├── fonts/                      # IBM Plex Sans／Mono
 │   └── __grok/                     # 平台：PWA 圖示與安裝教學
 ├── migrations/
-│   └── auth/0001_auth.sql          # 平台：Better Auth 資料表（本 app 未使用）
+│   └── auth/0001_auth.sql          # 平台：Better Auth 資料表（選用；migrate.mjs 不讀子目錄，不會套用）
 ├── attachments/                    # 參考資料：ASVS 5.0.0 原文（docx）與心智圖。兩份課程筆記 PDF 與威脅模型圖 GIF 只留在本機，不進版控
 ├── screenshots/                    # browser-smoke 的截圖輸出，只保留目錄
+├── .github/workflows/ci.yml        # CI：lint、typecheck、test、build；另一個 job 跑 e2e
 ├── .grok/                          # 平台：app-env.json、references/、skills/（給 Grok 代理的合約與技能）
 ├── AGENTS.md                       # 平台：Grok App Builder 的工作合約
 ├── startup.sh                      # 平台：Grok 沙箱重啟時的啟動腳本（路徑固定為 /workspace）
-├── vite.config.ts                  # Vite：TanStack Start、Tailwind、PWA 插件；build 時加 Nitro vercel preset 與安全標頭
+├── vite.config.ts                  # Vite：TanStack Start、Tailwind、PWA 與平台外掛；build／preview 時加 Nitro vercel preset 與安全標頭
 ├── vercel.json                     # 部署時只安裝正式依賴
 ├── eslint.config.mjs、.prettierrc、tsconfig.json
-└── package.json                    # Node 22；dev／build／test／typecheck／lint
+└── package.json                    # 要求 Node 22；dev／build／test／typecheck／lint
 ```
 
 ## 開發
@@ -174,15 +188,18 @@ G0withSixGates/
 ```sh
 npm ci
 npm run dev        # http://localhost:8080
-npm test           # 規則引擎、對比度與模板腳本的測試
+npm test           # 規則引擎、對比度、CSP 回報與模板腳本的測試
 npm run typecheck
 npm run lint
 npm run build      # 產出 .vercel/output（不進版控）
+npm run preview:restart && npm run test:e2e   # 對正式建置跑瀏覽器端的互動測試
 ```
 
-推送到 `main` 與每個 pull request 都會由 GitHub Actions（`.github/workflows/ci.yml`）跑 lint、typecheck、test 與 build。
+推送到 `main` 與每個 pull request 都會由 GitHub Actions（`.github/workflows/ci.yml`）跑 lint、typecheck、test 與 build，另一個 job 安裝 Chromium，對正式建置跑 `npm run test:e2e`，失敗時上傳截圖。
 
 渲染檢查：`npm run build && npm run preview:restart` 之後執行 `node scripts/browser-smoke.mjs http://127.0.0.1:8081/`，截圖與結果寫到專案的 `screenshots/`。在 Grok 以外執行時，「Created with Grok」標章腳本會被 grok.com 擋下，console 會出現一筆 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`，這是預期中的。
+
+`npm run test:e2e` 測要真的瀏覽器才看得到的事：每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。上面那筆標章錯誤會被略過。
 
 `npm test` 由 `scripts/run-tests.mjs` 執行：每組測試各自跑，任何一組失敗就回傳非 0；`src/**/*.test.ts` 會自動被找到。
 
@@ -192,7 +209,7 @@ npm run build      # 產出 .vercel/output（不進版控）
 
 - **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
 - **先觀察**：腳本、樣式、連線等來源限制以 `Content-Security-Policy-Report-Only` 送出，因為 Grok 標章腳本的內容無法事先檢視。上線後確認「Created with Grok」標章正常，部署日誌裡也沒有 `[csp]` 開頭的違規紀錄，再把 `ENFORCE_RESOURCE_POLICY` 改成 `true`。
-- **回報**：兩個 CSP 標頭都帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），並限制大小與筆數。
+- **回報**：兩個 CSP 標頭都帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），一個請求只寫一行並限制筆數；本文邊讀邊計數，超過 16KB 回 413，chunked 請求也一樣。端點本身沒有頻率限制，有需要時在 Vercel 防火牆設定。
 - `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
 
 ## 平台檔案

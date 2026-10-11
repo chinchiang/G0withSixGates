@@ -5,10 +5,11 @@
  * 與 Reporting API 的 `application/reports+json`（陣列、camelCase 欄位）。
  * 端點不需要登入，任何人都能送，所以只留判斷要不要強制 CSP 需要的欄位，
  * 網址去掉查詢字串與片段（可能帶權杖），字串截短，筆數設上限。
+ * 本文邊讀邊計數：chunked 請求沒有 content-length，不能只看標頭。
  */
 
 export const MAX_REPORT_BYTES = 16 * 1024;
-const MAX_ENTRIES = 20;
+export const MAX_ENTRIES = 20;
 const MAX_FIELD = 200;
 
 export interface CspSummary {
@@ -60,4 +61,29 @@ export function summarizeCspReports(raw: string): CspSummary[] {
   }
   if (isObject(parsed) && isObject(parsed["csp-report"])) return [summarize(parsed["csp-report"])];
   return [];
+}
+
+/** 讀到 limit 位元組為止；超過就中斷串流並回傳 null，不把整個本文讀進記憶體。 */
+export async function readCapped(body: ReadableStream<Uint8Array> | null, limit: number): Promise<string | null> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
 }

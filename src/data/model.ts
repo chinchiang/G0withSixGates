@@ -15,6 +15,8 @@ export interface Profile {
   name: string;
   exposure: Exposure;
   sensitivity: Sensitivity;
+  /** 金流、醫療核心、關鍵基礎設施：不論暴露面，ASVS 的高保證對象。 */
+  critical: boolean;
   api: boolean;
   llm: boolean;
   agent: boolean;
@@ -34,13 +36,28 @@ export const GATES: GateId[] = ["G0", "G1", "G2", "G3", "G4", "G5", "G6"];
 export interface AppSearch {
   view?: ViewId;
   gate?: GateId;
+  /** 對照頁：分頁（預設風險對閘門）、閘門篩選與搜尋字。 */
+  tab?: "chapters";
+  filter?: GateId;
+  q?: string;
 }
 
-/** 網址只留合法的 view 與 gate，其他參數一律丟掉。 */
+export const MAX_QUERY = 100;
+
+/** 網址只留合法的參數，其他一律丟掉。搜尋字可能被路由解析成數字，轉回字串並截短。 */
 export function parseSearch(search: Record<string, unknown>): AppSearch {
   const view = VIEWS.find((item) => item === search.view);
   const gate = GATES.find((item) => item === search.gate);
-  return { view: view === "overview" ? undefined : view, gate };
+  const filter = GATES.find((item) => item === search.filter);
+  const raw = typeof search.q === "string" || typeof search.q === "number" ? String(search.q) : "";
+  const q = raw.slice(0, MAX_QUERY);
+  return {
+    view: view === "overview" ? undefined : view,
+    gate,
+    tab: search.tab === "chapters" ? "chapters" : undefined,
+    filter,
+    q: q.trim() ? q : undefined,
+  };
 }
 
 export type Track = "設計期" | "白箱" | "黑箱";
@@ -112,6 +129,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: "內部排程腳本",
     exposure: "internal",
     sensitivity: "low",
+    critical: false,
     api: false,
     llm: false,
     agent: false,
@@ -129,6 +147,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: "對外客服知識庫",
     exposure: "public",
     sensitivity: "business",
+    critical: false,
     api: true,
     llm: true,
     agent: false,
@@ -146,6 +165,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: "Vibe 平台（高權限 Agent）",
     exposure: "public",
     sensitivity: "pii",
+    critical: false,
     api: true,
     llm: true,
     agent: true,
@@ -163,6 +183,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: "已整治的客服知識庫",
     exposure: "public",
     sensitivity: "business",
+    critical: false,
     api: true,
     llm: true,
     agent: false,
@@ -201,6 +222,7 @@ export function parseProfile(raw: unknown): Profile {
     name: typeof r.name === "string" ? r.name : d.name,
     exposure: pick(r.exposure, Object.keys(EXPOSURE_LABEL) as Exposure[], d.exposure),
     sensitivity: pick(r.sensitivity, Object.keys(SENSITIVITY_LABEL) as Sensitivity[], d.sensitivity),
+    critical: bool(r.critical, false),
     // 舊版沒有這個欄位，當時內部系統一律視為沒有 HTTP API。
     api: bool(r.api, false),
     llm: bool(r.llm, d.llm),

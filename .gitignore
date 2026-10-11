@@ -13,6 +13,7 @@ dist/
 # 本機與沙箱的執行期產物
 .node_modules.lock
 .grok/preview.log
+.grok/preview.pid
 .grok/status
 .grok/og-pending
 
