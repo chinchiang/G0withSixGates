@@ -6,9 +6,12 @@ import {
   catchingControls,
   caughtBy,
   coverage,
+  localDate,
+  localStamp,
   recommendLevel,
   reportFileName,
   reportMarkdown,
+  sameVerdictInputs,
   trifectaOpen,
   trifectaPresent,
   webSurface,
@@ -26,6 +29,10 @@ import {
   type Profile,
   type Sensitivity,
 } from "./model.ts";
+
+// 時間相關的斷言固定在台灣時區，不受跑測試的機器影響。
+// Time assertions are pinned to Taiwan's time zone so they do not depend on the machine running them.
+process.env.TZ = "Asia/Taipei";
 
 const ids = (plan: RunPlan) => plan.steps.flatMap((s) => s.findings.map((item) => item.id));
 const status = (plan: RunPlan, gate: string) => plan.steps.find((s) => s.gate === gate)?.status;
@@ -49,6 +56,7 @@ function* everyProfile(): Generator<Profile> {
     MITIGATIONS.filter((_, i) => mask & (1 << i)),
   );
   const flags = [
+    "critical",
     "api",
     "llm",
     "agent",
@@ -244,24 +252,23 @@ describe("gaps found by mutation testing", () => {
   });
 
   it("raises the G1, G2, G4 and G5 findings only for their triggers, always as blocks", () => {
-    assert.equal(find(buildPlan(PRESETS.platform), "g1-hook")?.severity, "block");
-    assert.equal(
-      find(buildPlan({ ...PRESETS.platform, destructive: false }), "g1-hook"),
-      undefined,
-    );
-    assert.equal(
-      find(buildPlan({ ...PRESETS.platform, destructive: false }), "g1-slop")?.severity,
-      "block",
-    );
+    // G1 跟著程式怎麼寫：有 Web 表面就是幻覺套件與安裝腳本，批次腳本是仿冒套件。
+    // G1 follows how the code was written: a web surface gets hallucinated packages and install hooks, a batch script gets a look-alike.
+    const webScript = buildPlan({ ...PRESETS.script, api: true });
+    assert.equal(find(webScript, "g1-slop")?.severity, "block");
+    assert.equal(find(webScript, "g1-hook")?.severity, "block");
+    assert.equal(find(webScript, "g1-cool"), undefined);
     assert.equal(find(buildPlan(PRESETS.script), "g1-cool")?.severity, "block");
+    assert.equal(find(buildPlan(PRESETS.script), "g1-hook"), undefined);
     assert.equal(find(buildPlan({ ...PRESETS.script, defects: "none" }), "g1-cool"), undefined);
 
-    assert.equal(find(buildPlan(PRESETS.script), "g2-key"), undefined);
-    assert.equal(find(buildPlan({ ...PRESETS.script, agent: true }), "g2-key")?.severity, "block");
-    assert.equal(
-      find(buildPlan({ ...PRESETS.script, exposure: "partner" }), "g2-key")?.severity,
-      "block",
+    // 寫死祕密不看受測系統有沒有模型，只是證據不同。 Hard-coded secrets do not depend on a model; only the evidence differs.
+    assert.match(find(buildPlan(PRESETS.script), "g2-key")?.detail.en ?? "", /database connection/);
+    assert.match(
+      find(buildPlan({ ...PRESETS.script, agent: true }), "g2-key")?.detail.en ?? "",
+      /vendor key/,
     );
+    assert.equal(find(buildPlan({ ...PRESETS.script, defects: "depth" }), "g2-key"), undefined);
     assert.equal(find(buildPlan({ ...PRESETS.kb, diffOnly: false }), "g2-hist"), undefined);
 
     const pii = buildPlan({ ...PRESETS.kb, sensitivity: "pii" });
@@ -301,7 +308,7 @@ describe("gaps found by mutation testing", () => {
 
   it("ranks a gate by its worst finding", () => {
     const script = buildPlan(PRESETS.script);
-    assert.equal(status(script, "G2"), "advisory");
+    assert.equal(status(buildPlan({ ...PRESETS.script, defects: "none" }), "G2"), "advisory");
     assert.equal(status(script, "G1"), "block");
     assert.equal(status(buildPlan({ ...PRESETS.hardened, defects: "none" }), "G3"), "pass");
     const kb = buildPlan(PRESETS.kb);
@@ -350,6 +357,9 @@ describe("invariants over every profile", () => {
           if (DEPTH.has(item.id)) assert.equal(item.severity, "block", `${item.id} ${label}`);
         }
       }
+      if (findings.some((item) => item.id === "g5-ssrf")) {
+        assert.equal(findings.find((item) => item.id === "g3-imds")?.severity, "block", label);
+      }
       for (const item of findings) produced.add(item.id);
       for (const s of plan.steps) {
         if (s.status === "na") assert.equal(s.findings.length, 0, label);
@@ -358,7 +368,7 @@ describe("invariants over every profile", () => {
       assert.equal(plan.release === "pass", plan.blockCount + plan.advisoryCount === 0, label);
       if (plan.release === "pass" && p.llm && p.exposure === "public") passWithModel++;
     }
-    assert.equal(count, 3 * 3 * 8 * 3 * 512);
+    assert.equal(count, 3 * 3 * 8 * 3 * 1024);
     assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
 
     // 每個可能出現的發現都有控制項攔得下，對照表也沒有過期的條目。
@@ -371,6 +381,19 @@ describe("invariants over every profile", () => {
         assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
     }
     assert.deepEqual(Object.keys(FINDING_CONTROLS).sort(), [...produced].sort());
+
+    // 每個控制項不是攔得下某個發現，就是明確標成流程性控制項；兩者不重疊。
+    // Every control either catches some finding or is explicitly a process control, never both.
+    const referenced = new Set(Object.values(FINDING_CONTROLS).flat());
+    for (const doc of GATE_DOCS) {
+      for (const item of doc.controls) {
+        assert.notEqual(
+          referenced.has(item.id),
+          Boolean(item.process),
+          `${item.id} is orphaned or double-flagged`,
+        );
+      }
+    }
   });
 });
 
@@ -448,7 +471,7 @@ describe("reportMarkdown", () => {
     assert.match(md, /^# 六扇門放行紀錄/);
     assert.doesNotMatch(md, /六道閘門|VIBEGATE|vibegate/i);
     assert.match(md, /示範模擬/);
-    assert.match(md, /執行時間：2026-10-04T02:00:00\.000Z/);
+    assert.match(md, /執行時間：2026-10-04 10:00:00（UTC\+08:00）/);
     assert.match(md, /設計期緩解：出向 Allow-list/);
     assert.match(md, /程式狀態：剩縱深項/);
     assert.match(md, /## G3 靜態分析（白箱／警示）/);
@@ -487,5 +510,90 @@ describe("reportMarkdown", () => {
 
   it("names the download after the project and the run date", () => {
     assert.equal(reportFileName(at), "six-gate-release-2026-10-04.md");
+  });
+
+  it("dates the record in the viewer's time zone, not UTC", () => {
+    // 台灣 07:30 還是 UTC 前一天 23:30；檔名與時間要跟著當地日期。
+    // 07:30 in Taiwan is still 23:30 the previous day in UTC; the file name and time follow the local date.
+    const early = new Date("2026-10-03T23:30:00.000Z");
+    assert.equal(localDate(early), "2026-10-04");
+    assert.equal(localStamp(early), "2026-10-04 07:30:00 (UTC+08:00)");
+    assert.equal(reportFileName(early), "six-gate-release-2026-10-04.md");
+    const en = reportMarkdown(PRESETS.kb, buildPlan(PRESETS.kb), early, {}, "en");
+    assert.match(en, /- Run time: 2026-10-04 07:30:00 \(UTC\+08:00\)/);
+  });
+
+  it("warns when the settings changed after the run, in both languages", () => {
+    const plan = buildPlan(PRESETS.kb);
+    assert.doesNotMatch(reportMarkdown(PRESETS.kb, plan, at, {}), /設定已經改過/);
+    assert.match(reportMarkdown(PRESETS.kb, plan, at, {}, "zh", true), /設定已經改過/);
+    assert.match(
+      reportMarkdown(PRESETS.kb, plan, at, {}, "en", true),
+      /settings on screen changed/,
+    );
+  });
+
+  it("records the high-impact flag", () => {
+    const p = { ...PRESETS.script, critical: true };
+    assert.match(reportMarkdown(p, buildPlan(p), at, {}), /高衝擊領域：是/);
+    assert.match(reportMarkdown(p, buildPlan(p), at, {}, "en"), /High-impact domain: yes/);
+  });
+});
+
+describe("high-impact domains", () => {
+  it("are L3 even when internal and low sensitivity", () => {
+    const advice = recommendLevel({ ...PRESETS.script, critical: true });
+    assert.equal(advice.level, "L3");
+    assert.match(advice.reasons.map((r) => r.en).join(""), /Payments/);
+    assert.equal(recommendLevel(PRESETS.script).level, "L1");
+  });
+
+  it("reads profiles saved before the flag as not high-impact", () => {
+    const { critical: _critical, ...legacy } = PRESETS.platform;
+    assert.equal(parseProfile(legacy).critical, false);
+    assert.equal(parseProfile({ ...legacy, critical: true }).critical, true);
+  });
+});
+
+describe("SSRF escalates the IMDSv2 gap", () => {
+  const find = (plan: RunPlan, id: string) =>
+    plan.steps.flatMap((s) => s.findings).find((f) => f.id === id);
+  // 對外客服知識庫加上模型可呼叫的抓取工具（對外通訊），但沒有沙箱或出向允許清單。
+  // The public knowledge base plus a model-callable fetch tool (egress), with no sandbox or egress allow-list.
+  const fetcher: Profile = { ...PRESETS.kb, egress: true };
+
+  it("blocks IMDSv2 at L2 once G5 reaches the metadata service", () => {
+    const plan = buildPlan({ ...fetcher, untrusted: false });
+    assert.equal(plan.level, "L2");
+    assert.equal(find(plan, "g5-ssrf")?.severity, "block");
+    assert.equal(find(plan, "g3-imds")?.severity, "block");
+  });
+
+  it("an egress allow-list or sandbox removes the SSRF and keeps IMDSv2 advisory", () => {
+    for (const mitigation of ["egress-list", "sandbox"] as const) {
+      const plan = buildPlan({ ...fetcher, mitigations: [mitigation] });
+      assert.equal(find(plan, "g5-ssrf"), undefined, mitigation);
+      assert.equal(find(plan, "g3-imds")?.severity, "advisory", mitigation);
+    }
+  });
+});
+
+describe("the IDOR and alg:none are separate findings", () => {
+  it("a JWT test alone does not cover the two-account check", () => {
+    const plan = buildPlan(PRESETS.kb);
+    assert.ok(ids(plan).includes("g5-idor"));
+    assert.ok(ids(plan).includes("g5-jwt"));
+    const covered = coverage(plan, { "g5-jwt": true });
+    assert.equal(covered.find((item) => item.finding.id === "g5-jwt")?.caught, true);
+    assert.equal(covered.find((item) => item.finding.id === "g5-idor")?.caught, false);
+  });
+});
+
+describe("stale verdicts", () => {
+  it("only count a change to a rule input", () => {
+    const renamed: Profile = { ...PRESETS.kb, preset: "custom", name: "改過名字" };
+    assert.equal(sameVerdictInputs(PRESETS.kb, renamed), true);
+    assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, diffOnly: false }), false);
+    assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, critical: true }), false);
   });
 });

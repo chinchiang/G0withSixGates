@@ -32,6 +32,11 @@ const T = {
   name: bi("系統名稱", "System name"),
   exposure: bi("暴露面", "Exposure"),
   sensitivity: bi("資料敏感度", "Data sensitivity"),
+  critical: bi("高衝擊領域", "High-impact domain"),
+  criticalHint: bi(
+    "金流、醫療核心、關鍵基礎設施；直接列為 L3",
+    "Payments, core healthcare, critical infrastructure; goes straight to L3",
+  ),
   api: bi("有 HTTP API 或網頁介面", "Has an HTTP API or web UI"),
   apiImplied: bi("對外或含 LLM 時一定有", "Always true when public or with an LLM"),
   apiHint: bi("內部 API 也要過 G4 與 G5", "Internal APIs still go through G4 and G5"),
@@ -131,6 +136,12 @@ export function ProfileForm() {
       </fieldset>
 
       <div className="grid gap-2">
+        <ToggleRow
+          label={t(T.critical)}
+          hint={t(T.criticalHint)}
+          on={profile.critical}
+          onChange={(critical) => patchProfile({ critical })}
+        />
         <ToggleRow
           label={t(T.api)}
           hint={apiImplied ? t(T.apiImplied) : t(T.apiHint)}
