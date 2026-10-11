@@ -141,6 +141,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Context 與它的 hook 放在一起；這個檔案改動時整頁重載是可以接受的。
+// The context and its hook live together; a full reload when this file changes is acceptable.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(): AppState {
   const value = useContext(Ctx);
   if (!value) throw new Error("AppState is not ready / AppState 尚未就緒");

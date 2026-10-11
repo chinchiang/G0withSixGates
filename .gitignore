@@ -15,6 +15,7 @@ dist/
 # Local and sandbox runtime artifacts
 .node_modules.lock
 .grok/preview.log
+.grok/preview.pid
 .grok/status
 .grok/og-pending
 

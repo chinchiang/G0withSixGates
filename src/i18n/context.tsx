@@ -20,11 +20,15 @@ export function LocaleProvider({ value, children }: { value: LocaleState; childr
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// Context 與它的 hook 放在一起；這個檔案改動時整頁重載是可以接受的。
+// The context and its hooks live together; a full reload when this file changes is acceptable.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLocale(): LocaleState {
   return useContext(Ctx);
 }
 
 /** 回傳 `t(bi)`：依目前語系取字串。 Returns `t(bi)`, which picks the string for the active locale. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useT(): (value: Bi) => string {
   const { locale } = useLocale();
   return (value) => pick(locale, value);
