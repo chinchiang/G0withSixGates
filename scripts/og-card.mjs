@@ -30,7 +30,7 @@ const gates = ["G0", "G1", "G2", "G3", "G4", "G5", "G6"];
 const labels = ["威脅建模", "供應鏈", "金鑰", "靜態分析", "存取控制", "動態測試", "AI 紅隊"];
 
 const html = `<!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8">
+<html lang="zh-Hant-TW"><head><meta charset="utf-8">
 <style>
   @font-face { font-family: Plex; font-weight: 400; src: ${font("plex-sans-400.woff2")}; }
   @font-face { font-family: Plex; font-weight: 600; src: ${font("plex-sans-600.woff2")}; }

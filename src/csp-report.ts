@@ -1,0 +1,106 @@
+/**
+ * 把瀏覽器送來的 CSP 違規報告整理成一行一筆的摘要，給 `/api/csp-report` 寫進部署日誌。
+ *
+ * 兩種格式都收：`report-uri` 的 `application/csp-report`（單筆、連字號欄位），
+ * 與 Reporting API 的 `application/reports+json`（陣列、camelCase 欄位）。
+ * 端點不需要登入，任何人都能送，所以只留找出被擋資源需要的欄位，
+ * 網址去掉查詢字串與片段（可能帶權杖），字串截短，筆數設上限。
+ * 本文邊讀邊計數：chunked 請求沒有 content-length，不能只看標頭。
+ *
+ * Turns the CSP violation reports browsers send into one-line summaries that
+ * `/api/csp-report` writes to the deployment logs. Both formats are accepted:
+ * `report-uri`'s `application/csp-report` (one report, hyphenated fields) and the
+ * Reporting API's `application/reports+json` (an array, camelCase fields). The
+ * endpoint is unauthenticated, so it keeps only the fields needed to find what was
+ * blocked, strips query strings and fragments (they may carry tokens), truncates
+ * strings and caps the count. The body is counted while it is read: a chunked
+ * request has no content-length, so the header alone is not enough.
+ */
+
+export const MAX_REPORT_BYTES = 16 * 1024;
+export const MAX_ENTRIES = 20;
+const MAX_FIELD = 200;
+
+export interface CspSummary {
+  disposition: string;
+  directive: string;
+  blocked: string;
+  document: string;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, MAX_FIELD) : "";
+}
+
+/** 只留來源與路徑；`inline`、`eval` 這類關鍵字原樣保留。 Keep origin and path only; keywords such as `inline` stay as they are. */
+function location(value: unknown): string {
+  const raw = text(value);
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`.slice(0, MAX_FIELD);
+  } catch {
+    return raw;
+  }
+}
+
+function summarize(body: Record<string, unknown>): CspSummary {
+  return {
+    disposition: text(body.disposition) || "report",
+    directive: text(
+      body.effectiveDirective ?? body["effective-directive"] ?? body["violated-directive"],
+    ),
+    blocked: location(body.blockedURL ?? body["blocked-uri"]),
+    document: location(body.documentURL ?? body["document-uri"]),
+  };
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+export function summarizeCspReports(raw: string): CspSummary[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.slice(0, MAX_REPORT_BYTES));
+  } catch {
+    return [];
+  }
+  if (Array.isArray(parsed)) {
+    return parsed
+      .filter((item) => isObject(item) && item.type === "csp-violation" && isObject(item.body))
+      .slice(0, MAX_ENTRIES)
+      .map((item) => summarize(item.body as Record<string, unknown>));
+  }
+  if (isObject(parsed) && isObject(parsed["csp-report"])) return [summarize(parsed["csp-report"])];
+  return [];
+}
+
+/**
+ * 讀到 limit 位元組為止；超過就中斷串流並回傳 null，不把整個本文讀進記憶體。
+ * Read up to `limit` bytes; past it, cancel the stream and return null instead of buffering the whole body.
+ */
+export async function readCapped(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+): Promise<string | null> {
+  if (!body) return "";
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}

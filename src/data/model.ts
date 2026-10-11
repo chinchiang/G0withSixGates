@@ -26,6 +26,8 @@ export interface Profile {
   name: string;
   exposure: Exposure;
   sensitivity: Sensitivity;
+  /** 金流、醫療核心、關鍵基礎設施：不論暴露面都是高保證對象。 Payments, core healthcare, critical infrastructure: high assurance whatever the exposure. */
+  critical: boolean;
   api: boolean;
   llm: boolean;
   agent: boolean;
@@ -46,17 +48,35 @@ export interface AppSearch {
   view?: ViewId;
   gate?: GateId;
   lang?: Locale;
+  /** 對照頁：分頁（預設風險對閘門）、閘門篩選與搜尋字。 Map view: tab (default: risks), gate filter and query. */
+  tab?: "chapters";
+  filter?: GateId;
+  q?: string;
 }
 
+/** 對照頁搜尋字的長度上限。 Maximum length of the map search query. */
+export const MAX_QUERY = 100;
+
 /**
- * 網址只留合法的 view、gate 與 lang，其他參數一律丟掉；預設值（總覽、中文）不寫進網址。
- * The URL keeps only valid view, gate and lang values; defaults (overview, Chinese) stay out of it.
+ * 網址只留合法的參數，其他一律丟掉；預設值（總覽、中文、風險對閘門）不寫進網址。
+ * 搜尋字可能被路由解析成數字，轉回字串並截短。
+ * The URL keeps only valid parameters; defaults (overview, Chinese, the risk tab) stay out of it.
+ * The router may parse a query as a number, so it is turned back into text and truncated.
  */
 export function parseSearch(search: Record<string, unknown>): AppSearch {
   const view = VIEWS.find((item) => item === search.view);
   const gate = GATES.find((item) => item === search.gate);
   const lang = isLocale(search.lang) && search.lang !== "zh" ? search.lang : undefined;
-  return { view: view === "overview" ? undefined : view, gate, lang };
+  const raw = typeof search.q === "string" || typeof search.q === "number" ? String(search.q) : "";
+  const q = raw.slice(0, MAX_QUERY);
+  return {
+    view: view === "overview" ? undefined : view,
+    gate,
+    lang,
+    tab: search.tab === "chapters" ? "chapters" : undefined,
+    filter: GATES.find((item) => item === search.filter),
+    q: q.trim() ? q : undefined,
+  };
 }
 
 export type Track = "design" | "whitebox" | "blackbox";
@@ -160,6 +180,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: PRESET_NAME.script.zh,
     exposure: "internal",
     sensitivity: "low",
+    critical: false,
     api: false,
     llm: false,
     agent: false,
@@ -177,6 +198,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: PRESET_NAME.kb.zh,
     exposure: "public",
     sensitivity: "business",
+    critical: false,
     api: true,
     llm: true,
     agent: false,
@@ -194,6 +216,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: PRESET_NAME.platform.zh,
     exposure: "public",
     sensitivity: "pii",
+    critical: false,
     api: true,
     llm: true,
     agent: true,
@@ -211,6 +234,7 @@ export const PRESETS: Record<Exclude<PresetId, "custom">, Profile> = {
     name: PRESET_NAME.hardened.zh,
     exposure: "public",
     sensitivity: "business",
+    critical: false,
     api: true,
     llm: true,
     agent: false,
@@ -275,6 +299,8 @@ export function parseProfile(raw: unknown): Profile {
       Object.keys(SENSITIVITY_LABEL) as Sensitivity[],
       d.sensitivity,
     ),
+    // 舊版沒有這個欄位，視為不是高衝擊領域。 Older saves lack this field; treat them as not high-impact.
+    critical: bool(r.critical, false),
     // 舊版沒有這個欄位，當時內部系統一律視為沒有 HTTP API。
     // Older saves lack this field; internal systems were treated as having no HTTP API.
     api: bool(r.api, false),
@@ -294,6 +320,11 @@ export function parseProfile(raw: unknown): Profile {
 export interface GateControl {
   id: string;
   text: Bi;
+  /**
+   * 流程性控制項：管線該有，但 Harness 的示範發現不會因為它而被攔下。
+   * A process control: the pipeline should have it, but no demo finding is caught by it.
+   */
+  process?: true;
 }
 
 export interface GateDoc {
@@ -355,6 +386,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g0-level",
+        process: true,
         text: bi(
           "已寫下 L1／L2／L3，並說明為何不是更低一級",
           "L1 / L2 / L3 is written down, with the reason it is not one level lower",
@@ -422,6 +454,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g1-sbom",
+        process: true,
         text: bi(
           "已產出 CycloneDX 或 SPDX，並以 EPSS 與 CISA KEV 排修補順序",
           "CycloneDX or SPDX is produced, and EPSS plus CISA KEV order the patching",
@@ -479,6 +512,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g2-rotate",
+        process: true,
         text: bi(
           "命中後的處置是撤銷與輪替，不是只改掉那一行",
           "A hit is handled by revoking and rotating, not by editing that one line",
@@ -538,6 +572,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g3-diff",
+        process: true,
         text: bi(
           "PR 只掃差異以控制在數分鐘內；全量留給夜間 CodeQL",
           "PRs scan only the diff to stay within minutes; the full run is left to nightly CodeQL",
@@ -679,8 +714,8 @@ export const GATE_DOCS: GateDoc[] = [
       {
         id: "g5-ssrf",
         text: bi(
-          "網址匯入不會打到雲端中繼資料或內部網段",
-          "URL import cannot reach cloud metadata or internal network ranges",
+          "網址匯入與模型的抓取工具不會打到雲端中繼資料或內部網段",
+          "URL import and the model's fetch tools cannot reach cloud metadata or internal network ranges",
         ),
       },
       {
@@ -799,11 +834,13 @@ export const FINDING_CONTROLS: Record<string, string[]> = {
   "g3-cmd": ["g3-param"],
   "g3-imds": ["g3-iac"],
   "g3-csp": ["g3-csp"],
-  "g4-bola": ["g4-owner", "g4-rls", "g5-bola"],
+  "g4-bola": ["g4-owner", "g4-rls", "g4-depth", "g5-bola"],
   "g4-pii": ["g4-pii"],
   "g4-tool": ["g4-allow", "g4-hitl"],
   "g4-rules": ["g4-rules"],
-  "g5-idor": ["g5-bola", "g5-jwt"],
+  "g5-idor": ["g5-bola"],
+  "g5-jwt": ["g5-jwt"],
+  "g5-ssrf": ["g5-ssrf"],
   "g5-mfa": ["g5-mfa"],
   "g5-debug": ["g5-debug"],
   "g5-rate": ["g5-rate"],

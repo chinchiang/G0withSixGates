@@ -110,6 +110,15 @@ export function agencyOpen(p: Profile): boolean {
   return p.agent && p.destructive && !p.mitigations.includes("hitl");
 }
 
+/**
+ * 兩份設定是否會得到同一份裁決。預設情境標記與系統名稱不影響規則，不算改動。
+ * Whether two profiles yield the same verdict. The preset tag and the system name do not affect the rules.
+ */
+export function sameVerdictInputs(a: Profile, b: Profile): boolean {
+  const key = ({ preset: _preset, name: _name, ...rest }: Profile) => JSON.stringify(rest);
+  return key(a) === key(b);
+}
+
 export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
   const reasons: Bi[] = [];
   if (p.sensitivity === "pii" && p.exposure === "public") {
@@ -117,6 +126,14 @@ export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
       bi(
         "對外系統處理個資，不適合停在第一道防線。",
         "A public system handling personal data should not stop at the first line of defense.",
+      ),
+    );
+  }
+  if (p.critical) {
+    reasons.push(
+      bi(
+        "屬於金流、醫療核心或關鍵基礎設施，不論暴露面都要高保證。",
+        "Payments, core healthcare or critical infrastructure call for high assurance whatever the exposure.",
       ),
     );
   }
@@ -228,6 +245,9 @@ export function buildPlan(p: Profile): RunPlan {
   const web = webSurface(p);
   const pii = p.sensitivity === "pii";
   const cut = biList(cutLabels(p));
+  // 模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 跟著升級。
+  // A model-callable HTTP tool with no sandbox or egress allow-list lets G5 reach cloud metadata, which escalates G3's IMDSv2.
+  const ssrf = vibe && web && (p.llm || p.agent) && p.egress && cutLabels(p).length === 0;
   const toolchain =
     level === "L1"
       ? bi("Semgrep 社群版、Trivy、Gitleaks、ZAP", "Semgrep Community, Trivy, Gitleaks, ZAP")
@@ -340,7 +360,9 @@ export function buildPlan(p: Profile): RunPlan {
       "Pre-install checks: existence, name distance, install scripts, cooling-off period.",
     ),
   ];
-  if (vibe && (p.llm || p.agent)) {
+  // 幻覺套件與惡意安裝腳本來自「用 AI 寫程式」，跟受測系統本身有沒有模型無關。
+  // Hallucinated packages and malicious install scripts come from writing code with AI, not from whether the system under test has a model.
+  if (vibe && web) {
     g1logs.push(
       bi(
         "規則檔與套件清單出現模型推薦的名稱。",
@@ -371,16 +393,14 @@ export function buildPlan(p: Profile): RunPlan {
       ),
       asvs: bi("V15.2 架構與相依", "V15.2 Architecture and dependencies"),
     });
-  }
-  if (vibe && p.agent && p.destructive) {
     g1.push({
       id: "g1-hook",
       gate: "G1",
       severity: "block",
       title: bi("安裝腳本會外連並讀取環境", "Install script calls out and reads the environment"),
       detail: bi(
-        "新依賴的 postinstall 在安裝當下執行，G2 的金鑰掃描來得太晚。",
-        "The new dependency's postinstall runs at install time; G2's secret scan arrives too late.",
+        "模型補上的新依賴帶著 postinstall，在安裝當下就執行。G2 的金鑰掃描來得太晚。",
+        "A new dependency the model added ships a postinstall that runs at install time; G2's secret scan arrives too late.",
       ),
       evidence: bi(
         "fast-json-safe@3.2.1 postinstall.js：fetch 外連，並讀取 process.env。發布 2 天。",
@@ -397,7 +417,7 @@ export function buildPlan(p: Profile): RunPlan {
       ),
       asvs: bi("V15.2", "V15.2"),
     });
-  } else if (vibe && !p.llm && !p.agent) {
+  } else if (vibe) {
     g1.push({
       id: "g1-cool",
       gate: "G1",
@@ -419,7 +439,7 @@ export function buildPlan(p: Profile): RunPlan {
       cwe: bi("營運對照：供應鏈名稱仿冒", "Operational reference: supply-chain name spoofing"),
       asvs: bi("V15.2", "V15.2"),
     });
-  } else if (!vibe) {
+  } else {
     g1logs.push(
       bi(
         "套件均存在，下載量與冷卻期通過。Syft 已產出 CycloneDX。",
@@ -440,20 +460,31 @@ export function buildPlan(p: Profile): RunPlan {
           "Full-history mode: regex and entropy scans over every commit.",
         ),
   ];
-  if (vibe && (p.llm || p.agent || p.exposure !== "internal")) {
+  if (vibe) {
+    const ai = p.llm || p.agent;
     g2.push({
       id: "g2-key",
       gate: "G2",
       severity: "block",
       title: bi("差異中有硬編碼金鑰", "Hard-coded secret in the diff"),
-      detail: bi(
-        "高熵字串符合供應商金鑰格式，且 .env 沒有被忽略規則排除。",
-        "A high-entropy string matches a vendor key format, and .env is not excluded by the ignore rules.",
-      ),
-      evidence: bi(
-        "src/lib/llm.ts:14  sk-ant-api03-……；.env 出現在暫存區。",
-        "src/lib/llm.ts:14  sk-ant-api03-…; .env is staged.",
-      ),
+      detail: ai
+        ? bi(
+            "高熵字串符合供應商金鑰格式，且 .env 沒有被忽略規則排除。",
+            "A high-entropy string matches a vendor key format, and .env is not excluded by the ignore rules.",
+          )
+        : bi(
+            "資料庫連線字串連同密碼寫在程式裡，且 .env 沒有被忽略規則排除。",
+            "A database connection string with its password is written into the code, and .env is not excluded by the ignore rules.",
+          ),
+      evidence: ai
+        ? bi(
+            "src/lib/llm.ts:14  sk-ant-api03-……；.env 出現在暫存區。",
+            "src/lib/llm.ts:14  sk-ant-api03-…; .env is staged.",
+          )
+        : bi(
+            'config/settings.py:12  DATABASE_URL = "postgres://admin:……@db.internal/prod"；.env 出現在暫存區。',
+            'config/settings.py:12  DATABASE_URL = "postgres://admin:…@db.internal/prod"; .env is staged.',
+          ),
       fix: bi(
         "撤銷該金鑰，改走祕密管理，再用歷史清理移除。先擋下這次推送。",
         "Revoke the key, move to secret management, then purge it from history. Block this push first.",
@@ -535,36 +566,40 @@ export function buildPlan(p: Profile): RunPlan {
       fix: bi("改為參數陣列，不要經過 shell。", "Use an argument array and bypass the shell."),
       tool: bi("Semgrep", "Semgrep"),
       cwe: bi("營運對照：CWE-78", "Operational reference: CWE-78"),
-      asvs: bi("v5.0.0-1.2.5", "v5.0.0-1.2.5"),
+      asvs: bi("V1.2.5", "V1.2.5"),
     });
   } else {
     g3logs.push(
       bi("抽樣的查詢與指令皆為參數化。", "Sampled queries and commands are all parameterized."),
     );
   }
-  if (vibe && p.exposure !== "internal") {
-    g3.push(
-      depth(level, {
-        id: "g3-imds",
-        gate: "G3",
-        title: bi("IMDSv2 未強制", "IMDSv2 not enforced"),
-        detail: bi(
-          "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前還沒有證實可達。",
-          "Instance metadata still accepts legacy token-less access. With an SSRF the impact grows; reachability is not yet confirmed.",
-        ),
-        evidence: bi(
-          'terraform/compute.tf：http_tokens = "optional"。',
-          'terraform/compute.tf: http_tokens = "optional".',
-        ),
-        fix: bi(
-          "改為 required。實務上 G5 若證實打得到 169.254.169.254，這項應升級為阻擋；本示範不模擬 SSRF 可達性。",
-          "Set it to required. In practice, if G5 confirms 169.254.169.254 is reachable this becomes a block; this demo does not simulate SSRF reachability.",
-        ),
-        tool: bi("Checkov", "Checkov"),
-        cwe: bi("營運對照：雲端中繼資料", "Operational reference: cloud metadata"),
-        asvs: bi("V13 組態", "V13 Configuration"),
-      }),
-    );
+  if (vibe && (p.exposure !== "internal" || ssrf)) {
+    const imds: Omit<Finding, "severity"> = {
+      id: "g3-imds",
+      gate: "G3",
+      title: bi("IMDSv2 未強制", "IMDSv2 not enforced"),
+      detail: ssrf
+        ? bi(
+            "執行個體中繼資料仍接受舊版無權杖存取。G5 已證實 SSRF 打得到中繼資料，這項升級為阻擋。",
+            "Instance metadata still accepts legacy token-less access. G5 confirmed an SSRF reaches it, so this is escalated to a block.",
+          )
+        : bi(
+            "執行個體中繼資料仍接受舊版無權杖存取。若另有 SSRF，影響會變大；目前還沒有證實可達。",
+            "Instance metadata still accepts legacy token-less access. With an SSRF the impact grows; reachability is not yet confirmed.",
+          ),
+      evidence: bi(
+        'terraform/compute.tf：http_tokens = "optional"。',
+        'terraform/compute.tf: http_tokens = "optional".',
+      ),
+      fix: bi(
+        "改為 required。G5 若打得到 169.254.169.254，這項升級為阻擋。",
+        "Set it to required. If G5 reaches 169.254.169.254, this becomes a block.",
+      ),
+      tool: bi("Checkov", "Checkov"),
+      cwe: bi("營運對照：雲端中繼資料", "Operational reference: cloud metadata"),
+      asvs: bi("V13 組態", "V13 Configuration"),
+    };
+    g3.push(ssrf ? { ...imds, severity: "block" } : depth(level, imds));
   }
   if (p.defects === "depth" && web) {
     g3.push(
@@ -749,25 +784,72 @@ export function buildPlan(p: Profile): RunPlan {
         severity: "block",
         title: bi("雙帳號實測確認越權", "Two-account test confirms the authorization bypass"),
         detail: bi(
-          "帳號 B 的權杖讀到帳號 A 的文件，並且權杖接受 alg:none。白箱的授權缺口已被黑箱證實。",
-          "Account B's token reads account A's document, and the token accepts alg:none. Black-box confirms the white-box authorization gap.",
+          "帳號 B 的權杖讀到帳號 A 的文件。白箱的授權缺口已被黑箱證實。",
+          "Account B's token reads account A's document. Black-box confirms the white-box authorization gap.",
         ),
         evidence: bi(
-          "GET /api/docs/18 → 200（主體為帳號 A）。JWT header alg＝none 亦被接受。",
-          "GET /api/docs/18 → 200 (principal is account A). JWT header alg = none is also accepted.",
+          "GET /api/docs/18（帶帳號 B 的權杖）→ 200，回傳主體為帳號 A。",
+          "GET /api/docs/18 (with account B's token) → 200, returning account A's record.",
         ),
         fix: bi(
-          "先修 G4 的擁有者條件與簽章驗證，再重跑這兩項。",
-          "Fix G4's owner condition and signature verification first, then rerun both checks.",
+          "先修 G4 的擁有者條件，再用兩個帳號重跑。",
+          "Fix G4's owner condition first, then rerun with two accounts.",
         ),
         tool:
           level === "L1"
             ? bi("OWASP ZAP＋第二權杖", "OWASP ZAP + second token")
             : bi("Burp AuthMatrix", "Burp AuthMatrix"),
-        cwe: bi("營運對照：CWE-639／CWE-347", "Operational reference: CWE-639 / CWE-347"),
-        asvs: bi("V8、V9.1", "V8, V9.1"),
+        cwe: bi("營運對照：CWE-639", "Operational reference: CWE-639"),
+        asvs: bi("V8 授權", "V8 Authorization"),
+      },
+      // 越權與 alg:none 是兩個發現：只做 JWT 測試不算涵蓋雙帳號越權。
+      // The IDOR and alg:none are separate findings: a JWT test alone does not cover the two-account check.
+      {
+        id: "g5-jwt",
+        gate: "G5",
+        severity: "block",
+        title: bi("權杖接受 alg:none", "Token accepts alg:none"),
+        detail: bi(
+          "竄改過的 JWT 把演算法改成 none、拿掉簽章，伺服器照樣接受。任何人都能自己簽發權杖。",
+          "A tampered JWT with the algorithm set to none and the signature stripped is still accepted. Anyone can mint their own token.",
+        ),
+        evidence: bi(
+          'JWT header {"alg":"none"}，簽章欄位留空 → GET /api/me 200。',
+          'JWT header {"alg":"none"} with an empty signature → GET /api/me 200.',
+        ),
+        fix: bi(
+          "伺服器端固定允許的演算法清單，拒絕 none，並分開 RS256 與 HS256 的金鑰。",
+          "Pin the allowed algorithms on the server, reject none, and keep RS256 and HS256 keys apart.",
+        ),
+        tool:
+          level === "L1" ? bi("jwt_tool", "jwt_tool") : bi("Burp JWT Editor", "Burp JWT Editor"),
+        cwe: bi("營運對照：CWE-347", "Operational reference: CWE-347"),
+        asvs: bi("V9.1.1、V9.1.2", "V9.1.1, V9.1.2"),
       },
     ];
+    if (ssrf) {
+      findings.push({
+        id: "g5-ssrf",
+        gate: "G5",
+        severity: "block",
+        title: bi("抓取工具打得到雲端中繼資料", "Fetch tool reaches cloud metadata"),
+        detail: bi(
+          "模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單。一段注入的網址就能讓它讀出執行個體憑證。",
+          "The model-callable HTTP tool has no sandbox or egress allow-list. One injected URL makes it read the instance credentials.",
+        ),
+        evidence: bi(
+          'fetch_url("http://169.254.169.254/latest/meta-data/iam/security-credentials/") → 200，回應含角色名稱。',
+          'fetch_url("http://169.254.169.254/latest/meta-data/iam/security-credentials/") → 200, the response names the role.',
+        ),
+        fix: bi(
+          "工具層加出向允許清單，封鎖連結本機與私有網段，並把 IMDSv2 改為 required。",
+          "Add an egress allow-list at the tool layer, block link-local and private ranges, and set IMDSv2 to required.",
+        ),
+        tool: bi("Burp Collaborator＋SSRF 案例", "Burp Collaborator + SSRF cases"),
+        cwe: bi("營運對照：CWE-918", "Operational reference: CWE-918"),
+        asvs: bi("V1.3.6、V13.2.4", "V1.3.6, V13.2.4"),
+      });
+    }
     if (pii) {
       findings.push({
         id: "g5-mfa",
@@ -1082,9 +1164,27 @@ export function caughtBy(plan: RunPlan, controlId: string): Finding[] {
     .filter((finding) => FINDING_CONTROLS[finding.id]?.includes(controlId));
 }
 
-/** 放行紀錄的檔名。 File name of the release record. */
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * 使用者所在時區的日期。toISOString 是 UTC，台灣早上八點前下載會變成前一天。
+ * The date in the viewer's time zone. toISOString is UTC, so a download in Taiwan before 8 a.m. would carry the previous day.
+ */
+export function localDate(at: Date): string {
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+/** 本地時間加上時區位移，例如 2026-10-04 10:00:00 (UTC+08:00)。 Local time with its UTC offset. */
+export function localStamp(at: Date): string {
+  const offset = -at.getTimezoneOffset();
+  const abs = Math.abs(offset);
+  const zone = `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  return `${localDate(at)} ${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())} (${zone})`;
+}
+
+/** 放行紀錄的檔名，用本地日期。 File name of the release record, dated locally. */
 export function reportFileName(at: Date): string {
-  return `six-gate-release-${at.toISOString().slice(0, 10)}.md`;
+  return `six-gate-release-${localDate(at)}.md`;
 }
 
 const R = {
@@ -1098,6 +1198,11 @@ const R = {
   settings: bi("## 受測設定", "## System under test"),
   exposure: bi("暴露面", "Exposure"),
   sensitivity: bi("資料敏感度", "Data sensitivity"),
+  critical: bi("高衝擊領域", "High-impact domain"),
+  stale: bi(
+    "> 注意：下載時畫面上的設定已經改過，這份裁決只代表下面列的執行當下設定。",
+    "> Note: the settings on screen changed after this run; this verdict only covers the settings listed below.",
+  ),
   web: bi("HTTP API 或網頁", "HTTP API or web"),
   llm: bi("LLM", "LLM"),
   agent: bi("Agent", "Agent"),
@@ -1139,6 +1244,8 @@ export function reportMarkdown(
   at: Date,
   checks: Record<string, boolean>,
   locale: Locale = "zh",
+  /** 下載時的設定已經和這次執行不同（畫面上會顯示「設定已改」）。 The settings changed after the run. */
+  stale = false,
 ): string {
   const t = (value: Bi) => pick(locale, value);
   const yn = (value: boolean) => yesNo(locale, value);
@@ -1164,8 +1271,9 @@ export function reportMarkdown(
     ``,
     `> ${t(DEMO_NOTICE)}`,
     ``,
+    ...(stale ? [t(R.stale), ``] : []),
     `- ${t(R.system)}${colon}${displayName(p, locale)}`,
-    `- ${t(R.time)}${colon}${at.toISOString()}`,
+    `- ${t(R.time)}${colon}${locale === "zh" ? localStamp(at).replace(" (", "（").replace(/\)$/, "）") : localStamp(at)}`,
     `- ${t(R.level)}${colon}${plan.level}`,
     `- ${t(R.verdict)}${colon}${t(RELEASE_LABEL[plan.release])}`,
     `- ${t(R.blocks)} ${plan.blockCount}${locale === "zh" ? "、" : ", "}${t(R.advisories)} ${plan.advisoryCount}`,
@@ -1173,7 +1281,7 @@ export function reportMarkdown(
     t(plan.headline),
     ``,
     t(R.settings),
-    `- ${t(R.exposure)}${colon}${t(EXPOSURE_LABEL[p.exposure])}${semi}${t(R.sensitivity)}${colon}${t(SENSITIVITY_LABEL[p.sensitivity])}`,
+    `- ${t(R.exposure)}${colon}${t(EXPOSURE_LABEL[p.exposure])}${semi}${t(R.sensitivity)}${colon}${t(SENSITIVITY_LABEL[p.sensitivity])}${semi}${t(R.critical)}${colon}${yn(p.critical)}`,
     `- ${t(R.web)}${colon}${yn(webSurface(p))}${semi}${t(R.llm)}${colon}${yn(p.llm)}${semi}${t(R.agent)}${colon}${yn(p.agent)}${semi}${t(R.destructive)}${colon}${yn(p.agent && p.destructive)}`,
     `- ${t(R.privateData)}${colon}${tri(p.privateData)}${semi}${t(R.untrusted)}${colon}${tri(p.untrusted)}${semi}${t(R.egress)}${colon}${tri(p.egress)}`,
     `- ${t(R.mitigations)}${colon}${p.mitigations.length ? t(biList(p.mitigations.map((item) => MITIGATION_LABEL[item]))) : t(R.none)}`,

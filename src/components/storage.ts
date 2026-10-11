@@ -14,6 +14,11 @@
 export const PROFILE_KEY = "six-gate-profile-v1";
 export const CHECK_KEY = "six-gate-checks-v1";
 export const LOCALE_KEY = "six-gate-locale";
+/**
+ * 最近一次 Harness 執行，存在 sessionStorage：重新整理還在，關掉分頁就清掉。
+ * The latest Harness run, kept in sessionStorage: it survives a reload and is gone when the tab closes.
+ */
+export const RUN_KEY = "six-gate-run-v1";
 
 /** 更名前的鍵。 Keys from before the rename. */
 export const LEGACY_KEYS: Record<string, string> = {
@@ -41,6 +46,15 @@ function defaultStore(): KeyValueStore | null {
  * Read and parse one key; when the new key is empty, read the legacy key and move it over.
  * Returns `fallback` when parsing fails or the data is broken.
  */
+/** sessionStorage；不可用時回傳 null。 sessionStorage, or null when it is unavailable. */
+export function sessionStore(): KeyValueStore | null {
+  try {
+    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function loadWithMigration<T>(
   key: string,
   parse: (raw: unknown) => T,
@@ -76,6 +90,32 @@ export function save(
   } catch {
     /* 無法寫入時就不存。 Skip persistence when storage is unavailable. */
   }
+}
+
+export function remove(key: string, store: KeyValueStore | null = defaultStore()): void {
+  if (!store) return;
+  try {
+    store.removeItem(key);
+  } catch {
+    /* 同上。 Same as above. */
+  }
+}
+
+export interface StoredRun<P> {
+  profile: P;
+  at: Date;
+}
+
+/**
+ * 讀回存下的執行；時間或設定壞掉就當成沒有執行過。
+ * Parse a stored run; a broken time or profile counts as no run at all.
+ */
+export function parseRun<P>(raw: unknown, parseProfile: (raw: unknown) => P): StoredRun<P> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const { profile, at } = raw as Record<string, unknown>;
+  const time = typeof at === "string" ? new Date(at) : null;
+  if (!profile || !time || Number.isNaN(time.getTime())) return null;
+  return { profile: parseProfile(profile), at: time };
 }
 
 export function readString(

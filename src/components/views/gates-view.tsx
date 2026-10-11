@@ -40,6 +40,10 @@ const T = {
   controlsEyebrow: bi("控制項", "Controls"),
   controlsTitle: bi("這道閘門要能勾完", "This gate should be fully checked"),
   catches: bi("本次 Harness 會攔下", "Caught in this Harness run"),
+  process: bi(
+    "流程性控制項：管線該有，但示範發現不會因為它被攔下。",
+    "Process control: your pipeline should have it, but no demo finding is caught by it.",
+  ),
   tools: bi("工具", "Tools"),
   runHint: bi(
     "跑一次 Harness，這裡會標出每個控制項在示範中攔下哪些發現。",
@@ -187,6 +191,11 @@ export function GatesView() {
                   </span>
                   <span className="text-sm leading-6">
                     {t(item.text)}
+                    {item.process && (
+                      <span className="mt-1 block text-xs leading-5 text-faint">
+                        {t(T.process)}
+                      </span>
+                    )}
                     {caught.length > 0 && (
                       <span className="mt-1 block text-xs leading-5 text-muted">
                         {t(T.catches)}:{" "}

@@ -15,7 +15,7 @@ export const LOCALES: readonly Locale[] = ["zh", "en"];
 export const DEFAULT_LOCALE: Locale = "zh";
 
 /** `<html lang>` 的值。 Values for `<html lang>`. */
-export const HTML_LANG: Record<Locale, string> = { zh: "zh-Hant", en: "en" };
+export const HTML_LANG: Record<Locale, string> = { zh: "zh-Hant-TW", en: "en" };
 
 /** 語系自己的名稱，給切換鈕用。 Each locale's own name, for the switcher. */
 export const LOCALE_NAME: Record<Locale, string> = { zh: "中文", en: "EN" };

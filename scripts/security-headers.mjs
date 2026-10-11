@@ -6,6 +6,8 @@
  * 以 `Content-Security-Policy-Report-Only` 回報」的觀察模式。Grok 標章腳本的內容無法事先檢視，所以每次
  * 部署後都要確認標章正常、console 沒有 CSP 違規；若標章被擋，把旗標改回 false 即可回復。
  * `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁不同，無法用雜湊放行。
+ * 兩種模式的 CSP 都把違規回報送到 `/api/csp-report`（`src/routes/api/csp-report.ts`），一個請求寫一行到
+ * 部署日誌；沒有回報端點，被擋下的資源只會出現在訪客自己的 console，誰也看不到。
  *
  * Security headers for the production build.
  *
@@ -27,6 +29,11 @@
  *   (Cloudflare serves a challenge page), and the platform contract forbids a CSP
  *   that blocks it. If a deploy ever shows the badge blocked or CSP violations in
  *   the console, set the flag back to false to return to observation mode.
+ *
+ * Both modes report violations to `/api/csp-report` (`src/routes/api/csp-report.ts`),
+ * which logs one line per request to the deployment's function logs. Without a
+ * reporting endpoint a blocked resource only shows up in each visitor's own
+ * console, and nobody would notice.
  *
  * `'unsafe-inline'` stays in `script-src`: TanStack Start's hydration script
  * differs on every page, so hashes cannot cover it, and a per-request nonce would
@@ -53,6 +60,14 @@ export const STRUCTURAL_POLICY = policy({
   "form-action": ["'self'", ...GROK],
 });
 
+export const CSP_REPORT_PATH = "/api/csp-report";
+
+/** `report-uri` for browsers without the Reporting API (Firefox), `report-to` for the rest. */
+export const REPORTING = policy({
+  "report-uri": [CSP_REPORT_PATH],
+  "report-to": ["csp"],
+});
+
 export const RESOURCE_POLICY = policy({
   "default-src": ["'self'"],
   "script-src": ["'self'", "'unsafe-inline'", ...GROK],
@@ -73,9 +88,12 @@ export function vercelHeaderRoute() {
 export function securityHeaders(enforceResources = ENFORCE_RESOURCE_POLICY) {
   return {
     "Content-Security-Policy": enforceResources
-      ? `${RESOURCE_POLICY}; ${STRUCTURAL_POLICY}`
-      : STRUCTURAL_POLICY,
-    ...(enforceResources ? {} : { "Content-Security-Policy-Report-Only": RESOURCE_POLICY }),
+      ? `${RESOURCE_POLICY}; ${STRUCTURAL_POLICY}; ${REPORTING}`
+      : `${STRUCTURAL_POLICY}; ${REPORTING}`,
+    ...(enforceResources
+      ? {}
+      : { "Content-Security-Policy-Report-Only": `${RESOURCE_POLICY}; ${REPORTING}` }),
+    "Reporting-Endpoints": `csp="${CSP_REPORT_PATH}"`,
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",

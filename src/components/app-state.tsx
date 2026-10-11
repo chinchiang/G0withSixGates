@@ -15,10 +15,14 @@ import {
   CHECK_KEY,
   LOCALE_KEY,
   PROFILE_KEY,
+  RUN_KEY,
   loadWithMigration,
   parseChecks,
+  parseRun,
   readString,
+  remove,
   save,
+  sessionStore,
   writeString,
 } from "@/components/storage";
 
@@ -57,7 +61,8 @@ interface AppState {
   /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 Latest verdict; the gates page uses it to show what each control catches. */
   plan: RunPlan | null;
   startRun: () => void;
-  clearRun: () => void;
+  /** 換回指定的執行結果（停止時還原上一次，沒有就是 null）。 Put back a given run (stop restores the previous one, or null). */
+  restoreRun: (run: HarnessRun | null) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -82,6 +87,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setChecks(loadWithMigration(CHECK_KEY, (raw) => parseChecks(raw, CONTROL_IDS), {}));
     const remembered = readString(LOCALE_KEY);
     if (isLocale(remembered)) setStoredLocale(remembered);
+    setRun(loadWithMigration(RUN_KEY, (raw) => parseRun(raw, parseProfile), null, sessionStore()));
     setHydrated(true);
   }, []);
 
@@ -92,6 +98,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) save(CHECK_KEY, checks);
   }, [checks, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (run) save(RUN_KEY, { profile: run.profile, at: run.at.toISOString() }, sessionStore());
+    else remove(RUN_KEY, sessionStore());
+  }, [run, hydrated]);
 
   useEffect(() => {
     document.documentElement.lang = HTML_LANG[locale];
@@ -121,8 +133,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
       profile,
       setProfile: setProfileState,
+      // 值沒有變（例如點已選中的選項）就不動，避免設定被誤標成自訂、裁決被誤判為過期。
+      // A no-op change (clicking the option already selected) leaves the profile alone, so it is not marked custom or stale.
       patchProfile: (partial) =>
-        setProfileState((current) => ({ ...current, ...partial, preset: "custom" })),
+        setProfileState((current) =>
+          (Object.keys(partial) as (keyof Profile)[]).every(
+            (key) => JSON.stringify(current[key]) === JSON.stringify(partial[key]),
+          )
+            ? current
+            : { ...current, ...partial, preset: "custom" },
+        ),
       checks,
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       replaceChecks: setChecks,
@@ -130,7 +150,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       run,
       plan,
       startRun: () => setRun({ profile, at: new Date() }),
-      clearRun: () => setRun(null),
+      restoreRun: setRun,
     };
   }, [view, gate, locale, navigate, profile, checks, run, plan]);
 
@@ -141,6 +161,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Context 與它的 hook 放在一起；這個檔案改動時整頁重載是可以接受的。
+// The context and its hook live together; a full reload when this file changes is acceptable.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(): AppState {
   const value = useContext(Ctx);
   if (!value) throw new Error("AppState is not ready / AppState 尚未就緒");

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { checkedOutputPath, checkedUrl } from "./browser-guard.mjs";
 import { computeBrandWarnings } from "./brand-check.mjs";
@@ -20,17 +21,19 @@ import {
   parseSmokeArgs,
 } from "./browser-smoke-verdict.mjs";
 
-const args = parseSmokeArgs(process.argv.slice(2), process.env);
+// The project root, so the script also runs outside the Grok sandbox (where it is /workspace).
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const args = parseSmokeArgs(process.argv.slice(2), process.env, ROOT);
 if (args.error) {
   console.error(JSON.stringify({ ok: false, error: args.error }, null, 2));
   process.exit(1);
 }
 
 const url = checkedUrl(args.url);
-const outPng = checkedOutputPath(args.outPng, ["/workspace"]);
+const outPng = checkedOutputPath(args.outPng, [ROOT]);
 const derived = derivedPaths(outPng);
-const mobilePng = checkedOutputPath(derived.mobilePng, ["/workspace"]);
-const outJson = checkedOutputPath(derived.verdictJson, ["/workspace"], "verdict JSON");
+const mobilePng = checkedOutputPath(derived.mobilePng, [ROOT]);
+const outJson = checkedOutputPath(derived.verdictJson, [ROOT], "verdict JSON");
 
 const MAX_BASELINE_BYTES = 1024 * 1024;
 const baselineRequested = Boolean(args.baseline);
@@ -38,7 +41,7 @@ let baselinePath = null;
 let baselineResolveError = null;
 if (baselineRequested) {
   try {
-    baselinePath = checkedOutputPath(realpathSync(args.baseline), ["/workspace"], "baseline");
+    baselinePath = checkedOutputPath(realpathSync(args.baseline), [ROOT], "baseline");
   } catch (err) {
     baselineResolveError = err?.code ?? "unresolvable path";
   }
@@ -140,7 +143,7 @@ try {
     };
   }
 
-  const brandWarnings = computeBrandWarnings({ hasCanvas: viewports.desktop.hasCanvas });
+  const brandWarnings = computeBrandWarnings({ hasCanvas: viewports.desktop.hasCanvas, workspaceRoot: ROOT });
   // Only a dev server answers /__app-env, so smoking the built output reads as
   // indeterminate — report a divergence, never the absence of an observation.
   const authWarnings = authInvariantWarnings(
