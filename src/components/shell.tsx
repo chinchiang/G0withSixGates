@@ -1,4 +1,12 @@
-import { ArrowLeftRight, Bot, Layers, LayoutDashboard, ShieldCheck, Wrench } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ArrowUpRight,
+  Bot,
+  Layers,
+  LayoutDashboard,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
 import { AppStateProvider, useApp } from "@/components/app-state";
 import { Overview } from "@/components/views/overview";
 import { HarnessView } from "@/components/views/harness-view";
@@ -17,13 +25,43 @@ import { APP_NAME, APP_SUBTITLE } from "@/brand";
  * AppShell: header, sidebar and bottom dock that switch views; the language switcher sits in the header.
  */
 
-const NAV: { id: ViewId; label: Bi; icon: typeof Bot }[] = [
-  { id: "overview", label: bi("總覽", "Overview"), icon: LayoutDashboard },
-  { id: "harness", label: bi("管線", "Pipeline"), icon: Bot },
-  { id: "gates", label: bi("閘門", "Gates"), icon: ShieldCheck },
-  { id: "levels", label: bi("分級", "Levels"), icon: Layers },
-  { id: "map", label: bi("對照", "Map"), icon: ArrowLeftRight },
-  { id: "tools", label: bi("工具", "Tools"), icon: Wrench },
+const NAV: { id: ViewId; label: Bi; description: Bi; icon: typeof Bot }[] = [
+  {
+    id: "overview",
+    description: bi("框架與入門", "Framework & getting started"),
+    label: bi("總覽", "Overview"),
+    icon: LayoutDashboard,
+  },
+  {
+    id: "harness",
+    description: bi("設定情境與放行裁決", "Scenario & release verdict"),
+    label: bi("管線", "Pipeline"),
+    icon: Bot,
+  },
+  {
+    id: "gates",
+    description: bi("G0–G6 控制項清單", "G0–G6 control checklist"),
+    label: bi("閘門", "Gates"),
+    icon: ShieldCheck,
+  },
+  {
+    id: "levels",
+    description: bi("ASVS 保證等級", "ASVS assurance levels"),
+    label: bi("分級", "Levels"),
+    icon: Layers,
+  },
+  {
+    id: "map",
+    description: bi("風險與標準章節", "Risks & standard chapters"),
+    label: bi("對照", "Map"),
+    icon: ArrowLeftRight,
+  },
+  {
+    id: "tools",
+    description: bi("檢測工具與選型", "Testing tools & selection"),
+    label: bi("工具", "Tools"),
+    icon: Wrench,
+  },
 ];
 
 const T = {
@@ -44,35 +82,32 @@ export function AppShell() {
 }
 
 function Frame() {
-  const { view, setView, profile, locale, setLocale } = useApp();
+  const { view, setView, profile, locale, setLocale, checkProgress } = useApp();
   const t = useT();
   const advice = recommendLevel(profile);
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="sticky top-0 z-20 border-b border-line bg-bg/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <p className="font-mono text-xs tracking-widest text-accent">SIX-GATE</p>
-            <p className="truncate text-base font-semibold leading-tight">
-              {t(APP_NAME)}
-              <span className="ml-2 hidden text-xs font-normal text-muted sm:inline">
-                {t(APP_SUBTITLE)}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="max-w-40 truncate text-xs text-muted sm:max-w-xs">
-                {displayName(profile, locale)}
-              </p>
-              <p className="font-mono text-xs text-accent">{advice.level}</p>
-            </div>
-            <div
-              role="group"
-              aria-label={t(T.language)}
-              className="flex overflow-hidden rounded-md border border-line font-mono text-xs"
-            >
+    <div className="app-shell min-h-screen bg-bg text-fg">
+      <a href="#main-content" className="skip-link">
+        {t(bi("跳至主要內容", "Skip to main content"))}
+      </a>
+      <header className="app-header">
+        <div className="header-inner">
+          <button type="button" onClick={() => setView("overview")} className="brand-home">
+            <span className="brand-mark">
+              <ShieldCheck aria-hidden="true" />
+            </span>
+            <span className="min-w-0 text-left">
+              <span className="block text-lg font-semibold tracking-tight">{t(APP_NAME)}</span>
+              <span className="block text-xs text-muted">{t(APP_SUBTITLE)}</span>
+            </span>
+          </button>
+          <span className="header-standard font-mono text-xs text-muted">
+            G0 + SIX SECURITY GATES
+          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="standard-chip hidden sm:inline-flex">ASVS 5.0.0</span>
+            <div role="group" aria-label={t(T.language)} className="language-switch">
               {LOCALES.map((item) => (
                 <button
                   key={item}
@@ -80,9 +115,6 @@ function Frame() {
                   lang={item === "zh" ? "zh-Hant-TW" : "en"}
                   aria-pressed={locale === item}
                   onClick={() => setLocale(item)}
-                  className={`min-h-9 min-w-11 px-3 ${
-                    locale === item ? "bg-accent/15 text-fg" : "text-muted hover:text-fg"
-                  }`}
                 >
                   {LOCALE_NAME[item]}
                 </button>
@@ -92,28 +124,81 @@ function Frame() {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-6xl">
-        <aside className="sticky top-20 hidden w-52 shrink-0 self-start border-r border-line px-3 py-4 md:block">
+      <div className="workspace-layout">
+        <aside className="app-sidebar">
+          <p className="sidebar-label">WORKSPACE</p>
           <nav aria-label={t(T.nav)} className="flex flex-col gap-1">
             {NAV.map((item) => (
               <NavButton
                 key={item.id}
                 item={item}
                 label={t(item.label)}
+                description={t(item.description)}
                 active={view === item.id}
                 onClick={() => setView(item.id)}
               />
             ))}
           </nav>
-          <p className="mt-6 px-3 text-xs leading-5 text-faint">{t(T.aside)}</p>
+          <div className="sidebar-context">
+            <p className="sidebar-label">{t(bi("目前情境", "CURRENT SCENARIO"))}</p>
+            <p className="text-sm font-medium">{displayName(profile, locale)}</p>
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+              <span>{t(bi("建議保證等級", "Recommended level"))}</span>
+              <span className="font-mono text-accent">{advice.level}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+              <span>{t(bi("清單進度", "Checklist progress"))}</span>
+              <span className="font-mono tabular-nums">
+                {checkProgress.done}/{checkProgress.total}
+              </span>
+            </div>
+            <progress
+              className="check-progress"
+              value={checkProgress.done}
+              max={checkProgress.total}
+              aria-label={t(bi("清單進度", "Checklist progress"))}
+            />
+            <p className="mt-2 text-xs leading-5 text-faint">
+              {t(
+                bi(
+                  "勾選僅供學習追蹤，不代表通過驗證。",
+                  "Checks track learning; they do not certify verification.",
+                ),
+              )}
+            </p>
+          </div>
+          <p className="mt-5 px-2 text-xs leading-5 text-faint">{t(T.aside)}</p>
+          <a
+            className="sidebar-source"
+            href="https://github.com/chinchiang/G0withSixGates"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub <ArrowUpRight aria-hidden="true" className="size-4" />
+          </a>
         </aside>
-        <main className="min-w-0 flex-1 px-4 py-4 pb-28 md:px-6 md:py-6 md:pb-16">
+        <main id="main-content" tabIndex={-1} className="app-main">
+          <div className="page-context">
+            <p className="font-mono text-xs text-faint">
+              SIX-GATE <span aria-hidden="true"> / </span>
+              <span className="text-muted">{t(NAV.find((item) => item.id === view)!.label)}</span>
+            </p>
+            <span className="text-xs text-faint">
+              {t(bi("互動教學 · 示範環境", "INTERACTIVE GUIDE · DEMO"))}
+            </span>
+          </div>
           {view === "overview" && <Overview />}
           {view === "harness" && <HarnessView />}
           {view === "gates" && <GatesView />}
           {view === "levels" && <LevelsView />}
           {view === "map" && <MapView />}
           {view === "tools" && <ToolsView />}
+          <footer className="app-footer">
+            <span>
+              G0 → G6 · {t(bi("從威脅建模到放行裁決", "From threat model to release verdict"))}
+            </span>
+            <span>OWASP ASVS 5.0.0</span>
+          </footer>
         </main>
       </div>
 
@@ -135,7 +220,7 @@ function Frame() {
                     active ? "text-accent" : "text-muted"
                   }`}
                 >
-                  <Icon className="size-5" strokeWidth={1.75} />
+                  <Icon aria-hidden="true" className="size-5" strokeWidth={1.75} />
                   {t(item.label)}
                 </button>
               </li>
@@ -150,11 +235,13 @@ function Frame() {
 function NavButton({
   item,
   label,
+  description,
   active,
   onClick,
 }: {
   item: (typeof NAV)[number];
   label: string;
+  description: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -164,12 +251,15 @@ function NavButton({
       type="button"
       aria-current={active ? "page" : undefined}
       onClick={onClick}
-      className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${
-        active ? "bg-accent/15 text-fg" : "text-muted hover:text-fg"
-      }`}
+      className={`side-nav-button ${active ? "is-active" : ""}`}
     >
-      <Icon className="size-4" strokeWidth={1.75} />
-      {label}
+      <span className="nav-icon">
+        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+      </span>
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="mt-1 block text-xs text-faint">{description}</span>
+      </span>
     </button>
   );
 }

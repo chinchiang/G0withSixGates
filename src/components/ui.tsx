@@ -21,9 +21,9 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-lg border border-line bg-surface ${className}`}>
+    <section className={`content-panel rounded-lg border border-line bg-surface ${className}`}>
       {(title || eyebrow || action) && (
-        <header className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+        <header className="panel-heading flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-4">
           <div>
             {eyebrow && (
               <p className="font-mono text-xs tracking-wider text-accent uppercase">{eyebrow}</p>

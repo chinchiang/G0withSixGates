@@ -1,3 +1,4 @@
+import { ArrowRight, ArrowUpRight, ScanLine, ShieldCheck } from "lucide-react";
 import {
   ASVS_TOTAL,
   GATES,
@@ -12,6 +13,7 @@ import {
 } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
+import { recommendLevel } from "@/data/engine";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
@@ -64,7 +66,7 @@ const T = {
 };
 
 export function Overview() {
-  const { openGate, setView, checkProgress } = useApp();
+  const { openGate, setView, checkProgress, profile } = useApp();
   const t = useT();
   const levels = (["L1", "L2", "L3"] as Level[]).map((level) => ({
     name: level === "L1" ? level : `${level} ${t(T.cumulative)}`,
@@ -72,53 +74,132 @@ export function Overview() {
   }));
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border border-line bg-surface px-4 py-5">
-        <p className="font-mono text-xs tracking-widest text-accent">{t(T.eyebrow)}</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{t(T.h1)}</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setView("harness")}
-            className="min-h-11 rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink"
-          >
-            {t(T.start)}
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("map")}
-            className="min-h-11 rounded-md border border-line px-4 text-sm"
-          >
-            {t(T.map)}
-          </button>
+    <div className="overview-content">
+      <section className="overview-hero" aria-labelledby="overview-heading">
+        <div className="hero-copy">
+          <p className="hero-eyebrow">
+            <span aria-hidden="true" className="status-dot" /> VIBE CODE / SECURITY BY DESIGN
+          </p>
+          <h1 id="overview-heading">
+            {t(bi("讓 AI 寫得快，", "Build fast with AI."))}
+            <span>{t(bi("也讓安全跟得上。", "Keep security in step."))}</span>
+          </h1>
+          <p className="hero-lede">
+            {t(
+              bi(
+                "從 G0 威脅建模出發，串起白箱、黑箱與 AI 紅隊六道閘門。把風險變成可檢查的控制項，再用 Harness 示範一次完整的放行裁決。",
+                "Start with G0 threat modeling, then connect six white-box, black-box and AI red-team gates. Turn risks into concrete controls and explore a complete release verdict with the demo Harness.",
+              ),
+            )}
+          </p>
+          <div className="hero-actions">
+            <button type="button" onClick={() => setView("harness")} className="hero-primary">
+              <ScanLine aria-hidden="true" className="size-4" />
+              {t(T.start)}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </button>
+            <button type="button" onClick={() => setView("map")} className="hero-secondary">
+              {t(T.map)}
+              <ArrowUpRight aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+          <p className="hero-caption">
+            {t(
+              bi(
+                "教學模擬，不會掃描或連線到你的專案。",
+                "An educational simulation; it does not scan or connect to your project.",
+              ),
+            )}
+          </p>
+        </div>
+        <div className="hero-route">
+          <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
+            <p className="font-mono text-xs tracking-wider text-muted">
+              {t(bi("驗證路徑", "VERIFICATION PATH"))}
+            </p>
+            <ShieldCheck aria-hidden="true" className="size-5 text-accent" />
+          </div>
+          {[
+            {
+              gate: "G0" as const,
+              code: "01 / DESIGN",
+              title: bi("先辨識風險", "Identify the risk"),
+              text: bi("威脅建模 → 決定保證等級", "Threat modeling → assurance level"),
+            },
+            {
+              gate: "G1" as const,
+              code: "02 / VERIFY",
+              title: bi("再逐關驗證", "Verify every gate"),
+              text: bi("白箱 × 黑箱 × AI 紅隊", "White box × black box × AI red team"),
+            },
+            {
+              gate: null,
+              code: "03 / DECIDE",
+              title: bi("留下放行依據", "Record the release decision"),
+              text: bi("檢視阻擋原因與修復建議", "Review blockers and remediation"),
+            },
+          ].map((item) => (
+            <button
+              type="button"
+              className="route-step"
+              key={item.code}
+              onClick={() => (item.gate ? openGate(item.gate) : setView("harness"))}
+            >
+              <span className="font-mono text-xs text-accent">{item.code}</span>
+              <span className="block text-base font-semibold">{t(item.title)}</span>
+              <span className="text-xs text-muted">{t(item.text)}</span>
+              <ArrowUpRight aria-hidden="true" className="route-arrow size-4" />
+            </button>
+          ))}
         </div>
       </section>
 
-      <Panel eyebrow={t(T.symptomsEyebrow)} title={t(T.symptomsTitle)}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {SYMPTOMS.map((item) => (
-            // 標題放在按鈕外面：按鈕裡不能放標題元素，螢幕閱讀器也才看得到它是標題。
-            // Heading outside the button: heading elements are invalid inside buttons and screen readers would lose them.
-            <article key={item.id} className="rounded-md border border-line bg-bg px-3 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <h3 className="text-sm font-semibold">{t(item.title)}</h3>
-                <span className="font-mono text-lg text-accent tabular-nums">{item.stat}</span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-muted">{t(item.text)}</p>
-              <button
-                type="button"
-                onClick={() => openGate(item.gate)}
-                className="mt-1 flex min-h-11 items-center font-mono text-xs text-accent"
-              >
-                {item.gate} {t(GATE_NAME[item.gate])}
-                <span className="ml-1 text-faint">· {t(item.source)}</span>
-              </button>
-            </article>
-          ))}
-        </div>
-        <p className="mt-3 text-xs leading-5 text-faint">{t(T.symptomsNote)}</p>
-      </Panel>
+      <div
+        className="overview-metrics"
+        role="group"
+        aria-label={t(bi("框架摘要", "Framework summary"))}
+      >
+        {[
+          {
+            value: "G0 + 6",
+            label: bi("安全閘門", "Security gates"),
+            note: bi("設計、白箱到黑箱", "Design, white box & black box"),
+            view: "gates" as const,
+          },
+          {
+            value: String(ASVS_TOTAL),
+            label: bi("ASVS 要求", "ASVS requirements"),
+            note: bi("對齊 5.0.0 標準", "Aligned with version 5.0.0"),
+            view: "levels" as const,
+          },
+          {
+            value: recommendLevel(profile).level,
+            label: bi("建議保證等級", "Recommended level"),
+            note: bi("依目前情境推導", "Based on the current scenario"),
+            view: "harness" as const,
+          },
+          {
+            value: `${checkProgress.done}/${checkProgress.total}`,
+            label: bi("學習清單進度", "Learning checklist"),
+            note: bi("勾選不代表通過驗證", "Checks do not certify verification"),
+            view: "gates" as const,
+          },
+        ].map((item) => (
+          <button
+            type="button"
+            key={item.label.en}
+            className="metric-card"
+            onClick={() => setView(item.view)}
+          >
+            <span className="metric-label">
+              {t(item.label)}
+              <ArrowUpRight aria-hidden="true" className="size-4" />
+            </span>
+            <strong className="metric-value">{item.value}</strong>
+            <span className="text-xs text-faint">{t(item.note)}</span>
+          </button>
+        ))}
+      </div>
 
       <Panel
         eyebrow={t(T.orderEyebrow)}
@@ -129,23 +210,44 @@ export function Overview() {
           </span>
         }
       >
-        <ol className="grid gap-2">
+        <ol className="gate-flow">
           {GATES.map((gate) => (
             <li key={gate}>
-              <button
-                type="button"
-                onClick={() => openGate(gate)}
-                className="flex min-h-11 w-full items-center gap-3 rounded-md border border-line bg-bg px-3 text-left"
-              >
+              <button type="button" onClick={() => openGate(gate)} className="gate-flow-button">
                 <span className="w-8 font-mono text-sm text-accent">{gate}</span>
                 <span className="text-sm">{t(GATE_NAME[gate])}</span>
-                <span className="ml-auto font-mono text-xs text-faint">
+                <span className="font-mono text-xs text-faint">
                   {t(TRACK_LABEL[GATE_TRACK[gate]])}
                 </span>
               </button>
             </li>
           ))}
         </ol>
+      </Panel>
+
+      <Panel eyebrow={t(T.symptomsEyebrow)} title={t(T.symptomsTitle)}>
+        <div className="symptom-grid">
+          {SYMPTOMS.map((item) => (
+            // 標題放在按鈕外面：按鈕裡不能放標題元素，螢幕閱讀器也才看得到它是標題。
+            // Heading outside the button: heading elements are invalid inside buttons and screen readers would lose them.
+            <article key={item.id} className="symptom-card">
+              <div className="flex flex-col-reverse gap-3">
+                <h3 className="text-sm font-semibold">{t(item.title)}</h3>
+                <span className="symptom-stat font-mono text-accent tabular-nums">{item.stat}</span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted">{t(item.text)}</p>
+              <button
+                type="button"
+                onClick={() => openGate(item.gate)}
+                className="mt-3 flex min-h-11 flex-wrap items-center gap-x-1 font-mono text-xs text-accent"
+              >
+                {item.gate} {t(GATE_NAME[item.gate])}
+                <span className="ml-1 text-faint">· {t(item.source)}</span>
+              </button>
+            </article>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-faint">{t(T.symptomsNote)}</p>
       </Panel>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -215,6 +317,13 @@ export function Overview() {
           ))}
         </div>
       </Panel>
+      <details className="research-note">
+        <summary>
+          {t(bi("研究背景與框架動機", "Research background & framework rationale"))}
+        </summary>
+        <p className="mt-3 text-sm font-medium">{t(T.h1)}</p>
+        <p className="mt-2 text-sm leading-6 text-muted">{t(T.intro)}</p>
+      </details>
     </div>
   );
 }
