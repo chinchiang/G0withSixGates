@@ -1,3 +1,4 @@
+import { findingGuidance } from "./finding-guidance.ts";
 import { bi, biList, joinAlt, pick, yesNo, type Bi, type Locale } from "../i18n/locale.ts";
 import {
   DEFECT_LABEL,
@@ -1218,8 +1219,11 @@ const R = {
   diffOnly: bi("PR 只掃差異", "Diff-only PR scan"),
   defects: bi("程式狀態", "Code state"),
   reasons: bi("## 分級理由", "## Why this level"),
-  evidence: bi("證據", "Evidence"),
-  fix: bi("修正", "Fix"),
+  evidence: bi("示範證據", "Demo evidence"),
+  cause: bi("問題原因", "Cause"),
+  impact: bi("可能影響", "Potential impact"),
+  retest: bi("重新驗證條件", "Retest criteria"),
+  fix: bi("修正方式", "Remediation"),
   yours: bi("你們的管線", "Your pipeline"),
   covered: bi("已涵蓋", "covered"),
   missed: bi("會漏掉", "would miss"),
@@ -1301,9 +1305,12 @@ export function reportMarkdown(
     for (const log of s.logs) lines.push(`- ${t(log)}`);
     for (const item of s.findings) {
       lines.push(`- **${t(STATUS_LABEL[item.severity])}** ${t(item.title)}`);
-      lines.push(`  - ${t(item.detail)}`);
+      const guidance = findingGuidance(item.id);
+      lines.push(`  - ${t(R.cause)}${colon}${t(item.detail)}`);
+      lines.push(`  - ${t(R.impact)}${colon}${t(guidance.impact)}`);
       lines.push(`  - ${t(R.evidence)}${colon}${t(item.evidence)}`);
       lines.push(`  - ${t(R.fix)}${colon}${t(item.fix)}`);
+      lines.push(`  - ${t(R.retest)}${colon}${t(guidance.retest)}`);
       lines.push(`  - ${t(item.tool)}｜${t(item.asvs)}｜${t(item.cwe)}`);
       const cov = covered.get(item.id);
       if (cov) {

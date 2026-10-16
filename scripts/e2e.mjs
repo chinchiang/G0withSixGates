@@ -10,24 +10,26 @@
  * console、版面、儲存、網址狀態與 CSP 回報端點。
  *
  * 「Created with Grok」標章腳本在 Grok 以外會被 grok.com 擋下
- * （ERR_BLOCKED_BY_RESPONSE.NotSameOrigin），那一筆是預期中的，不算錯誤。
+ * 或在受代理環境發生憑證信任失敗；只將該精確網址的已知載入失敗另列警告，其他錯誤仍會失敗。
  *
  * Browser interaction tests against a running server (by default the 127.0.0.1:8081
  * that `npm run preview:restart` serves); any failure exits non-zero. `npm test`
  * covers the rule engine and data; this covers what only a real browser shows:
  * rendering in both locales, the console, layout, storage, URL state and the CSP
  * report endpoint. Outside Grok the "Created with Grok" badge script is blocked by
- * grok.com (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin); that one error is expected.
+ * grok.com or fail proxy certificate trust. Only known load failures from that exact
+ * URL are recorded separately as external warnings; other errors still fail.
  */
 import assert from "node:assert/strict";
 import { request } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { isExternalBrandingFailure } from "./browser-diagnostics.mjs";
 
 const BASE = new URL(process.argv[2] ?? "http://127.0.0.1:8081/");
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), "..", "screenshots");
-const EXPECTED_CONSOLE = /ERR_BLOCKED_BY_RESPONSE\.NotSameOrigin/;
+const externalWarnings = new Set();
 const VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
   mobile: { width: 390, height: 844 },
@@ -58,7 +60,10 @@ async function openPage(browser, viewport, reducedMotion = "reduce") {
   const page = await context.newPage();
   const errors = [];
   page.on("console", (msg) => {
-    if (msg.type() === "error" && !EXPECTED_CONSOLE.test(msg.text())) errors.push(msg.text());
+    if (msg.type() !== "error") return;
+    const diagnostic = { text: msg.text(), url: msg.location().url };
+    if (isExternalBrandingFailure(diagnostic)) externalWarnings.add(JSON.stringify(diagnostic));
+    else errors.push(msg.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
   return { page, errors, close: () => context.close() };
@@ -245,6 +250,72 @@ try {
     await close();
   });
 
+  await test("guided review: keyboard focus, anchors, findings, report and related links", async () => {
+    const { page, errors, close } = await openPage(browser, { width: 320, height: 740 });
+    await page.goto(url(), { waitUntil: "networkidle" });
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.className), "skip-link");
+    await page.keyboard.press("Enter");
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content");
+    await page.getByRole("button", { name: "啟動 Harness" }).click();
+    assert.equal(await page.evaluate(() => document.activeElement?.tagName), "H1");
+    const guide = page.getByRole("navigation", { name: "使用步驟" });
+    await guide.getByRole("link", { name: /選擇情境/ }).click();
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "scenario-settings");
+    await guide.getByRole("link", { name: /執行模擬驗證/ }).click();
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "harness-run-control");
+    await page.keyboard.press("Enter");
+    await page.getByText("不准放行。").waitFor();
+    await page.waitForFunction(() => document.activeElement?.id === "harness-results");
+    const finding = page.locator("#finding-toggle-g2-key");
+    await finding.click();
+    const detail = page.locator("#finding-detail-g2-key");
+    assert.equal(await finding.getAttribute("aria-controls"), await detail.getAttribute("id"));
+    await detail.getByText("問題原因", { exact: true }).waitFor();
+    await detail.getByText("可能影響", { exact: true }).waitFor();
+    await detail.getByText("重新驗證條件", { exact: true }).waitFor();
+    assert.match(await detail.innerText(), /撤銷並輪替/);
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "下載紀錄" }).click(),
+    ]);
+    let report = "";
+    for await (const chunk of await download.createReadStream()) report += chunk;
+    assert.match(report, /重新驗證條件/);
+    assert.match(report, /撤銷並輪替/);
+    await page.getByRole("button", { name: "已整治的客服知識庫" }).click();
+    await page.getByRole("button", { name: "重新執行" }).click();
+    await page.getByText("可以合併，但警示要有期限與負責人。").waitFor();
+    await page.getByRole("button", { name: "已整治", exact: true }).click();
+    await page.getByRole("button", { name: "重新執行" }).click();
+    await page.getByText("放行。G0 與六道閘門都有紀錄，沒有靜默略過。").waitFor();
+    const related = page.getByRole("navigation", { name: "相關網站" });
+    assert.equal(await related.getByRole("link").count(), 2);
+    for (const link of await related.getByRole("link").all()) {
+      assert.equal(await link.getAttribute("target"), "_blank");
+      assert.match(await link.getAttribute("rel"), /noreferrer/);
+    }
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    assert.deepEqual(errors, []);
+    await close();
+  });
+
+  await test("narrow screens: every gate is visible without sideways scrolling", async () => {
+    const { page, errors, close } = await openPage(browser, { width: 320, height: 740 });
+    await page.goto(url("?view=gates&lang=en"), { waitUntil: "networkidle" });
+    const nav = page.getByRole("navigation", { name: "Gates", exact: true });
+    for (const button of await nav.getByRole("button").all()) {
+      const box = await button.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 320, await button.innerText());
+      assert.ok(box.height >= 44);
+    }
+    assert.deepEqual(errors, []);
+    await close();
+  });
+
   await test("unknown URLs show the bilingual not-found page with a way home", async () => {
     const { page, close } = await openPage(browser, VIEWPORTS.mobile);
     const response = await page.goto(url("/no-such-page"), { waitUntil: "networkidle" });
@@ -276,6 +347,7 @@ try {
   await browser.close();
 }
 
+for (const warning of externalWarnings) console.log(`External platform warning: ${warning}`);
 const failed = results.filter((item) => !item.ok).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 process.exit(failed ? 1 : 0);

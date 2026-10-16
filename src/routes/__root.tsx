@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_TITLE },
       { name: "description", content: `${APP_DESCRIPTION.zh} ${APP_DESCRIPTION.en}` },
-      { name: "theme-color", content: "#101410" },
+      { name: "theme-color", content: "#080d16" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
