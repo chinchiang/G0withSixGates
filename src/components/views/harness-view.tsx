@@ -12,6 +12,8 @@ import {
   type Coverage,
 } from "@/data/engine";
 import { useApp, type HarnessRun } from "@/components/app-state";
+import { GettingStarted } from "@/components/getting-started";
+import { findingGuidance } from "@/data/finding-guidance";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 import { bi, joinAlt } from "@/i18n/locale";
@@ -118,6 +120,13 @@ export function HarnessView() {
   // 只改名稱或預設情境標記不影響規則，不算過期。 Renaming or the preset tag does not change the rules, so it is not stale.
   const stale = phase === "done" && !!run && !sameVerdictInputs(run.profile, profile);
   const activeIndex = phase === "running" ? visible : -1;
+  const previousPhase = useRef(phase);
+  useEffect(() => {
+    if (previousPhase.current === "running" && phase === "done") {
+      resultsRef.current?.focus({ preventScroll: true });
+    }
+    previousPhase.current = phase;
+  }, [phase]);
 
   // 閘門依序亮起時，螢幕閱讀器逐道聽到結果，最後聽到裁決。回到這頁時不重唸：初始內容不會被宣讀。
   // As gates light up, screen readers hear each result and then the verdict. Returning to the view does not re-announce.
@@ -199,17 +208,18 @@ export function HarnessView() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <Panel eyebrow={t(T.systemEyebrow)} title={t(T.systemTitle)}>
+      <GettingStarted phase={phase} stale={stale} />
+      <div className="harness-layout">
+        <Panel eyebrow={t(T.systemEyebrow)} title={t(T.systemTitle)} headingId="scenario-settings">
           <ProfileForm />
           <div className="mt-4 flex flex-wrap gap-2">
             {phase === "running" ? (
-              <GhostButton type="button" onClick={stop}>
+              <GhostButton id="harness-run-control" type="button" onClick={stop}>
                 <Square className="size-4" />
                 {t(T.stop)}
               </GhostButton>
             ) : (
-              <TextButton type="button" onClick={start}>
+              <TextButton id="harness-run-control" type="button" onClick={start}>
                 <Play className="size-4" />
                 {phase === "done" ? t(T.rerun) : t(T.run)}
               </TextButton>
@@ -223,8 +233,15 @@ export function HarnessView() {
 
         <div
           ref={resultsRef}
+          id="harness-results"
+          role="region"
+          aria-labelledby="harness-results-heading"
+          tabIndex={-1}
           className={`scroll-mt-20 space-y-3 ${phase === "idle" ? "" : "min-h-[calc(100svh-5rem)] lg:min-h-0"}`}
         >
+          <h2 id="harness-results-heading" className="text-lg font-semibold">
+            {t(bi("驗證結果", "Verification results"))}
+          </h2>
           <p role="status" className="sr-only">
             {announcement}
           </p>
@@ -265,6 +282,42 @@ export function HarnessView() {
                 </p>
               )}
               {stale && <p className="mt-2 text-xs text-accent">{t(T.stale)}</p>}
+              <div className="next-action">
+                <h3 className="text-sm font-semibold">
+                  {t(bi("接下來怎麼做", "What to do next"))}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  {t(
+                    stale
+                      ? bi(
+                          "先依目前設定重新執行，再判讀新的裁決。",
+                          "Rerun with the current settings before interpreting a new verdict.",
+                        )
+                      : plan.release === "block"
+                        ? bi(
+                            "先處理阻擋項，展開下方發現，依修正方式與重新驗證條件逐項處理。",
+                            "Address blocking items first; expand each finding and follow its fix and retest criteria.",
+                          )
+                        : plan.release === "conditional"
+                          ? bi(
+                              "為每項警示指定負責人與期限，完成後重新驗證；有條件放行不代表警示已修復。",
+                              "Assign an owner and deadline to every advisory and retest after remediation; conditional release does not mean the advisories are fixed.",
+                            )
+                          : bi(
+                              "下載紀錄保留設定與依據。正式放行仍需接入實際掃描結果；之後若設定或程式改變，請重新驗證。",
+                              "Download the record with its settings and evidence. A real release still requires actual scan results; rerun verification after code or settings change.",
+                            ),
+                  )}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-faint">
+                  {t(
+                    bi(
+                      "教學操作：完成修正設定後按「重新執行」。勾選控制項只會更新管線缺口，不會把阻擋項改成通過。",
+                      'In this demo, update the remediation settings and select "Run again". Checklist changes update coverage only; they never turn a blocking finding into a pass.',
+                    ),
+                  )}
+                </p>
+              </div>
             </div>
           )}
 
@@ -347,13 +400,16 @@ function FindingCard({
 }) {
   const t = useT();
   const { finding } = cov;
+  const guidance = findingGuidance(finding.id);
   return (
-    <div className="rounded-md border border-line bg-bg">
+    <div className="finding-card rounded-md border border-line bg-bg">
       <button
         type="button"
+        id={`finding-toggle-${finding.id}`}
         aria-expanded={expanded}
+        aria-controls={`finding-detail-${finding.id}`}
         onClick={onToggle}
-        className="flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left"
+        className="finding-toggle flex min-h-11 w-full items-start gap-2 px-3 py-2 text-left"
       >
         <span className="shrink-0">
           <Badge tone={finding.severity}>{t(STATUS_LABEL[finding.severity])}</Badge>
@@ -365,55 +421,68 @@ function FindingCard({
           {cov.caught ? t(T.covered) : t(T.missed)}
         </span>
       </button>
-      {expanded && (
-        <div className="space-y-2 border-t border-line px-3 py-2 text-sm leading-6 text-muted">
-          <p>{t(finding.detail)}</p>
-          <p className="break-all font-mono text-xs text-fg">{t(finding.evidence)}</p>
-          <p>
-            {t(T.fix)}: {t(finding.fix)}
-          </p>
-          <p className="font-mono text-xs text-faint">
-            {t(finding.tool)} · {t(finding.asvs)} · {t(finding.cwe)}
-          </p>
-          {cov.controls.length > 0 && (
-            <div>
-              <p className="text-xs text-muted">{t(T.catching)}</p>
-              <ul className="mt-1">
-                {cov.controls.map((control) => (
-                  <li key={control.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenGate(control.gate)}
-                      className="flex min-h-11 w-full items-start gap-2 py-1 text-left text-fg"
-                    >
-                      {control.checked ? (
-                        <Check
-                          className="mt-1 size-4 shrink-0 text-accent"
-                          strokeWidth={2.5}
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <X
-                          className="mt-1 size-4 shrink-0 text-signal"
-                          strokeWidth={2.5}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span>
-                        <span className="font-mono text-xs text-accent">{control.gate}</span>{" "}
-                        {t(control.text)}
-                        <span className="sr-only">
-                          {control.checked ? t(T.checked) : t(T.unchecked)}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+      <div
+        id={`finding-detail-${finding.id}`}
+        hidden={!expanded}
+        role="region"
+        aria-labelledby={`finding-toggle-${finding.id}`}
+        className="space-y-3 border-t border-line px-3 py-3 text-sm leading-6 text-muted"
+      >
+        <dl className="finding-guidance">
+          {[
+            { label: bi("問題原因", "Cause"), value: finding.detail },
+            { label: bi("可能影響", "Potential impact"), value: guidance.impact },
+            { label: bi("示範證據", "Demo evidence"), value: finding.evidence },
+            { label: bi("修正方式", "Remediation"), value: finding.fix },
+            { label: bi("重新驗證條件", "Retest criteria"), value: guidance.retest },
+          ].map((row) => (
+            <div key={row.label.en}>
+              <dt className="text-xs font-semibold text-fg">{t(row.label)}</dt>
+              <dd className="mt-1">{t(row.value)}</dd>
             </div>
-          )}
-        </div>
-      )}
+          ))}
+        </dl>
+        <p className="font-mono text-xs text-faint">
+          {t(finding.tool)} · {t(finding.asvs)} · {t(finding.cwe)}
+        </p>
+        {cov.controls.length > 0 && (
+          <div>
+            <p className="text-xs text-muted">{t(T.catching)}</p>
+            <ul className="mt-1">
+              {cov.controls.map((control) => (
+                <li key={control.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenGate(control.gate)}
+                    className="flex min-h-11 w-full items-start gap-2 py-1 text-left text-fg"
+                  >
+                    {control.checked ? (
+                      <Check
+                        className="mt-1 size-4 shrink-0 text-accent"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <X
+                        className="mt-1 size-4 shrink-0 text-signal"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>
+                      <span className="font-mono text-xs text-accent">{control.gate}</span>{" "}
+                      {t(control.text)}
+                      <span className="sr-only">
+                        {control.checked ? t(T.checked) : t(T.unchecked)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

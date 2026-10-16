@@ -613,3 +613,117 @@
     width: 100%;
   }
 }
+
+/* Guided review: anchors clear the sticky header; mobile controls stay visible. */
+:where([id], [tabindex="-1"]) {
+  scroll-margin-top: 6rem;
+}
+.getting-started {
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+}
+.guide-steps {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.guide-steps a {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 2.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.guide-steps a:hover,
+.guide-steps a[aria-current="step"] {
+  border-color: var(--color-accent);
+}
+.guide-number {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.harness-layout {
+  display: grid;
+  gap: 1rem;
+}
+.gate-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.next-action {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line-strong);
+}
+.finding-guidance {
+  display: grid;
+  gap: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.related-sites {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+}
+.related-sites a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.related-sites a:hover {
+  border-color: var(--color-accent);
+}
+@media (min-width: 640px) {
+  .guide-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1180px) {
+  .harness-layout {
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .related-sites {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .related-sites > div {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 639px) {
+  .finding-toggle {
+    flex-wrap: wrap;
+  }
+  .finding-toggle > :nth-child(2) {
+    flex: 1;
+    min-width: 0;
+  }
+  .finding-toggle > :last-child {
+    width: 100%;
+    text-align: right;
+  }
+}

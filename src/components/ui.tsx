@@ -11,12 +11,14 @@ export function Panel({
   eyebrow,
   title,
   action,
+  headingId,
   children,
   className = "",
 }: {
   eyebrow?: string;
   title?: string;
   action?: ReactNode;
+  headingId?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -28,7 +30,15 @@ export function Panel({
             {eyebrow && (
               <p className="font-mono text-xs tracking-wider text-accent uppercase">{eyebrow}</p>
             )}
-            {title && <h2 className="mt-1 text-base font-semibold">{title}</h2>}
+            {title && (
+              <h2
+                id={headingId}
+                tabIndex={headingId ? -1 : undefined}
+                className="mt-1 text-base font-semibold"
+              >
+                {title}
+              </h2>
+            )}
           </div>
           {action}
         </header>

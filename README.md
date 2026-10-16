@@ -11,6 +11,24 @@ An interactive teaching tool that organizes security testing for vibe coding int
 >
 > The Harness is a **demo simulation**: findings and evidence are teaching examples generated from the scenario you pick; nothing real is scanned. Chapter references are a teaching summary; verify against the standard itself.
 
+## 使用方式 / Getting started
+
+1. 從首頁進入管線，先選擇預設情境，再調整受測系統條件。頁首的三步引導可直接跳到設定、執行按鈕與結果。
+2. 執行模擬驗證後，先處理阻擋項；展開發現可查看原因、影響、示範證據、修正方式與重新驗證條件。
+3. 修正設定後重新執行，再下載放行紀錄。勾選閘門控制項只會更新「管線缺口」，不會把示範發現改成通過。有條件放行的警示仍需負責人與期限。
+
+4. Open the pipeline from the overview, choose a preset and adjust the system settings. The three-step guide links directly to settings, the run control and results.
+5. Run the simulation and address blocking findings first. Expand a finding for its cause, impact, demo evidence, remediation and retest criteria.
+6. Update the settings, run again and download the release record. Gate checks update pipeline coverage only; they never change a finding to a pass. Conditional-release advisories still need an owner and deadline.
+
+鍵盤換頁後焦點會移到主標題，完成驗證後移到結果區；手機上的七個閘門選項會換行顯示。頁尾提供法規觀測與每日威脅情報的相關網站連結。
+
+Navigation moves keyboard focus to the page heading; completing a run moves it to the results. All seven gate options wrap on narrow screens. Related regulatory and daily threat-intelligence sites are linked from the footer.
+
+瀏覽器檢查會將平台品牌腳本的兩種已知外部載入失敗另列為警告：來源必須精確符合 `https://grok.com/grok-app-builder/extensions.js`，且錯誤為 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` 或 `ERR_CERT_AUTHORITY_INVALID`。警告仍會保留於輸出；其他網址、應用程式錯誤與未預期的失敗都會讓檢查失敗。此分類不會修改腳本載入方式，也不會停用憑證驗證。
+
+Browser checks record two known external platform-badge load failures as warnings only when the source exactly matches `https://grok.com/grok-app-builder/extensions.js` and the error is `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` or `ERR_CERT_AUTHORITY_INVALID`. Warnings remain in the output; other URLs, application errors and unexpected failures still fail validation. This classification does not change script loading or disable certificate verification.
+
 ## 🏛️ 系統架構與流程 / Architecture Overview
 
 整個 App 在瀏覽器裡執行：伺服器端只負責 SSR、平台的 PWA 中介層與一個收 CSP 違規回報的端點（`/api/csp-report`），沒有模型呼叫，也不掃描任何真實系統。下圖由上而下是一次請求經過的五層，每一層一排；灰色是平台元件，米色是資料與輸出。同一排裡的卡片沒有先後關係（部署層以數字標示順序）。
@@ -90,14 +108,14 @@ flowchart TB
 
 ## 畫面 / Views
 
-| 畫面 View | 內容 Content |
-| --- | --- |
-| 總覽 Overview | 會被 AI 生成速度放大的缺陷、事故對到閘門、ASVS 5.0 等級比例<br/>Defects that generation speed amplifies, incidents mapped to gates, ASVS 5.0 level shares |
-| 管線 Pipeline | 設定受測系統，執行 Harness，看各閘門裁決、放行紀錄與「你們的管線缺口」<br/>Configure the system under test, run the Harness, see each gate's verdict, the release record and "your pipeline gaps" |
-| 閘門 Gates | G0–G6 的時機、對抗對象與控制項清單；勾選代表你們真實的管線已有該控制<br/>When each of G0–G6 runs, what it defends against, its control checklist; a check means your real pipeline has that control |
-| 分級 Levels | L1／L2／L3 的意義、建議等級與在 Harness 裡的效果<br/>What L1 / L2 / L3 mean, the recommended level and its effect in the Harness |
-| 對照 Map | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters |
-| 工具 Tools | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits |
+| 畫面 View     | 內容 Content                                                                                                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 總覽 Overview | 會被 AI 生成速度放大的缺陷、事故對到閘門、ASVS 5.0 等級比例<br/>Defects that generation speed amplifies, incidents mapped to gates, ASVS 5.0 level shares                                           |
+| 管線 Pipeline | 設定受測系統，執行 Harness，看各閘門裁決、放行紀錄與「你們的管線缺口」<br/>Configure the system under test, run the Harness, see each gate's verdict, the release record and "your pipeline gaps"   |
+| 閘門 Gates    | G0–G6 的時機、對抗對象與控制項清單；勾選代表你們真實的管線已有該控制<br/>When each of G0–G6 runs, what it defends against, its control checklist; a check means your real pipeline has that control |
+| 分級 Levels   | L1／L2／L3 的意義、建議等級與在 Harness 裡的效果<br/>What L1 / L2 / L3 mean, the recommended level and its effect in the Harness                                                                    |
+| 對照 Map      | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters                                                                                    |
+| 工具 Tools    | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits                                                                                      |
 
 畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；中文與其他預設值不會出現在網址。受測系統設定、勾選與語系只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果存在 sessionStorage：重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
 

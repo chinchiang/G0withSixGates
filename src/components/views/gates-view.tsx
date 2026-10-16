@@ -119,7 +119,7 @@ export function GatesView() {
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
       </div>
 
-      <nav aria-label={t(T.gatesNav)} className="flex gap-2 overflow-x-auto pb-1">
+      <nav aria-label={t(T.gatesNav)} className="gate-navigation">
         {GATES.map((id) => (
           <button
             key={id}
@@ -135,9 +135,13 @@ export function GatesView() {
         ))}
       </nav>
 
+      <p role="status" className="sr-only">
+        {doc.id} {t(doc.name)}
+      </p>
       <Panel
         eyebrow={`${doc.id} · ${t(TRACK_LABEL[GATE_TRACK[doc.id]])}`}
         title={t(doc.name)}
+        headingId="gate-details-heading"
         action={
           <span className="font-mono text-xs text-muted tabular-nums">
             {done}/{doc.controls.length}

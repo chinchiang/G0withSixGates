@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { isExternalBrandingFailure } from "./browser-diagnostics.mjs";
 import { checkedOutputPath, checkedUrl } from "./browser-guard.mjs";
 import { computeBrandWarnings } from "./brand-check.mjs";
 import {
@@ -100,12 +101,15 @@ try {
 
   const viewports = {};
   for (const vp of VIEWPORTS) {
-    const errors = { consoleErrors: [], pageErrors: [] };
+    const errors = { consoleErrors: [], pageErrors: [], externalWarnings: [] };
     const page = await browser.newPage({
       viewport: { width: vp.width, height: vp.height },
     });
     page.on("console", (msg) => {
-      if (msg.type() === "error") errors.consoleErrors.push(msg.text());
+      if (msg.type() !== "error") return;
+      const diagnostic = { text: msg.text(), url: msg.location().url };
+      if (isExternalBrandingFailure(diagnostic)) errors.externalWarnings.push(diagnostic);
+      else errors.consoleErrors.push(msg.text());
     });
     page.on("pageerror", (err) => errors.pageErrors.push(String(err?.message || err)));
     // `domcontentloaded`, not `networkidle`: Vite keeps an HMR websocket open, so
@@ -139,11 +143,15 @@ try {
       horizontalOverflow,
       consoleErrors: errors.consoleErrors,
       pageErrors: errors.pageErrors,
+      externalWarnings: errors.externalWarnings,
       screenshot: vp.screenshot,
     };
   }
 
-  const brandWarnings = computeBrandWarnings({ hasCanvas: viewports.desktop.hasCanvas, workspaceRoot: ROOT });
+  const brandWarnings = computeBrandWarnings({
+    hasCanvas: viewports.desktop.hasCanvas,
+    workspaceRoot: ROOT,
+  });
   // Only a dev server answers /__app-env, so smoking the built output reads as
   // indeterminate — report a divergence, never the absence of an observation.
   const authWarnings = authInvariantWarnings(

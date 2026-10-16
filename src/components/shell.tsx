@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   ArrowLeftRight,
   ArrowUpRight,
@@ -7,6 +8,7 @@ import {
   ShieldCheck,
   Wrench,
 } from "lucide-react";
+import { RelatedSites } from "@/components/related-sites";
 import { AppStateProvider, useApp } from "@/components/app-state";
 import { Overview } from "@/components/views/overview";
 import { HarnessView } from "@/components/views/harness-view";
@@ -85,6 +87,15 @@ function Frame() {
   const { view, setView, profile, locale, setLocale, checkProgress } = useApp();
   const t = useT();
   const advice = recommendLevel(profile);
+  const previousView = useRef(view);
+  useEffect(() => {
+    if (previousView.current === view) return;
+    previousView.current = view;
+    const heading = document.querySelector<HTMLElement>("#main-content h1");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [view]);
 
   return (
     <div className="app-shell min-h-screen bg-bg text-fg">
@@ -95,7 +106,7 @@ function Frame() {
         <div className="header-inner">
           <button type="button" onClick={() => setView("overview")} className="brand-home">
             <span className="brand-mark">
-              <ShieldCheck aria-hidden="true" />
+              <img src="/favicon.svg" alt="" width="28" height="28" />
             </span>
             <span className="min-w-0 text-left">
               <span className="block text-lg font-semibold tracking-tight">{t(APP_NAME)}</span>
@@ -193,6 +204,7 @@ function Frame() {
           {view === "levels" && <LevelsView />}
           {view === "map" && <MapView />}
           {view === "tools" && <ToolsView />}
+          <RelatedSites />
           <footer className="app-footer">
             <span>
               G0 → G6 · {t(bi("從威脅建模到放行裁決", "From threat model to release verdict"))}
