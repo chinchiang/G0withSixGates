@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
+import { TRACK_TONE, segStyle } from "@/components/tone";
 import { bi, joinList } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
@@ -114,9 +115,9 @@ export function GatesView() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-xs tracking-widest text-accent">G0–G6</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t(T.h1)}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
+        <p className="eyebrow">G0–G6</p>
+        <h1 className="page-title">{t(T.h1)}</h1>
+        <p className="page-lede">{t(T.intro)}</p>
       </div>
 
       <nav aria-label={t(T.gatesNav)} className="gate-navigation">
@@ -126,10 +127,9 @@ export function GatesView() {
             type="button"
             aria-current={id === doc.id ? "page" : undefined}
             onClick={() => openGate(id)}
-            className={`min-h-11 shrink-0 rounded-md border px-3 font-mono text-sm ${
-              id === doc.id ? "border-accent bg-accent/15 text-fg" : "border-line text-muted"
-            }`}
+            className={`tab tab-mono shrink-0 ${TRACK_TONE[GATE_TRACK[id]]}`}
           >
+            <span className="tab-dot" aria-hidden="true" />
             {id} {t(GATE_NAME[id])}
           </button>
         ))}
@@ -165,7 +165,7 @@ export function GatesView() {
         </dl>
         <div className="mt-4 flex flex-wrap gap-2">
           {doc.asvs.map((item) => (
-            <Badge key={item.zh} tone="neutral">
+            <Badge key={item.zh} tone="pill">
               {t(item)}
             </Badge>
           ))}
@@ -183,14 +183,9 @@ export function GatesView() {
                   type="button"
                   onClick={() => toggle(item.id)}
                   aria-pressed={on}
-                  className="flex min-h-11 w-full items-start gap-3 rounded-md border border-line bg-bg px-3 py-3 text-left"
+                  className="check-row"
                 >
-                  <span
-                    className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-sm border ${
-                      on ? "border-accent bg-accent text-accent-ink" : "border-line-strong"
-                    }`}
-                    aria-hidden="true"
-                  >
+                  <span className="check-box" aria-hidden="true">
                     {on ? <Check className="size-3.5" strokeWidth={2.5} /> : null}
                   </span>
                   <span className="text-sm leading-6">
@@ -241,6 +236,15 @@ export function GatesView() {
           <span className="tabular-nums">
             {t(T.allChecked)} {checkProgress.done}/{checkProgress.total}
           </span>
+          <span className="seg-bar order-last w-full" aria-hidden="true">
+            <span
+              className="seg-fill"
+              style={segStyle(
+                checkProgress.total ? (checkProgress.done / checkProgress.total) * 100 : 0,
+                "linear-gradient(90deg, var(--color-grad-a), var(--color-accent))",
+              )}
+            />
+          </span>
           <span role="status">{notice}</span>
           {undo ? (
             <button type="button" onClick={restore} className="min-h-11 text-accent">
@@ -263,11 +267,8 @@ export function GatesView() {
         <Panel eyebrow={t(T.layersEyebrow)} title={t(T.layersTitle)}>
           <ol className="space-y-2">
             {LAYERS.map((layer, index) => (
-              <li
-                key={layer.zh}
-                className="flex min-h-11 items-center gap-3 rounded-md border border-line bg-bg px-3"
-              >
-                <span className="font-mono text-sm text-accent">{index + 1}</span>
+              <li key={layer.zh} className="zone-tile tone-blue">
+                <span className="zone-count">{index + 1}</span>
                 <span className="text-sm">{t(layer)}</span>
               </li>
             ))}
@@ -281,7 +282,7 @@ export function GatesView() {
           <p className="mb-3 text-sm leading-6 text-muted">{t(T.maestroNote)}</p>
           <ul className="space-y-2">
             {MAESTRO.map((row) => (
-              <li key={row.layer} className="rounded-md border border-line bg-bg px-3 py-3">
+              <li key={row.layer} className="zone-tile zone-stack tone-violet">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">
                     <span className="font-mono text-accent">{row.layer}</span> {t(row.name)}

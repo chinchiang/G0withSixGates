@@ -3,6 +3,7 @@ import { recommendLevel } from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, Panel } from "@/components/ui";
+import { LEVEL_TONE } from "@/components/tone";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
@@ -54,9 +55,9 @@ export function LevelsView() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-xs tracking-widest text-accent">{t(T.eyebrow)}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t(T.h1)}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
+        <p className="eyebrow">{t(T.eyebrow)}</p>
+        <h1 className="page-title">{t(T.h1)}</h1>
+        <p className="page-lede">{t(T.intro)}</p>
       </div>
 
       <div className="grid gap-3">
@@ -66,12 +67,17 @@ export function LevelsView() {
           return (
             <article
               key={level}
-              className={`rounded-lg border px-4 py-4 ${active ? "border-accent bg-accent/10" : "border-line bg-surface"}`}
+              className={`level-card ${LEVEL_TONE[level]} ${active ? "is-recommended" : ""}`}
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">{level}</h2>
-                <span className="text-sm text-muted">{t(meta.name)}</span>
-                {active && <Badge tone="accent">{t(T.recommended)}</Badge>}
+              <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+                <h2 className="level-code">{level}</h2>
+                <span className="pb-1 text-sm text-muted">{t(meta.name)}</span>
+                <span className="ml-auto flex items-center gap-2 pb-1">
+                  {active && <Badge tone="accent">{t(T.recommended)}</Badge>}
+                  <span className="font-mono text-2xl font-semibold tabular-nums text-(--tone)">
+                    {meta.cumulative}%
+                  </span>
+                </span>
               </div>
               <p className="mt-2 font-mono text-xs text-muted tabular-nums">
                 {t(
@@ -91,11 +97,7 @@ export function LevelsView() {
 
       <Panel eyebrow={t(T.systemEyebrow)} title={displayName(profile, locale)}>
         <ProfileForm />
-        <button
-          type="button"
-          onClick={() => setView("tools")}
-          className="mt-4 min-h-11 rounded-md border border-line px-4 text-sm"
-        >
+        <button type="button" onClick={() => setView("tools")} className="btn-ghost mt-4">
           {t(T.seeTools)} {advice.level} {t(T.toolsFor)}
         </button>
       </Panel>
@@ -110,8 +112,8 @@ export function LevelsView() {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {STACKS.map((stack) => (
-          <article key={stack.level} className="rounded-lg border border-line bg-surface px-4 py-4">
-            <h3 className="font-mono text-sm text-accent">{stack.level}</h3>
+          <article key={stack.level} className={`zone-tile zone-stack ${LEVEL_TONE[stack.level]}`}>
+            <h3 className="zone-count">{stack.level}</h3>
             <p className="mt-1 text-sm font-semibold">{t(stack.title)}</p>
             <p className="mt-2 text-sm leading-6 text-muted">{t(stack.fit)}</p>
           </article>

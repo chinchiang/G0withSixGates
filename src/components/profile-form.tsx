@@ -102,7 +102,7 @@ export function ProfileForm() {
           value={profile.preset === "custom" ? profile.name : displayName(profile, locale)}
           maxLength={NAME_MAX_LENGTH}
           onChange={(event) => patchProfile({ name: event.target.value })}
-          className="mt-1 min-h-11 w-full rounded-md border border-line-strong bg-bg px-3 text-fg"
+          className="field-input mt-1"
         />
       </label>
 
@@ -235,7 +235,7 @@ export function ProfileForm() {
         </div>
       </fieldset>
 
-      <div className="rounded-md border border-line bg-bg px-3 py-3">
+      <div className="rounded-xl border border-line bg-bg px-3 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">{advice.level}</Badge>
           <Badge tone={open ? "block" : "pass"}>

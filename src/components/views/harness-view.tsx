@@ -24,6 +24,19 @@ import { useT } from "@/i18n/context";
  * Pipeline: configure the system, run the Harness, light gates up one by one, verdict, gaps, download the record.
  */
 
+const VERDICT_TONE = {
+  block: "tone-block",
+  conditional: "tone-advisory",
+  pass: "tone-pass",
+} as const;
+
+const STATUS_TONE = {
+  block: "tone-block",
+  advisory: "tone-advisory",
+  pass: "tone-pass",
+  na: "tone-na",
+} as const;
+
 const T = {
   eyebrow: bi("HARNESS 代理", "HARNESS AGENT"),
   h1: bi("G0 定級，六道閘門一次跑完", "G0 sets the level, then all six gates run at once"),
@@ -195,12 +208,12 @@ export function HarnessView() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-xs tracking-widest text-accent">{t(T.eyebrow)}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t(T.h1)}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
-        <p className="mt-3 flex max-w-2xl items-start gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm leading-6">
+        <p className="eyebrow">{t(T.eyebrow)}</p>
+        <h1 className="page-title">{t(T.h1)}</h1>
+        <p className="page-lede">{t(T.intro)}</p>
+        <p className="scan-banner">
           <span className="shrink-0">
-            <Badge tone="advisory">{t(T.demo)}</Badge>
+            <Badge tone="pass">{t(T.demo)}</Badge>
           </span>
           <span>
             {t(DEMO_NOTICE)} {t(T.demoTail)}
@@ -246,31 +259,46 @@ export function HarnessView() {
             {announcement}
           </p>
           {phase === "done" && plan && (
-            <div
-              className={`rounded-lg border px-4 py-3 ${
-                plan.release === "block"
-                  ? "border-signal/50 bg-signal/10"
-                  : "border-accent/40 bg-accent/10"
-              }`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  tone={
-                    plan.release === "block"
-                      ? "block"
-                      : plan.release === "pass"
-                        ? "pass"
-                        : "advisory"
-                  }
-                >
-                  {t(RELEASE_LABEL[plan.release])}
-                </Badge>
-                <span className="font-mono text-xs text-muted tabular-nums">
-                  {plan.level} · {t(T.blocks)} {plan.blockCount} · {t(T.advisories)}{" "}
-                  {plan.advisoryCount}
-                </span>
+            <div className={`verdict ${VERDICT_TONE[plan.release]}`}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 basis-60">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      tone={
+                        plan.release === "block"
+                          ? "block"
+                          : plan.release === "pass"
+                            ? "pass"
+                            : "advisory"
+                      }
+                    >
+                      {t(RELEASE_LABEL[plan.release])}
+                    </Badge>
+                    <span className="font-mono text-xs text-muted tabular-nums">{plan.level}</span>
+                  </div>
+                  <p className="mt-2 text-lg font-semibold leading-7">{t(plan.headline)}</p>
+                </div>
+                <dl className="verdict-stats w-full sm:w-auto sm:min-w-64">
+                  <div className="verdict-stat">
+                    <dd className="m-0">
+                      <b>{plan.blockCount}</b>
+                    </dd>
+                    <dt>{t(T.blocks)}</dt>
+                  </div>
+                  <div className="verdict-stat">
+                    <dd className="m-0">
+                      <b>{plan.advisoryCount}</b>
+                    </dd>
+                    <dt>{t(T.advisories)}</dt>
+                  </div>
+                  <div className="verdict-stat">
+                    <dd className="m-0">
+                      <b>{plan.level}</b>
+                    </dd>
+                    <dt>{t(bi("等級", "Level"))}</dt>
+                  </div>
+                </dl>
               </div>
-              <p className="mt-2 text-sm leading-6">{t(plan.headline)}</p>
               {missed.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
                   {t(
@@ -334,12 +362,14 @@ export function HarnessView() {
               return (
                 <li
                   key={item.gate}
-                  className={`rounded-lg border px-3 py-3 ${
-                    current ? "border-accent bg-surface" : "border-line bg-surface"
+                  className={`step-item ${revealed ? STATUS_TONE[item.status] : "tone-na"} ${
+                    current ? "is-current" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-8 font-mono text-sm text-accent">{item.gate}</span>
+                    <span className="w-8 font-mono text-sm font-semibold text-accent">
+                      {item.gate}
+                    </span>
                     <span className="text-sm font-medium">
                       {t(GATE_NAME[item.gate])}
                       <span className="ml-2 font-normal text-faint">
@@ -416,7 +446,7 @@ function FindingCard({
         </span>
         <span className="text-sm">{t(finding.title)}</span>
         <span
-          className={`ml-auto shrink-0 pt-0.5 text-xs ${cov.caught ? "text-muted" : "text-accent"}`}
+          className={`ml-auto shrink-0 pt-0.5 text-xs ${cov.caught ? "text-muted" : "badge-transition-up"}`}
         >
           {cov.caught ? t(T.covered) : t(T.missed)}
         </span>
@@ -523,7 +553,7 @@ function GapPanel({
               <button
                 type="button"
                 onClick={() => onOpenGate(controls[0]?.gate ?? finding.gate)}
-                className="w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
+                className="gap-item tone-advisory w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
               >
                 <span className="flex items-start gap-2 text-sm">
                   <span className="font-mono text-accent">{finding.gate}</span>

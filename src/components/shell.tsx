@@ -5,7 +5,9 @@ import {
   Bot,
   Layers,
   LayoutDashboard,
+  Moon,
   ShieldCheck,
+  Sun,
   Wrench,
 } from "lucide-react";
 import { RelatedSites } from "@/components/related-sites";
@@ -69,6 +71,8 @@ const NAV: { id: ViewId; label: Bi; description: Bi; icon: typeof Bot }[] = [
 const T = {
   nav: bi("主要導覽", "Main navigation"),
   language: bi("語言", "Language"),
+  theme: bi("切換深淺色主題", "Toggle light and dark theme"),
+  demoEnv: bi("示範環境", "DEMO ENVIRONMENT"),
   aside: bi(
     "對齊 OWASP ASVS 5.0.0。章節對照是教學摘要，正式驗證以標準原文為準。",
     "Aligned with OWASP ASVS 5.0.0. Chapter references are a teaching summary; verify against the standard itself.",
@@ -84,7 +88,7 @@ export function AppShell() {
 }
 
 function Frame() {
-  const { view, setView, profile, locale, setLocale, checkProgress } = useApp();
+  const { view, setView, profile, locale, setLocale, theme, setTheme, checkProgress } = useApp();
   const t = useT();
   const advice = recommendLevel(profile);
   const previousView = useRef(view);
@@ -98,7 +102,7 @@ function Frame() {
   }, [view]);
 
   return (
-    <div className="app-shell min-h-screen bg-bg text-fg">
+    <div className="app-shell min-h-screen text-fg">
       <a href="#main-content" className="skip-link">
         {t(bi("跳至主要內容", "Skip to main content"))}
       </a>
@@ -109,7 +113,9 @@ function Frame() {
               <img src="/favicon.svg" alt="" width="28" height="28" />
             </span>
             <span className="min-w-0 text-left">
-              <span className="block text-lg font-semibold tracking-tight">{t(APP_NAME)}</span>
+              <span className="brand-title block text-lg font-semibold tracking-tight">
+                {t(APP_NAME)}
+              </span>
               <span className="block text-xs text-muted">{t(APP_SUBTITLE)}</span>
             </span>
           </button>
@@ -117,7 +123,21 @@ function Frame() {
             G0 + SIX SECURITY GATES
           </span>
           <div className="flex shrink-0 items-center gap-3">
-            <span className="standard-chip hidden sm:inline-flex">ASVS 5.0.0</span>
+            <span className="live-chip hidden sm:inline-flex">ASVS 5.0.0</span>
+            <button
+              type="button"
+              className="theme-toggle"
+              aria-pressed={theme === "light"}
+              aria-label={t(T.theme)}
+              title={t(T.theme)}
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            >
+              {theme === "light" ? (
+                <Sun aria-hidden="true" className="size-5" strokeWidth={1.75} />
+              ) : (
+                <Moon aria-hidden="true" className="size-5" strokeWidth={1.75} />
+              )}
+            </button>
             <div role="group" aria-label={t(T.language)} className="language-switch">
               {LOCALES.map((item) => (
                 <button
@@ -151,17 +171,18 @@ function Frame() {
             ))}
           </nav>
           <div className="sidebar-context">
+            <p className="sys-line">{t(T.demoEnv)}</p>
             <p className="sidebar-label">{t(bi("目前情境", "CURRENT SCENARIO"))}</p>
             <p className="text-sm font-medium">{displayName(profile, locale)}</p>
-            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+            <div className="sys-kv">
               <span>{t(bi("建議保證等級", "Recommended level"))}</span>
-              <span className="font-mono text-accent">{advice.level}</span>
+              <b className="text-accent">{advice.level}</b>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted">
+            <div className="sys-kv">
               <span>{t(bi("清單進度", "Checklist progress"))}</span>
-              <span className="font-mono tabular-nums">
+              <b>
                 {checkProgress.done}/{checkProgress.total}
-              </span>
+              </b>
             </div>
             <progress
               className="check-progress"
@@ -194,7 +215,7 @@ function Frame() {
               SIX-GATE <span aria-hidden="true"> / </span>
               <span className="text-muted">{t(NAV.find((item) => item.id === view)!.label)}</span>
             </p>
-            <span className="text-xs text-faint">
+            <span className="status-label">
               {t(bi("互動教學 · 示範環境", "INTERACTIVE GUIDE · DEMO"))}
             </span>
           </div>
@@ -207,6 +228,9 @@ function Frame() {
           <RelatedSites />
           <footer className="app-footer">
             <span>
+              <strong>{t(APP_NAME)}</strong> · {t(APP_SUBTITLE)}
+            </span>
+            <span className="flow">
               G0 → G6 · {t(bi("從威脅建模到放行裁決", "From threat model to release verdict"))}
             </span>
             <span>OWASP ASVS 5.0.0</span>
@@ -214,10 +238,7 @@ function Frame() {
         </main>
       </div>
 
-      <nav
-        aria-label={t(T.nav)}
-        className="dock fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg-raised md:hidden"
-      >
+      <nav aria-label={t(T.nav)} className="dock md:hidden">
         <ul className="grid grid-cols-6">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -228,11 +249,10 @@ function Frame() {
                   type="button"
                   aria-current={active ? "page" : undefined}
                   onClick={() => setView(item.id)}
-                  className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 text-xs ${
-                    active ? "text-accent" : "text-muted"
-                  }`}
                 >
-                  <Icon aria-hidden="true" className="size-5" strokeWidth={1.75} />
+                  <span className="dock-icon">
+                    <Icon aria-hidden="true" className="size-5" strokeWidth={1.75} />
+                  </span>
                   {t(item.label)}
                 </button>
               </li>
@@ -270,7 +290,7 @@ function NavButton({
       </span>
       <span>
         <span className="block text-sm font-medium">{label}</span>
-        <span className="mt-1 block text-xs text-faint">{description}</span>
+        <span className="nav-desc mt-1 block text-xs text-faint">{description}</span>
       </span>
     </button>
   );
