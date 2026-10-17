@@ -10,6 +10,7 @@ import {
 import { recommendLevel } from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
+import { LEVEL_TONE } from "@/components/tone";
 import { bi, type Bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
@@ -65,9 +66,9 @@ export function ToolsView() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-xs tracking-widest text-accent">{t(T.eyebrow)}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t(T.h1)}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+        <p className="eyebrow">{t(T.eyebrow)}</p>
+        <h1 className="page-title">{t(T.h1)}</h1>
+        <p className="page-lede">
           {t(
             bi(
               `選型看兩件事：能不能跨檔追蹤污點，以及能不能在安裝前擋下幻覺套件。其餘依 ${advice.level} 決定要不要花錢。目前系統「${displayName(profile, "zh")}」建議 ${advice.level}。`,
@@ -83,10 +84,10 @@ export function ToolsView() {
           return (
             <article
               key={stack.level}
-              className={`rounded-lg border px-4 py-4 ${active ? "border-accent bg-accent/10" : "border-line bg-surface"}`}
+              className={`level-card ${LEVEL_TONE[stack.level]} ${active ? "is-recommended" : ""}`}
             >
               <div className="flex items-center gap-2">
-                <h2 className="font-mono text-sm text-accent">{stack.level}</h2>
+                <h2 className="zone-count">{stack.level}</h2>
                 {active && <Badge tone="accent">{t(T.recommended)}</Badge>}
               </div>
               <p className="mt-1 text-sm font-semibold">{t(stack.title)}</p>
@@ -101,10 +102,10 @@ export function ToolsView() {
         })}
       </div>
 
-      <ToolGroup eyebrow="SAST" title={T.sastTitle} items={SAST_TOOLS} />
-      <ToolGroup eyebrow="SCA" title={T.scaTitle} items={SCA_TOOLS} />
-      <ToolGroup eyebrow="DAST" title={T.dastTitle} items={DAST_TOOLS} />
-      <ToolGroup eyebrow={t(T.redEyebrow)} title={T.redTitle} items={RED_TOOLS} />
+      <ToolGroup eyebrow="SAST" title={T.sastTitle} items={SAST_TOOLS} tone="tone-blue" />
+      <ToolGroup eyebrow="SCA" title={T.scaTitle} items={SCA_TOOLS} tone="tone-blue" />
+      <ToolGroup eyebrow="DAST" title={T.dastTitle} items={DAST_TOOLS} tone="tone-cyan" />
+      <ToolGroup eyebrow={t(T.redEyebrow)} title={T.redTitle} items={RED_TOOLS} tone="tone-pink" />
 
       <Panel eyebrow={t(T.wiringEyebrow)} title={t(T.wiringTitle)}>
         <ol className="space-y-3 text-sm leading-6">
@@ -120,13 +121,23 @@ export function ToolsView() {
   );
 }
 
-function ToolGroup({ eyebrow, title, items }: { eyebrow: string; title: Bi; items: ToolCard[] }) {
+function ToolGroup({
+  eyebrow,
+  title,
+  items,
+  tone,
+}: {
+  eyebrow: string;
+  title: Bi;
+  items: ToolCard[];
+  tone: string;
+}) {
   const t = useT();
   return (
     <Panel eyebrow={eyebrow} title={t(title)}>
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {items.map((item) => (
-          <li key={item.name.en} className="rounded-md border border-line bg-bg px-3 py-3">
+          <li key={item.name.en} className={`tool-card ${tone}`}>
             <h3 className="text-sm font-semibold">{t(item.name)}</h3>
             <p className="mt-2 text-sm leading-6">{t(item.point)}</p>
             <p className="mt-1 text-sm leading-6 text-muted">{t(item.limit)}</p>

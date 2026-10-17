@@ -10,7 +10,7 @@ import {
   type GateId,
 } from "@/data/model";
 import { useApp } from "@/components/app-state";
-import { Badge, Panel } from "@/components/ui";
+import { Badge, FilterChip, Panel } from "@/components/ui";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
@@ -98,9 +98,9 @@ export function MapView() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-xs tracking-widest text-accent">{t(T.eyebrow)}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{t(T.h1)}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{t(T.intro)}</p>
+        <p className="eyebrow">{t(T.eyebrow)}</p>
+        <h1 className="page-title">{t(T.h1)}</h1>
+        <p className="page-lede">{t(T.intro)}</p>
       </div>
 
       <div role="group" aria-label={t(T.viewMode)} className="flex flex-wrap gap-2">
@@ -108,7 +108,7 @@ export function MapView() {
           type="button"
           aria-pressed={tab === "cross"}
           onClick={() => setTab("cross")}
-          className={`min-h-11 rounded-md border px-3 text-sm ${tab === "cross" ? "border-accent bg-accent/15" : "border-line"}`}
+          className="tab"
         >
           {t(T.cross)}
         </button>
@@ -116,39 +116,44 @@ export function MapView() {
           type="button"
           aria-pressed={tab === "chapters"}
           onClick={() => setTab("chapters")}
-          className={`min-h-11 rounded-md border px-3 text-sm ${tab === "chapters" ? "border-accent bg-accent/15" : "border-line"}`}
+          className="tab"
         >
           {t(T.chapters)}
         </button>
       </div>
 
-      <label className="block">
-        <span className="sr-only">{t(T.searchLabel)}</span>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          maxLength={MAX_QUERY}
-          placeholder={t(T.searchPlaceholder)}
-          className="min-h-11 w-full rounded-md border border-line-strong bg-surface px-3 text-sm"
-        />
-      </label>
-
-      <div role="group" aria-label={t(T.filter)} className="flex gap-2 overflow-x-auto pb-1">
-        <FilterChip active={gate === "all"} onClick={() => setGate("all")} label={t(T.all)} />
-        {GATES.map((id) => (
-          <FilterChip
-            key={id}
-            active={gate === id}
-            onClick={() => setGate(id)}
-            label={`${id} ${t(GATE_NAME[id])}`}
+      <div className="filter-bar">
+        <label className="block">
+          <span className="sr-only">{t(T.searchLabel)}</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            maxLength={MAX_QUERY}
+            placeholder={t(T.searchPlaceholder)}
+            className="field-input"
           />
-        ))}
+        </label>
+
+        <div role="group" aria-label={t(T.filter)} className="flex gap-2 overflow-x-auto pb-1">
+          <FilterChip active={gate === "all"} onClick={() => setGate("all")} label={t(T.all)} />
+          {GATES.map((id) => (
+            <FilterChip
+              key={id}
+              active={gate === id}
+              onClick={() => setGate(id)}
+              label={`${id} ${t(GATE_NAME[id])}`}
+            />
+          ))}
+        </div>
       </div>
 
       {tab === "cross" ? (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li key={row.id} className="rounded-lg border border-line bg-surface px-4 py-3">
+            <li
+              key={row.id}
+              className={`risk-row ${row.policy === "block" ? "tone-block" : "tone-advisory"}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-semibold">{t(row.risk)}</h2>
                 <Badge tone={row.policy}>
@@ -199,7 +204,7 @@ export function MapView() {
                         aria-label={`${id} ${t(GATE_NAME[id])}`}
                         className="flex min-h-11 min-w-11 items-center justify-center"
                       >
-                        <Badge tone="neutral">{id}</Badge>
+                        <Badge tone="pill">{id}</Badge>
                       </button>
                     ))}
                   </span>
@@ -216,28 +221,5 @@ export function MapView() {
         </ul>
       )}
     </div>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`min-h-11 shrink-0 rounded-md border px-3 font-mono text-xs ${
-        active ? "border-accent bg-accent/15 text-fg" : "border-line text-muted"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

@@ -16,6 +16,8 @@ import {
   LOCALE_KEY,
   PROFILE_KEY,
   RUN_KEY,
+  THEME_KEY,
+  isTheme,
   loadWithMigration,
   parseChecks,
   parseRun,
@@ -37,6 +39,11 @@ const CONTROL_IDS: ReadonlySet<string> = new Set(
   GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)),
 );
 
+export type Theme = "dark" | "light";
+
+/** theme-color meta 跟著主題走；值與 styles.css 的 --t-bg 一致。 The theme-color meta follows the theme; values match --t-bg in styles.css. */
+const THEME_COLOR: Record<Theme, string> = { dark: "#070b12", light: "#ffffff" };
+
 export interface HarnessRun {
   profile: Profile;
   at: Date;
@@ -49,6 +56,8 @@ interface AppState {
   openGate: (gate: GateId) => void;
   locale: Locale;
   setLocale: (locale: Locale) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
   profile: Profile;
   setProfile: (profile: Profile) => void;
   patchProfile: (partial: Partial<Profile>) => void;
@@ -80,6 +89,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // Without ?lang= use the remembered locale; server rendering always starts with the default.
   const [storedLocale, setStoredLocale] = useState<Locale>(DEFAULT_LOCALE);
   const locale: Locale = search.lang ?? storedLocale;
+  const [theme, setThemeState] = useState<Theme>("dark");
   const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
 
   useEffect(() => {
@@ -87,6 +97,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setChecks(loadWithMigration(CHECK_KEY, (raw) => parseChecks(raw, CONTROL_IDS), {}));
     const remembered = readString(LOCALE_KEY);
     if (isLocale(remembered)) setStoredLocale(remembered);
+    const rememberedTheme = readString(THEME_KEY);
+    if (isTheme(rememberedTheme)) setThemeState(rememberedTheme);
     setRun(loadWithMigration(RUN_KEY, (raw) => parseRun(raw, parseProfile), null, sessionStore()));
     setHydrated(true);
   }, []);
@@ -108,6 +120,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = HTML_LANG[locale];
   }, [locale]);
+
+  // 主題只在水合完成後才改 DOM：頁面載入前的小段腳本已先套好記住的主題，避免閃一下。
+  // Touch the DOM only after hydration: the inline script in <head> already applied the remembered theme, so there is no flash.
+  useEffect(() => {
+    if (!hydrated) return;
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute("content", THEME_COLOR[theme]);
+  }, [theme, hydrated]);
 
   const value = useMemo<AppState>(() => {
     const total = GATE_DOCS.reduce((sum, doc) => sum + doc.controls.length, 0);
@@ -131,6 +153,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           search: (prev) => ({ ...prev, lang: next === DEFAULT_LOCALE ? undefined : next }),
         });
       },
+      theme,
+      setTheme: (next) => {
+        setThemeState(next);
+        writeString(THEME_KEY, next);
+      },
       profile,
       setProfile: setProfileState,
       // 值沒有變（例如點已選中的選項）就不動，避免設定被誤標成自訂、裁決被誤判為過期。
@@ -152,7 +179,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       startRun: () => setRun({ profile, at: new Date() }),
       restoreRun: setRun,
     };
-  }, [view, gate, locale, navigate, profile, checks, run, plan]);
+  }, [view, gate, locale, theme, navigate, profile, checks, run, plan]);
 
   return (
     <Ctx.Provider value={value}>

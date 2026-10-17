@@ -14,6 +14,8 @@
 export const PROFILE_KEY = "six-gate-profile-v1";
 export const CHECK_KEY = "six-gate-checks-v1";
 export const LOCALE_KEY = "six-gate-locale";
+/** 主題偏好（"dark" | "light"）；只存在 localStorage，不寫進網址。 Theme preference ("dark" | "light"); localStorage only, never in the URL. */
+export const THEME_KEY = "six-gate-theme";
 /**
  * 最近一次 Harness 執行，存在 sessionStorage：重新整理還在，關掉分頁就清掉。
  * The latest Harness run, kept in sessionStorage: it survives a reload and is gone when the tab closes.
@@ -25,6 +27,10 @@ export const LEGACY_KEYS: Record<string, string> = {
   [PROFILE_KEY]: "vibegate-profile-v1",
   [CHECK_KEY]: "vibegate-checks-v1",
 };
+
+export function isTheme(value: unknown): value is "dark" | "light" {
+  return value === "dark" || value === "light";
+}
 
 /** 最小介面，方便測試用假物件替代。 Minimal interface so tests can pass a fake. */
 export interface KeyValueStore {

@@ -2,9 +2,10 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { GateStatus, Severity } from "@/data/model";
 
 /**
- * 基礎元件：Panel、Badge、Choice、ToggleRow 與兩種按鈕。不含任何文字，文字由呼叫端依語系傳入。
- * Base components: Panel, Badge, Choice, ToggleRow and two buttons. They carry no text of their own;
- * callers pass localized strings.
+ * 基礎元件：Panel、Badge、Choice、FilterChip、ToggleRow 與兩種按鈕。不含任何文字，文字由呼叫端依語系傳入。
+ * 視覺都在 styles.css（.panel、.badge-*、.chip、.tab、.toggle-row、.btn-*），這裡只負責結構與 ARIA。
+ * Base components: Panel, Badge, Choice, FilterChip, ToggleRow and two buttons. They carry no text of their own;
+ * callers pass localized strings. The look lives in styles.css; this file owns structure and ARIA.
  */
 
 export function Panel({
@@ -23,19 +24,13 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`content-panel rounded-lg border border-line bg-surface ${className}`}>
+    <section className={`content-panel panel ${className}`}>
       {(title || eyebrow || action) && (
         <header className="panel-heading flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-4">
           <div>
-            {eyebrow && (
-              <p className="font-mono text-xs tracking-wider text-accent uppercase">{eyebrow}</p>
-            )}
+            {eyebrow && <p className="eyebrow">{eyebrow}</p>}
             {title && (
-              <h2
-                id={headingId}
-                tabIndex={headingId ? -1 : undefined}
-                className="mt-1 text-base font-semibold"
-              >
+              <h2 id={headingId} tabIndex={headingId ? -1 : undefined} className="mt-1">
                 {title}
               </h2>
             )}
@@ -49,29 +44,23 @@ export function Panel({
 }
 
 const TONE: Record<string, string> = {
-  // 底色只疊 10%：疊 15% 會讓紅字在卡片上低於 4.5:1。 Only a 10% tint: 15% drops the red text below 4.5:1 on cards.
-  block: "bg-signal/10 text-signal border-signal/40",
-  advisory: "bg-accent/15 text-accent border-accent/40",
-  pass: "bg-surface-2 text-fg border-line",
-  na: "bg-bg text-faint border-line",
-  accent: "bg-accent text-accent-ink border-accent",
-  neutral: "bg-surface-2 text-muted border-line",
+  block: "badge-block",
+  advisory: "badge-advisory",
+  pass: "badge-pass",
+  na: "badge-na",
+  accent: "badge-accent",
+  neutral: "badge-neutral",
+  pill: "badge-pill",
 };
 
 export function Badge({
   tone,
   children,
 }: {
-  tone: Severity | GateStatus | "accent" | "neutral";
+  tone: Severity | GateStatus | "accent" | "neutral" | "pill";
   children: ReactNode;
 }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-xs tracking-wide ${TONE[tone]}`}
-    >
-      {children}
-    </span>
-  );
+  return <span className={`badge ${TONE[tone]}`}>{children}</span>;
 }
 
 export function Choice({
@@ -86,17 +75,25 @@ export function Choice({
   className?: string;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
-        active
-          ? "border-accent bg-accent/15 text-fg"
-          : "border-line bg-bg-raised text-muted hover:text-fg"
-      } ${className}`}
-    >
+    <button type="button" aria-pressed={active} onClick={onClick} className={`chip ${className}`}>
       {children}
+    </button>
+  );
+}
+
+/** 藥丸篩選鈕（地圖頁與其他篩選列共用）。 Pill filter button shared by the map page and other filter rows. */
+export function FilterChip({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button type="button" aria-pressed={active} onClick={onClick} className="tab tab-mono shrink-0">
+      {label}
     </button>
   );
 }
@@ -121,21 +118,14 @@ export function ToggleRow({
       aria-checked={on}
       disabled={disabled}
       onClick={() => onChange(!on)}
-      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-line bg-bg-raised px-3 py-2 text-left disabled:opacity-60"
+      className="toggle-row"
     >
       <span>
         <span className="block text-sm text-fg">{label}</span>
         {hint && <span className="mt-0.5 block text-xs text-muted">{hint}</span>}
       </span>
-      <span
-        className={`relative h-6 w-11 shrink-0 rounded-full ${
-          on ? "bg-accent" : "bg-surface-2 inset-ring inset-ring-line-strong"
-        }`}
-        aria-hidden="true"
-      >
-        <span
-          className={`absolute top-0.5 size-5 rounded-full ${on ? "left-5 bg-bg" : "left-0.5 bg-muted"}`}
-        />
+      <span className="toggle-track" aria-hidden="true">
+        <span className="toggle-knob" />
       </span>
     </button>
   );
@@ -143,20 +133,10 @@ export function ToggleRow({
 
 export function TextButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { className = "", ...rest } = props;
-  return (
-    <button
-      {...rest}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50 ${className}`}
-    />
-  );
+  return <button {...rest} className={`btn-primary ${className}`} />;
 }
 
 export function GhostButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { className = "", ...rest } = props;
-  return (
-    <button
-      {...rest}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line bg-bg-raised px-4 text-sm text-fg disabled:opacity-50 ${className}`}
-    />
-  );
+  return <button {...rest} className={`btn-ghost ${className}`} />;
 }

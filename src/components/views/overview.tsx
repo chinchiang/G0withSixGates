@@ -1,7 +1,16 @@
-import { ArrowRight, ArrowUpRight, ScanLine, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CheckCheck,
+  Layers,
+  ScanLine,
+  ShieldCheck,
+  Target,
+} from "lucide-react";
 import {
   ASVS_TOTAL,
   GATES,
+  GATE_DOCS,
   GATE_NAME,
   GATE_TRACK,
   INCIDENTS,
@@ -9,10 +18,12 @@ import {
   PRINCIPLES,
   SYMPTOMS,
   TRACK_LABEL,
+  type GateId,
   type Level,
 } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
+import { TRACK_TONE, segStyle } from "@/components/tone";
 import { recommendLevel } from "@/data/engine";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
@@ -65,13 +76,28 @@ const T = {
   ),
 };
 
+/** 等級量表的三色。 The three level colours. */
+const LEVEL_COLOR: Record<Level, string> = {
+  L1: "var(--color-blue)",
+  L2: "var(--color-cyan)",
+  L3: "var(--color-violet)",
+};
+
 export function Overview() {
-  const { openGate, setView, checkProgress, profile } = useApp();
+  const { openGate, setView, checkProgress, profile, checks } = useApp();
   const t = useT();
   const levels = (["L1", "L2", "L3"] as Level[]).map((level) => ({
     name: level === "L1" ? level : `${level} ${t(T.cumulative)}`,
     pct: LEVEL_META[level].cumulative,
+    color: LEVEL_COLOR[level],
   }));
+  // 每道閘門已勾幾項控制項。 How many controls are checked per gate.
+  const gateCounts = Object.fromEntries(
+    GATE_DOCS.map((doc) => [
+      doc.id,
+      { done: doc.controls.filter((item) => checks[item.id]).length, total: doc.controls.length },
+    ]),
+  ) as Record<GateId, { done: number; total: number }>;
 
   return (
     <div className="overview-content">
@@ -82,7 +108,9 @@ export function Overview() {
           </p>
           <h1 id="overview-heading">
             {t(bi("讓 AI 寫得快，", "Build fast with AI."))}
-            <span>{t(bi("也讓安全跟得上。", "Keep security in step."))}</span>
+            <span className="gradient-text">
+              {t(bi("也讓安全跟得上。", "Keep security in step."))}
+            </span>
           </h1>
           <p className="hero-lede">
             {t(
@@ -92,6 +120,18 @@ export function Overview() {
               ),
             )}
           </p>
+          <ul className="hero-chips" aria-label={t(bi("重點", "Highlights"))}>
+            {[
+              bi("示範模擬 · 不連線", "Simulation · offline"),
+              bi("ASVS 5.0.0", "ASVS 5.0.0"),
+              bi("G0 + 6 道閘門", "G0 + 6 gates"),
+              bi("中文 / English", "zh / en"),
+            ].map((chip) => (
+              <li key={chip.en} className="vh-chip">
+                {t(chip)}
+              </li>
+            ))}
+          </ul>
           <div className="hero-actions">
             <button type="button" onClick={() => setView("harness")} className="hero-primary">
               <ScanLine aria-hidden="true" className="size-4" />
@@ -165,40 +205,53 @@ export function Overview() {
             label: bi("安全閘門", "Security gates"),
             note: bi("設計、白箱到黑箱", "Design, white box & black box"),
             view: "gates" as const,
+            tone: "tone-violet",
+            icon: ShieldCheck,
           },
           {
             value: String(ASVS_TOTAL),
             label: bi("ASVS 要求", "ASVS requirements"),
             note: bi("對齊 5.0.0 標準", "Aligned with version 5.0.0"),
             view: "levels" as const,
+            tone: "tone-blue",
+            icon: Layers,
           },
           {
             value: recommendLevel(profile).level,
             label: bi("建議保證等級", "Recommended level"),
             note: bi("依目前情境推導", "Based on the current scenario"),
             view: "harness" as const,
+            tone: "tone-cyan",
+            icon: Target,
           },
           {
             value: `${checkProgress.done}/${checkProgress.total}`,
             label: bi("學習清單進度", "Learning checklist"),
             note: bi("勾選不代表通過驗證", "Checks do not certify verification"),
             view: "gates" as const,
+            tone: "tone-orange",
+            icon: CheckCheck,
           },
-        ].map((item) => (
-          <button
-            type="button"
-            key={item.label.en}
-            className="metric-card"
-            onClick={() => setView(item.view)}
-          >
-            <span className="metric-label">
-              {t(item.label)}
-              <ArrowUpRight aria-hidden="true" className="size-4" />
-            </span>
-            <strong className="metric-value">{item.value}</strong>
-            <span className="text-xs text-faint">{t(item.note)}</span>
-          </button>
-        ))}
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              type="button"
+              key={item.label.en}
+              className={`metric-card ${item.tone}`}
+              onClick={() => setView(item.view)}
+            >
+              <span className="metric-label">
+                {t(item.label)}
+                <span className="metric-icon">
+                  <Icon aria-hidden="true" className="size-4" />
+                </span>
+              </span>
+              <strong className="metric-value">{item.value}</strong>
+              <span className="metric-note">{t(item.note)}</span>
+            </button>
+          );
+        })}
       </div>
 
       <Panel
@@ -213,11 +266,20 @@ export function Overview() {
         <ol className="gate-flow">
           {GATES.map((gate) => (
             <li key={gate}>
-              <button type="button" onClick={() => openGate(gate)} className="gate-flow-button">
-                <span className="w-8 font-mono text-sm text-accent">{gate}</span>
+              <button
+                type="button"
+                onClick={() => openGate(gate)}
+                className={`zone-tile ${TRACK_TONE[GATE_TRACK[gate]]}`}
+              >
+                <span className="zone-count w-8">{gate}</span>
                 <span className="text-sm">{t(GATE_NAME[gate])}</span>
-                <span className="font-mono text-xs text-faint">
-                  {t(TRACK_LABEL[GATE_TRACK[gate]])}
+                <span className="zone-end flex flex-col items-start gap-0.5">
+                  <span className="font-mono text-xs text-muted">
+                    {t(TRACK_LABEL[GATE_TRACK[gate]])}
+                  </span>
+                  <span className="font-mono text-xs text-muted tabular-nums">
+                    {gateCounts[gate].done}/{gateCounts[gate].total}
+                  </span>
                 </span>
               </button>
             </li>
@@ -230,10 +292,12 @@ export function Overview() {
           {SYMPTOMS.map((item) => (
             // 標題放在按鈕外面：按鈕裡不能放標題元素，螢幕閱讀器也才看得到它是標題。
             // Heading outside the button: heading elements are invalid inside buttons and screen readers would lose them.
-            <article key={item.id} className="symptom-card">
+            <article key={item.id} className={`symptom-card ${TRACK_TONE[GATE_TRACK[item.gate]]}`}>
               <div className="flex flex-col-reverse gap-3">
                 <h3 className="text-sm font-semibold">{t(item.title)}</h3>
-                <span className="symptom-stat font-mono text-accent tabular-nums">{item.stat}</span>
+                <span className="symptom-stat gradient-text font-mono tabular-nums">
+                  {item.stat}
+                </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-muted">{t(item.text)}</p>
               <button
@@ -269,15 +333,20 @@ export function Overview() {
                 className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.75rem] items-center gap-3"
               >
                 <span className="text-xs text-muted">{item.name}</span>
-                <span className="h-4 rounded-r-[4px] bg-accent/15" aria-hidden="true">
-                  <span
-                    className="block h-full rounded-r-[4px] bg-accent"
-                    style={{ width: `${item.pct}%` }}
-                  />
+                <span className="seg-bar" aria-hidden="true">
+                  <span className="seg-fill" style={segStyle(item.pct, item.color)} />
                 </span>
                 <span className="text-right font-mono text-xs text-fg tabular-nums">
                   {item.pct}%
                 </span>
+              </li>
+            ))}
+          </ul>
+          <ul className="op-legend" aria-hidden="true">
+            {levels.map((item) => (
+              <li key={item.name}>
+                <span className="tab-dot" style={{ background: item.color }} />
+                {item.name}
               </li>
             ))}
           </ul>
@@ -299,7 +368,7 @@ export function Overview() {
       <Panel eyebrow={t(T.incidentsEyebrow)} title={t(T.incidentsTitle)}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {INCIDENTS.map((item) => (
-            <article key={item.id} className="rounded-md border border-line bg-bg px-3 py-3">
+            <article key={item.id} className={`incident-card ${TRACK_TONE[GATE_TRACK[item.gate]]}`}>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">{t(item.title)}</h3>
                 <button
@@ -307,7 +376,7 @@ export function Overview() {
                   onClick={() => openGate(item.gate)}
                   className="flex min-h-11 items-center"
                 >
-                  <Badge tone="neutral">
+                  <Badge tone="pill">
                     {item.gate} {t(GATE_NAME[item.gate])}
                   </Badge>
                 </button>

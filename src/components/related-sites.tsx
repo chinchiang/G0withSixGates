@@ -8,7 +8,8 @@ export function RelatedSites() {
   return (
     <nav className="related-sites" aria-label={t(bi("相關網站", "Related sites"))}>
       <div>
-        <p className="text-sm font-semibold">
+        <p className="eyebrow">Related</p>
+        <p className="mt-1 text-sm font-semibold">
           {t(bi("延伸閱讀與資安情報", "Related security intelligence"))}
         </p>
         <p className="mt-1 text-xs text-faint">
@@ -34,6 +35,7 @@ export function RelatedSites() {
         },
       ].map((site) => (
         <a
+          className="report-card"
           href={locale === "en" && site.enHref ? site.enHref : site.href}
           key={site.href}
           target="_blank"
