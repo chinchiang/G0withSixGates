@@ -44,6 +44,7 @@ test("structural directives are enforced; resource limits start as report-only",
     "report-uri",
   ]);
   assert.deepEqual(enforced["object-src"], ["'none'"]);
+  assert.deepEqual(enforced["base-uri"], ["'none'"]);
   assert.equal(headers["Content-Security-Policy-Report-Only"], `${RESOURCE_POLICY}; ${REPORTING}`);
 });
 

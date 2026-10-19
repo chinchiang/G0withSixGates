@@ -80,9 +80,10 @@ export function ProfileForm() {
     <div className="space-y-4">
       {/* 兩欄換行而不是橫向捲動：四個情境都要一眼看得到，教學提示會點名「已整治」。
           Two wrapping columns instead of a sideways scroller: all four presets must be visible, and the teaching hint names the remediated one. */}
-      <div role="group" aria-label={t(T.presets)} className="grid grid-cols-2 gap-2">
+      <div role="radiogroup" aria-label={t(T.presets)} className="grid grid-cols-2 gap-2">
         {PRESET_ORDER.map((id) => (
           <Choice
+            role="radio"
             key={id}
             active={profile.preset === id}
             // 選預設情境時名稱跟著語系走；之後改任何欄位就變成自訂。
@@ -106,11 +107,14 @@ export function ProfileForm() {
         />
       </label>
 
-      <fieldset>
-        <legend className="mb-2 text-sm text-muted">{t(T.exposure)}</legend>
-        <div className="grid grid-cols-3 gap-2">
+      <div>
+        <p className="mb-2 text-sm text-muted" aria-hidden="true">
+          {t(T.exposure)}
+        </p>
+        <div role="radiogroup" aria-label={t(T.exposure)} className="grid grid-cols-3 gap-2">
           {(Object.keys(EXPOSURE_LABEL) as Exposure[]).map((value) => (
             <Choice
+              role="radio"
               key={value}
               active={profile.exposure === value}
               onClick={() => patchProfile({ exposure: value })}
@@ -119,13 +123,16 @@ export function ProfileForm() {
             </Choice>
           ))}
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset>
-        <legend className="mb-2 text-sm text-muted">{t(T.sensitivity)}</legend>
-        <div className="grid grid-cols-3 gap-2">
+      <div>
+        <p className="mb-2 text-sm text-muted" aria-hidden="true">
+          {t(T.sensitivity)}
+        </p>
+        <div role="radiogroup" aria-label={t(T.sensitivity)} className="grid grid-cols-3 gap-2">
           {(Object.keys(SENSITIVITY_LABEL) as Sensitivity[]).map((value) => (
             <Choice
+              role="radio"
               key={value}
               active={profile.sensitivity === value}
               onClick={() => patchProfile({ sensitivity: value })}
@@ -134,7 +141,7 @@ export function ProfileForm() {
             </Choice>
           ))}
         </div>
-      </fieldset>
+      </div>
 
       <div className="grid gap-2">
         <ToggleRow
@@ -198,11 +205,14 @@ export function ProfileForm() {
         />
       </div>
 
-      <fieldset>
-        <legend className="mb-2 text-sm text-muted">{t(T.defects)}</legend>
-        <div className="grid grid-cols-3 gap-2">
+      <div>
+        <p className="mb-2 text-sm text-muted" aria-hidden="true">
+          {t(T.defects)}
+        </p>
+        <div role="radiogroup" aria-label={t(T.defects)} className="grid grid-cols-3 gap-2">
           {DEFECT_STATES.map((value) => (
             <Choice
+              role="radio"
               key={value}
               active={profile.defects === value}
               onClick={() => patchProfile({ defects: value })}
@@ -212,7 +222,7 @@ export function ProfileForm() {
           ))}
         </div>
         <p className="mt-2 text-xs leading-5 text-muted">{t(DEFECT_HINT[profile.defects])}</p>
-      </fieldset>
+      </div>
 
       <fieldset>
         <legend className="mb-2 text-sm text-muted">{t(T.mitigations)}</legend>

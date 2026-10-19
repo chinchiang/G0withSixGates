@@ -68,12 +68,28 @@ export function Choice({
   onClick,
   children,
   className = "",
+  role,
 }: {
   active?: boolean;
   onClick: () => void;
   children: ReactNode;
   className?: string;
+  /** "radio"：放在 role="radiogroup" 裡的單選；預設是 aria-pressed 切換鈕。 "radio": single-select inside role="radiogroup"; the default is an aria-pressed toggle. */
+  role?: "radio";
 }) {
+  if (role === "radio") {
+    return (
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!!active}
+        onClick={onClick}
+        className={`chip ${className}`}
+      >
+        {children}
+      </button>
+    );
+  }
   return (
     <button type="button" aria-pressed={active} onClick={onClick} className={`chip ${className}`}>
       {children}

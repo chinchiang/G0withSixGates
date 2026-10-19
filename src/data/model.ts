@@ -255,6 +255,16 @@ export const DEFAULT_PROFILE: Profile = PRESETS.kb;
 export const NAME_MAX_LENGTH = 60;
 
 /**
+ * 去掉控制字元與換行，再以字元（不是 UTF-16 單位）截斷，避免切開代理對。
+ * Strip control characters and newlines, then truncate by code point rather than UTF-16 unit so a surrogate pair is never split.
+ */
+function cleanName(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  const stripped = name.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, "");
+  return Array.from(stripped).slice(0, NAME_MAX_LENGTH).join("");
+}
+
+/**
  * 顯示用的系統名稱：預設情境名稱依語系切換；使用者自己打的名字照原樣；空白則回退到情境名稱。
  * System name for display: preset names follow the locale, user-typed names stay as typed,
  * and a blank name falls back to the preset name.
@@ -292,7 +302,7 @@ export function parseProfile(raw: unknown): Profile {
 
   return {
     preset: pickOne(r.preset, PRESET_IDS, "custom"),
-    name: typeof r.name === "string" ? r.name.slice(0, NAME_MAX_LENGTH) : d.name,
+    name: typeof r.name === "string" ? cleanName(r.name) : d.name,
     exposure: pickOne(r.exposure, Object.keys(EXPOSURE_LABEL) as Exposure[], d.exposure),
     sensitivity: pickOne(
       r.sensitivity,
@@ -481,8 +491,8 @@ export const GATE_DOCS: GateDoc[] = [
       "Pre-commit and every push. A PR may scan only the diff; the nightly job still scans the full history.",
     ),
     cause: bi(
-      "啟用程式碼助手的儲存庫較容易把金鑰寫死，也常忘記 .gitignore。教材引用 GitGuardian：此類儲存庫約 6.4% 含外洩金鑰，約高出四成。",
-      "Repositories with coding assistants enabled hard-code keys more often and tend to forget .gitignore. The course material cites GitGuardian: about 6.4% of such repositories leak a secret, roughly 40% higher.",
+      "啟用 Copilot 的儲存庫較容易把金鑰寫死，也常忘記 .gitignore。教材引用 GitGuardian：啟用 Copilot 的儲存庫約 6.4% 含外洩金鑰，約高出四成。",
+      "Repositories with Copilot enabled hard-code keys more often and tend to forget .gitignore. The course material cites GitGuardian: about 6.4% of repositories with Copilot enabled leak a secret, roughly 40% higher.",
     ),
     summary: bi(
       "正則與熵值一起掃。命中即阻擋推送，先撤銷憑證，再用歷史清理工具移除，而不是只刪掉最新提交。",
@@ -492,8 +502,8 @@ export const GATE_DOCS: GateDoc[] = [
       {
         id: "g2-hook",
         text: bi(
-          "本機 pre-commit 已掛上 gitleaks protect --staged",
-          "A local pre-commit hook runs gitleaks protect --staged",
+          "本機 pre-commit 已掛上 gitleaks git --pre-commit --staged",
+          "A local pre-commit hook runs gitleaks git --pre-commit --staged",
         ),
       },
       {
@@ -534,8 +544,8 @@ export const GATE_DOCS: GateDoc[] = [
       "Every pull request. Single-file rules are not enough, because models often split source and sink across files.",
     ),
     cause: bi(
-      "訓練資料讓模型傾向拼接字串，而不是參數化查詢。教材引用 Veracode：AI 生成程式對 XSS 的防禦率約 14%，而 CWE-79 是 MITRE 2025 Top 25 的第一名。",
-      "Training data biases models toward string concatenation rather than parameterized queries. The course material cites Veracode: AI-generated code defends against XSS about 14% of the time, and CWE-79 tops the MITRE 2025 Top 25.",
+      "模型輸出常未經跳脫就直接渲染進頁面，也容易拼接字串而不用參數化查詢。教材引用 Veracode：AI 生成程式對 XSS（模型輸出未跳脫）的防禦率約 14%，而 CWE-79 是 MITRE 2025 Top 25 的第一名。",
+      "Model output is often rendered into the page unescaped, and models also lean toward string concatenation over parameterized queries. The course material cites Veracode: AI-generated code defends against XSS (model output rendered unescaped) about 14% of the time, and CWE-79 tops the MITRE 2025 Top 25.",
     ),
     summary: bi(
       "跨檔污點分析追蹤不受信任來源（含 HTTP 與模型輸出）到危險匯點。IaC 另掃 Terraform／Kubernetes，強制 IMDSv2，並收斂過度寬鬆的 CORS。",
@@ -1522,7 +1532,7 @@ export const SCA_TOOLS: ToolCard[] = [
     ),
   },
   {
-    name: bi("Socket／DevSentinel", "Socket／DevSentinel"),
+    name: bi("Socket／DevSentinel", "Socket / DevSentinel"),
     point: bi(
       "安裝前看行為、下載量與新發布版本。",
       "Checks behaviour, downloads and freshly published versions before install.",
@@ -1693,8 +1703,8 @@ export const SYMPTOMS: Symptom[] = [
     title: bi("硬編碼金鑰", "Hard-coded secrets"),
     stat: "6.4%",
     text: bi(
-      "助手儲存庫含外洩金鑰的比例較高，且常漏掉忽略規則。",
-      "Assistant-enabled repositories leak secrets more often and tend to miss ignore rules.",
+      "啟用 Copilot 的儲存庫含外洩金鑰的比例較高，且常漏掉忽略規則。",
+      "Repositories with Copilot enabled leak secrets more often and tend to miss ignore rules.",
     ),
     gate: "G2",
     source: bi("教材引 GitGuardian", "Course material citing GitGuardian"),
@@ -1858,3 +1868,61 @@ export const LEVEL_META: Record<
     ),
   },
 };
+
+/**
+ * 資料來源：總覽頁與下載紀錄共用。
+ * Sources shared by the overview page and the downloaded record.
+ */
+export const SOURCES: { title: Bi; href: string }[] = [
+  {
+    title: bi(
+      'Perry 等人，"Do Users Write More Insecure Code with AI Assistants?"（ACM CCS 2023）',
+      'Perry et al., "Do Users Write More Insecure Code with AI Assistants?" (ACM CCS 2023)',
+    ),
+    href: "https://arxiv.org/abs/2211.03622",
+  },
+  {
+    title: bi(
+      'Spracklen 等人，"We Have a Package for You! A Comprehensive Analysis of Package Hallucinations"（USENIX Security 2025）',
+      'Spracklen et al., "We Have a Package for You! A Comprehensive Analysis of Package Hallucinations" (USENIX Security 2025)',
+    ),
+    href: "https://arxiv.org/abs/2406.10279",
+  },
+  {
+    title: bi(
+      "GitGuardian，State of Secrets Sprawl 2025",
+      "GitGuardian, State of Secrets Sprawl 2025",
+    ),
+    href: "https://www.gitguardian.com/state-of-secrets-sprawl-report-2025",
+  },
+  {
+    title: bi(
+      "Veracode，2025 GenAI Code Security Report",
+      "Veracode, 2025 GenAI Code Security Report",
+    ),
+    href: "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/",
+  },
+  {
+    title: bi(
+      "Cloud Security Alliance，MAESTRO（2025）",
+      "Cloud Security Alliance, MAESTRO (2025)",
+    ),
+    href: "https://cloudsecurityalliance.org/blog/2025/02/06/agentic-ai-threat-modeling-framework-maestro",
+  },
+  {
+    title: bi("NVD，CVE-2025-29927", "NVD, CVE-2025-29927"),
+    href: "https://nvd.nist.gov/vuln/detail/CVE-2025-29927",
+  },
+  {
+    title: bi("MITRE，CWE Top 25", "MITRE, CWE Top 25"),
+    href: "https://cwe.mitre.org/top25/",
+  },
+  {
+    title: bi("Wiz，Base44 漏洞揭露", "Wiz, Base44 vulnerability disclosure"),
+    href: "https://www.wiz.io/blog/critical-vulnerability-base44",
+  },
+  {
+    title: bi("OWASP ASVS 5.0.0", "OWASP ASVS 5.0.0"),
+    href: "https://github.com/OWASP/ASVS/tree/v5.0.0",
+  },
+];

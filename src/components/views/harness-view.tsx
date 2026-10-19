@@ -77,7 +77,6 @@ const T = {
   waiting: bi("等待", "Waiting"),
   covered: bi("管線已涵蓋", "Pipeline covers it"),
   missed: bi("管線會漏掉", "Pipeline would miss it"),
-  fix: bi("修正", "Fix"),
   catching: bi(
     "攔下它的控制項（任一項已勾就算涵蓋）",
     "Controls that catch it (any one checked counts as covered)",
@@ -104,6 +103,7 @@ export function HarnessView() {
   );
   const missed = covered.filter((item) => !item.caught);
   // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。 Coming back to this view shows the last result at once, without replaying the animation.
+  // `visible` 只在動畫執行中有意義；其餘時間由 `revealed` 直接全部顯示。 `visible` only matters while the animation runs; otherwise `revealed` shows everything.
   const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
   const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -357,7 +357,9 @@ export function HarnessView() {
 
           <ol className="space-y-2">
             {(plan?.steps ?? []).map((item, index) => {
-              const revealed = index < visible;
+              // 非執行中（重新整理後還原、停止後還原）一律全部顯示；只有動畫進行時才逐道亮起。
+              // Outside an animation (restored after a reload, restored by Stop) every step is shown; only a live run reveals them one by one.
+              const revealed = phase !== "running" || index < visible;
               const current = index === activeIndex;
               return (
                 <li

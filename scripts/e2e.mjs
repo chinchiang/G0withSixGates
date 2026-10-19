@@ -121,7 +121,7 @@ try {
     await test(`${name}: all four presets are visible without scrolling sideways`, async () => {
       const { page, close } = await openPage(browser, viewport);
       await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
-      const group = page.getByRole("group", { name: "預設情境" });
+      const group = page.getByRole("radiogroup", { name: "預設情境" });
       const box = await group.boundingBox();
       for (const label of [
         "內部排程腳本",
@@ -129,7 +129,7 @@ try {
         "Vibe 平台（高權限 Agent）",
         "已整治的客服知識庫",
       ]) {
-        const chip = await group.getByRole("button", { name: label }).boundingBox();
+        const chip = await group.getByRole("radio", { name: label }).boundingBox();
         assert.ok(chip, `${label} missing`);
         assert.ok(
           chip.x >= box.x - 1 && chip.x + chip.width <= box.x + box.width + 1,
@@ -176,13 +176,22 @@ try {
     // 結果存在 sessionStorage：重新整理還在。 The run lives in sessionStorage and survives a reload.
     await page.reload({ waitUntil: "networkidle" });
     await verdict.waitFor();
+    // 重新整理後不能還有「等待」，第一道閘門仍顯示狀態徽章。 After a reload no gate says 「等待」 and the first step still shows its status badge.
+    const results = page.locator("#harness-results");
+    assert.equal(await results.getByText("等待", { exact: true }).count(), 0);
+    assert.ok(
+      (await results.locator("ol > li").first().locator(".badge").count()) > 0,
+      "the first step lost its status badge after a reload",
+    );
 
     // 換成已整治的情境再跑，中途停止：保留上一份「阻擋合併」，而不是整份清掉。
-    await page.getByRole("button", { name: "已整治的客服知識庫" }).click();
+    await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
     await page.getByText("設定已改，這份裁決對不上目前的系統。請再跑一次。").waitFor();
     await page.getByRole("button", { name: "重新執行" }).click();
     await page.getByRole("button", { name: "停止" }).click();
     await verdict.waitFor();
+    // 停止還原上一份結果時，所有閘門都要顯示結果，不是「等待」。 Stop restores the previous result with every gate shown, not 「等待」.
+    assert.equal(await results.getByText("等待", { exact: true }).count(), 0);
 
     const [download] = await Promise.all([
       page.waitForEvent("download"),
@@ -193,6 +202,33 @@ try {
     for await (const chunk of stream) text += chunk;
     assert.match(download.suggestedFilename(), /^six-gate-release-\d{4}-\d{2}-\d{2}\.md$/);
     assert.match(text, /設定已經改過/, "a stale verdict must say so in the file");
+    assert.deepEqual(errors, []);
+    await close();
+  });
+
+  await test("theme: toggle switches light and dark, updates theme-color and survives a reload", async () => {
+    const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
+    // 水合後可能有兩個 theme-color 標籤，全部都要一致。 Hydration may leave two theme-color tags; they must all agree.
+    const color = async () => {
+      const all = await page
+        .locator('meta[name="theme-color"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute("content")));
+      assert.equal(new Set(all).size, 1, `theme-color tags disagree: ${all}`);
+      return all[0];
+    };
+    await page.goto(url(), { waitUntil: "networkidle" });
+    const dark = await color();
+    await page.getByRole("button", { name: "切換為淺色主題" }).click();
+    await page.locator('html[data-theme="light"]').waitFor();
+    const light = await color();
+    assert.notEqual(light, dark);
+    assert.equal(light, "#ffffff");
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator('html[data-theme="light"]').waitFor();
+    assert.equal(await color(), light);
+    await page.getByRole("button", { name: "切換為深色主題" }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.theme !== "light");
+    assert.equal(await color(), dark);
     assert.deepEqual(errors, []);
     await close();
   });
@@ -283,10 +319,10 @@ try {
     for await (const chunk of await download.createReadStream()) report += chunk;
     assert.match(report, /重新驗證條件/);
     assert.match(report, /撤銷並輪替/);
-    await page.getByRole("button", { name: "已整治的客服知識庫" }).click();
+    await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
     await page.getByRole("button", { name: "重新執行" }).click();
     await page.getByText("可以合併，但警示要有期限與負責人。").waitFor();
-    await page.getByRole("button", { name: "已整治", exact: true }).click();
+    await page.getByRole("radio", { name: "已整治", exact: true }).click();
     await page.getByRole("button", { name: "重新執行" }).click();
     await page.getByText("放行。G0 與六道閘門都有紀錄，沒有靜默略過。").waitFor();
     const related = page.getByRole("navigation", { name: "相關網站" });

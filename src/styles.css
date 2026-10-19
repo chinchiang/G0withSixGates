@@ -298,9 +298,6 @@
 .tone-na {
   --tone: var(--color-na);
 }
-.tone-accent {
-  --tone: var(--color-accent);
-}
 
 .eyebrow {
   display: flex;
@@ -1229,7 +1226,6 @@ button.zone-tile:hover {
   font-variant-numeric: tabular-nums;
   color: var(--tone, var(--color-fg));
 }
-.gate-flow-button > :last-child,
 .zone-tile > .zone-end {
   margin-left: auto;
 }

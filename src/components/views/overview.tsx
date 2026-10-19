@@ -16,6 +16,7 @@ import {
   INCIDENTS,
   LEVEL_META,
   PRINCIPLES,
+  SOURCES,
   SYMPTOMS,
   TRACK_LABEL,
   type GateId,
@@ -34,7 +35,6 @@ import { useT } from "@/i18n/context";
  */
 
 const T = {
-  eyebrow: bi("白箱 · 黑箱 · 紅隊", "WHITE BOX · BLACK BOX · RED TEAM"),
   h1: bi(
     "測試被留成最後一道，就把它做成不可繞過的。",
     "If testing is left as the last line, make it one nobody can walk around.",
@@ -392,6 +392,22 @@ export function Overview() {
         </summary>
         <p className="mt-3 text-sm font-medium">{t(T.h1)}</p>
         <p className="mt-2 text-sm leading-6 text-muted">{t(T.intro)}</p>
+        <h3 className="mt-4 text-sm font-semibold">{t(bi("資料來源", "Sources"))}</h3>
+        <ul className="mt-2 space-y-1 text-sm leading-6 text-muted">
+          {SOURCES.map((source) => (
+            <li key={source.href}>
+              <a
+                href={source.href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-6 items-start gap-1 text-accent underline-offset-2 hover:underline"
+              >
+                <span>{t(source.title)}</span>
+                <ArrowUpRight className="mt-1 size-3.5 shrink-0" aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
       </details>
     </div>
   );

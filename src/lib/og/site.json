@@ -1,4 +1,5 @@
 {
   "title": "六扇門 Six-Gate for Vibe Code",
-  "card": "custom"
+  "card": "custom",
+  "description": "Vibe Coding 的資安閘門：G0 威脅建模加 G1–G6 白箱、黑箱與 AI 紅隊六道閘門，Harness 示範放行裁決，對齊 OWASP ASVS 5.0。 Security gates for vibe coding: G0 threat modeling plus six white-box, black-box and AI red-team gates (G1–G6). A demo Harness issues the release verdict, aligned with OWASP ASVS 5.0."
 }

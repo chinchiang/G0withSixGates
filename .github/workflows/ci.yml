@@ -7,6 +7,17 @@ on:
     branches: [main]
   pull_request:
 
+# 最小權限：CI 只需要讀取程式碼。
+# Least privilege: CI only needs to read the code.
+permissions:
+  contents: read
+
+# 同一個分支有新的推送時，取消尚未跑完的舊執行。
+# A newer push to the same ref cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -19,6 +30,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # 格式與正式相依套件的已知高風險漏洞。
+      # Formatting, and known high-severity vulnerabilities in production dependencies.
+      - run: npm run format:check
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm test
       # 建置會接著跑 db:migrate；沒有 DATABASE_URL 時 migrate 腳本會略過。
       # build chains db:migrate; without DATABASE_URL the migrate script skips.

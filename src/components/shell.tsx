@@ -71,7 +71,8 @@ const NAV: { id: ViewId; label: Bi; description: Bi; icon: typeof Bot }[] = [
 const T = {
   nav: bi("主要導覽", "Main navigation"),
   language: bi("語言", "Language"),
-  theme: bi("切換深淺色主題", "Toggle light and dark theme"),
+  toLight: bi("切換為淺色主題", "Switch to light theme"),
+  toDark: bi("切換為深色主題", "Switch to dark theme"),
   demoEnv: bi("示範環境", "DEMO ENVIRONMENT"),
   aside: bi(
     "對齊 OWASP ASVS 5.0.0。章節對照是教學摘要，正式驗證以標準原文為準。",
@@ -127,9 +128,8 @@ function Frame() {
             <button
               type="button"
               className="theme-toggle"
-              aria-pressed={theme === "light"}
-              aria-label={t(T.theme)}
-              title={t(T.theme)}
+              aria-label={t(theme === "light" ? T.toDark : T.toLight)}
+              title={t(theme === "light" ? T.toDark : T.toLight)}
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             >
               {theme === "light" ? (

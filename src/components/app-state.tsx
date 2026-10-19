@@ -10,6 +10,7 @@ import {
 } from "@/data/model";
 import { buildPlan, type RunPlan } from "@/data/engine";
 import { DEFAULT_LOCALE, HTML_LANG, isLocale, type Locale } from "@/i18n/locale";
+import { THEME_COLOR, type Theme } from "@/theme";
 import { LocaleProvider } from "@/i18n/context";
 import {
   CHECK_KEY,
@@ -39,10 +40,7 @@ const CONTROL_IDS: ReadonlySet<string> = new Set(
   GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)),
 );
 
-export type Theme = "dark" | "light";
-
-/** theme-color meta 跟著主題走；值與 styles.css 的 --t-bg 一致。 The theme-color meta follows the theme; values match --t-bg in styles.css. */
-const THEME_COLOR: Record<Theme, string> = { dark: "#070b12", light: "#ffffff" };
+export type { Theme };
 
 export interface HarnessRun {
   profile: Profile;
@@ -126,9 +124,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     document.documentElement.dataset.theme = theme;
-    document
-      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-      ?.setAttribute("content", THEME_COLOR[theme]);
+    // 水合後路由可能再補一個 theme-color，兩個都要更新。 Hydration may add a second theme-color tag, so update every one.
+    for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+      meta.setAttribute("content", THEME_COLOR[theme]);
+    }
   }, [theme, hydrated]);
 
   const value = useMemo<AppState>(() => {
