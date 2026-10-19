@@ -14,8 +14,8 @@
 export const PROFILE_KEY = "six-gate-profile-v1";
 export const CHECK_KEY = "six-gate-checks-v1";
 export const LOCALE_KEY = "six-gate-locale";
-/** 主題偏好（"dark" | "light"）；只存在 localStorage，不寫進網址。 Theme preference ("dark" | "light"); localStorage only, never in the URL. */
-export const THEME_KEY = "six-gate-theme";
+// 主題鍵與型別守衛集中在 src/theme.ts。 The theme key and type guard live in src/theme.ts.
+export { THEME_KEY, isTheme } from "../theme.ts";
 /**
  * 最近一次 Harness 執行，存在 sessionStorage：重新整理還在，關掉分頁就清掉。
  * The latest Harness run, kept in sessionStorage: it survives a reload and is gone when the tab closes.
@@ -27,10 +27,6 @@ export const LEGACY_KEYS: Record<string, string> = {
   [PROFILE_KEY]: "vibegate-profile-v1",
   [CHECK_KEY]: "vibegate-checks-v1",
 };
-
-export function isTheme(value: unknown): value is "dark" | "light" {
-  return value === "dark" || value === "light";
-}
 
 /** 最小介面，方便測試用假物件替代。 Minimal interface so tests can pass a fake. */
 export interface KeyValueStore {
@@ -47,11 +43,6 @@ function defaultStore(): KeyValueStore | null {
   }
 }
 
-/**
- * 讀出並解析一個鍵；新鍵沒有值就讀舊鍵並搬過去。解析失敗或資料壞掉時回傳 `fallback`。
- * Read and parse one key; when the new key is empty, read the legacy key and move it over.
- * Returns `fallback` when parsing fails or the data is broken.
- */
 /** sessionStorage；不可用時回傳 null。 sessionStorage, or null when it is unavailable. */
 export function sessionStore(): KeyValueStore | null {
   try {
@@ -61,6 +52,11 @@ export function sessionStore(): KeyValueStore | null {
   }
 }
 
+/**
+ * 讀出並解析一個鍵；新鍵沒有值就讀舊鍵並搬過去。解析失敗或資料壞掉時回傳 `fallback`。
+ * Read and parse one key; when the new key is empty, read the legacy key and move it over.
+ * Returns `fallback` when parsing fails or the data is broken.
+ */
 export function loadWithMigration<T>(
   key: string,
   parse: (raw: unknown) => T,

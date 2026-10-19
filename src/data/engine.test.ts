@@ -6,6 +6,7 @@ import {
   catchingControls,
   caughtBy,
   coverage,
+  escapeMarkdown,
   localDate,
   localStamp,
   recommendLevel,
@@ -19,6 +20,7 @@ import {
 } from "./engine.ts";
 import {
   DEFECT_STATES,
+  SOURCES,
   FINDING_CONTROLS,
   GATE_DOCS,
   MITIGATIONS,
@@ -595,5 +597,34 @@ describe("stale verdicts", () => {
     assert.equal(sameVerdictInputs(PRESETS.kb, renamed), true);
     assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, diffOnly: false }), false);
     assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, critical: true }), false);
+  });
+});
+
+describe("report escaping and sources", () => {
+  const at = new Date("2026-10-04T00:00:00.000Z");
+  const hostile = "<img src=x onerror=1>[x](javascript:alert(1))";
+
+  it("does not let a hostile system name through as raw Markdown or HTML", () => {
+    const profile: Profile = { ...PRESETS.kb, preset: "custom", name: hostile };
+    for (const locale of ["zh", "en"] as const) {
+      const md = reportMarkdown(profile, buildPlan(profile), at, {}, locale);
+      assert.ok(!md.includes(hostile));
+      assert.doesNotMatch(md, /(?<!\\)<img/);
+      assert.doesNotMatch(md, /(?<!\\)\[x\]/);
+    }
+  });
+
+  it("cannot start a heading from a name containing a newline", () => {
+    const profile: Profile = { ...PRESETS.kb, preset: "custom", name: "x\n# heading" };
+    const md = reportMarkdown(profile, buildPlan(profile), at, {}, "en");
+    assert.ok(!/^# heading/m.test(md));
+    assert.equal(escapeMarkdown("x\r\n# heading"), "x \\# heading");
+  });
+
+  it("lists every source in both locales", () => {
+    for (const locale of ["zh", "en"] as const) {
+      const md = reportMarkdown(PRESETS.kb, buildPlan(PRESETS.kb), at, {}, locale);
+      for (const source of SOURCES) assert.ok(md.includes(source.href), source.href);
+    }
   });
 });

@@ -9,6 +9,7 @@ import {
   GATE_NAME,
   GATE_TRACK,
   MITIGATION_LABEL,
+  SOURCES,
   SENSITIVITY_LABEL,
   TRACK_LABEL,
   displayName,
@@ -609,8 +610,8 @@ export function buildPlan(p: Profile): RunPlan {
         gate: "G3",
         title: bi("CSP 仍是 report-only", "CSP still report-only"),
         detail: bi(
-          "政策已寫，但瀏覽器還沒有強制。這是縱深項目。",
-          "The policy is written but the browser is not enforcing it yet. This is a depth item.",
+          "政策已寫，但瀏覽器還沒有強制。這是縱深項目。ASVS 5.0 將 CSP（3.4.3）列為 L2 要求；本課程在 L3 以下僅列為縱深警示。",
+          "The policy is written but the browser is not enforcing it yet. This is a depth item. ASVS 5.0 lists CSP (3.4.3) as an L2 requirement; this course treats it as a depth advisory below L3.",
         ),
         evidence: bi(
           "Content-Security-Policy-Report-Only 已送出；無強制標頭。",
@@ -930,8 +931,8 @@ export function buildPlan(p: Profile): RunPlan {
             "Password reset is rate-limited more loosely than login",
           ),
           detail: bi(
-            "登入有限制，重設密碼沒有同等控制。這是防自動化的落差。",
-            "Login is limited; password reset lacks the same control. This is an anti-automation gap.",
+            "登入有限制，重設密碼沒有同等控制。這是防自動化的落差。ASVS 5.0 將暴力破解控制（6.3.1）列為 L1 要求；本課程在 L3 以下僅列為縱深警示。",
+            "Login is limited; password reset lacks the same control. This is an anti-automation gap. ASVS 5.0 lists brute-force controls (6.3.1) as an L1 requirement; this course treats it as a depth advisory below L3.",
           ),
           evidence: bi(
             "POST /login 429；POST /password/reset 連續 40 次仍 200。",
@@ -1189,6 +1190,7 @@ export function reportFileName(at: Date): string {
 }
 
 const R = {
+  sources: bi("## 資料來源", "## Sources"),
   title: bi("# 六扇門放行紀錄", "# Six-Gate release record"),
   system: bi("系統", "System"),
   time: bi("執行時間", "Run time"),
@@ -1242,6 +1244,21 @@ const R = {
 /** 不適用的三要素欄位。 The trifecta fields when they do not apply. */
 const NOT_APPLICABLE = bi("不適用", "n/a");
 
+/**
+ * 跳脫使用者輸入，免得它在 Markdown 裡變成標題、連結或 HTML：先去掉控制字元（含換行），再跳脫語法字元。
+ * Escape user input so it cannot become a heading, link or HTML in Markdown: strip control characters (newlines included), then escape syntax characters.
+ */
+export function escapeMarkdown(text: string): string {
+  return (
+    text
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ")
+      .replace(/[\\`*_{}[\]()#!|<>&~]/g, "\\$&")
+      .replace(/^(\s*)([+-])/, "$1\\$2")
+      .trim()
+  );
+}
+
 export function reportMarkdown(
   p: Profile,
   plan: RunPlan,
@@ -1255,6 +1272,10 @@ export function reportMarkdown(
   const yn = (value: boolean) => yesNo(locale, value);
   const colon = locale === "zh" ? "：" : ": ";
   const semi = locale === "zh" ? "；" : "; ";
+  const rawName = displayName(p, locale);
+  const safeName = escapeMarkdown(rawName);
+  // 理由與日誌會引用系統名稱，換成跳脫後的版本。 Reasons and logs quote the system name; swap in the escaped form.
+  const named = (text: string) => text.split(rawName).join(safeName);
   const ai = p.llm || p.agent;
   const tri = (value: boolean) => (ai ? yn(value) : t(NOT_APPLICABLE));
   const covered = new Map(coverage(plan, checks).map((item) => [item.finding.id, item]));
@@ -1276,7 +1297,7 @@ export function reportMarkdown(
     `> ${t(DEMO_NOTICE)}`,
     ``,
     ...(stale ? [t(R.stale), ``] : []),
-    `- ${t(R.system)}${colon}${displayName(p, locale)}`,
+    `- ${t(R.system)}${colon}${safeName}`,
     `- ${t(R.time)}${colon}${locale === "zh" ? localStamp(at).replace(" (", "（").replace(/\)$/, "）") : localStamp(at)}`,
     `- ${t(R.level)}${colon}${plan.level}`,
     `- ${t(R.verdict)}${colon}${t(RELEASE_LABEL[plan.release])}`,
@@ -1292,7 +1313,8 @@ export function reportMarkdown(
     `- ${t(R.threatModel)}${colon}${p.threatModel ? t(R.done) : t(R.notDone)}${semi}${t(R.diffOnly)}${colon}${yn(p.diffOnly)}${semi}${t(R.defects)}${colon}${t(DEFECT_LABEL[p.defects])}`,
     ``,
     t(R.reasons),
-    ...plan.reasons.map((r) => `- ${t(r)}`),
+    // 其中一條理由會帶入系統名稱，同樣要跳脫。 One reason quotes the system name, so it is escaped as well.
+    ...plan.reasons.map((r) => `- ${named(t(r))}`),
     ``,
   ];
   for (const s of plan.steps) {
@@ -1302,7 +1324,7 @@ export function reportMarkdown(
         ? `## ${s.gate} ${t(GATE_NAME[s.gate])}（${meta}）`
         : `## ${s.gate} ${t(GATE_NAME[s.gate])} (${meta})`,
     );
-    for (const log of s.logs) lines.push(`- ${t(log)}`);
+    for (const log of s.logs) lines.push(`- ${named(t(log))}`);
     for (const item of s.findings) {
       lines.push(`- **${t(STATUS_LABEL[item.severity])}** ${t(item.title)}`);
       const guidance = findingGuidance(item.id);
@@ -1345,5 +1367,9 @@ export function reportMarkdown(
   }
   lines.push("");
   lines.push(t(R.footer));
+  lines.push("");
+  lines.push(t(R.sources));
+  for (const source of SOURCES)
+    lines.push(`- [${escapeMarkdown(t(source.title))}](${source.href})`);
   return lines.join("\n");
 }

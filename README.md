@@ -13,11 +13,11 @@ An interactive teaching tool that organizes security testing for vibe coding int
 
 ## 使用方式 / Getting started
 
-1. 從首頁進入管線，先選擇預設情境，再調整受測系統條件。頁首的三步引導可直接跳到設定、執行按鈕與結果。
+1. 從首頁進入管線，先選擇預設情境，再調整受測系統條件。管線畫面內的三步引導可直接跳到設定、執行按鈕與結果。
 2. 執行模擬驗證後，先處理阻擋項；展開發現可查看原因、影響、示範證據、修正方式與重新驗證條件。
 3. 修正設定後重新執行，再下載放行紀錄。勾選閘門控制項只會更新「管線缺口」，不會把示範發現改成通過。有條件放行的警示仍需負責人與期限。
 
-4. Open the pipeline from the overview, choose a preset and adjust the system settings. The three-step guide links directly to settings, the run control and results.
+4. Open the pipeline from the overview, choose a preset and adjust the system settings. The three-step guide in the Pipeline view links directly to settings, the run control and results.
 5. Run the simulation and address blocking findings first. Expand a finding for its cause, impact, demo evidence, remediation and retest criteria.
 6. Update the settings, run again and download the release record. Gate checks update pipeline coverage only; they never change a finding to a pass. Conditional-release advisories still need an owner and deadline.
 
@@ -55,13 +55,13 @@ flowchart TB
     subgraph STATE["③ 狀態 State（只在瀏覽器 browser only）"]
         URLS[("網址 URL<br/>view・gate・lang<br/>tab・filter・q")]
         APP["AppStateProvider<br/>app-state.tsx"]
-        STORE[("localStorage<br/>storage.ts<br/>six-gate-profile<br/>six-gate-checks<br/>six-gate-locale<br/>舊鍵自動搬移 migrated")]
+        STORE[("localStorage<br/>storage.ts<br/>six-gate-profile<br/>six-gate-checks<br/>six-gate-locale<br/>six-gate-theme（淺色／深色 light／dark）<br/>舊鍵自動搬移 migrated")]
         RUNS[("sessionStorage<br/>six-gate-run<br/>最近一次執行 latest run")]
         LOC["LocaleProvider<br/>useT()<br/>src/i18n/context.tsx"]
     end
 
     subgraph UI["④ 介面 UI（src/components）"]
-        SHELL["AppShell<br/>shell.tsx<br/>導覽・語言切換<br/>nav・language"]
+        SHELL["AppShell<br/>shell.tsx<br/>導覽・語言與主題切換<br/>nav・language・theme"]
         VIEWS["六個畫面<br/>Six views<br/>總覽・管線・閘門<br/>分級・對照・工具"]
         FORM["ProfileForm<br/>受測系統設定<br/>system under test"]
     end
@@ -95,8 +95,8 @@ flowchart TB
    `getRouter()` wires the error and not-found screens; `__root.tsx` renders the head and `PreviewHostBridge`; `index.tsx` keeps only valid `view`, `gate`, `lang` and the map's `tab`, `filter` and `q` via `parseSearch`; `api/csp-report.ts` receives the browser's CSP violation reports.
 3. **狀態 State**：`AppStateProvider` 讀寫網址參數，經 `storage.ts` 安全讀寫 localStorage（含舊 `vibegate-*` 鍵搬移）與 sessionStorage（最近一次執行），並決定語系交給 `LocaleProvider`。
    `AppStateProvider` reads and writes the URL params, persists to localStorage (including the `vibegate-*` migration) and sessionStorage (the latest run) through `storage.ts`, and hands the locale to `LocaleProvider`.
-4. **介面 UI**：`AppShell` 提供導覽與中文／EN 切換；在「管線」畫面按下執行 Harness，`ProfileForm` 的設定交回狀態層。
-   `AppShell` provides navigation and the 中文 / EN switch; pressing Run on the Pipeline view sends the `ProfileForm` settings back to state.
+4. **介面 UI**：`AppShell` 提供導覽、中文／EN 切換與淺色／深色主題切換；在「管線」畫面按下執行 Harness，`ProfileForm` 的設定交回狀態層。
+   `AppShell` provides navigation, the 中文 / EN switch and the light / dark theme toggle; pressing Run on the Pipeline view sends the `ProfileForm` settings back to state.
 5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決，`coverage` 對照閘門頁勾選算出管線缺口；內容全部來自 `model.ts` 的雙語 `Bi`。
    `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict, and `coverage` compares them with the gates-page checks to find pipeline gaps; all content is bilingual `Bi` from `model.ts`.
 6. **輸出 Output**：`reportMarkdown(…, locale)` 依目前語系產生 `six-gate-release-YYYY-MM-DD.md` 供下載；日期與時間用使用者所在時區，設定在執行後改過時會加註。
@@ -108,18 +108,18 @@ flowchart TB
 
 ## 畫面 / Views
 
-| 畫面 View     | 內容 Content                                                                                                                                                                                        |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 總覽 Overview | 會被 AI 生成速度放大的缺陷、事故對到閘門、ASVS 5.0 等級比例<br/>Defects that generation speed amplifies, incidents mapped to gates, ASVS 5.0 level shares                                           |
-| 管線 Pipeline | 設定受測系統，執行 Harness，看各閘門裁決、放行紀錄與「你們的管線缺口」<br/>Configure the system under test, run the Harness, see each gate's verdict, the release record and "your pipeline gaps"   |
-| 閘門 Gates    | G0–G6 的時機、對抗對象與控制項清單；勾選代表你們真實的管線已有該控制<br/>When each of G0–G6 runs, what it defends against, its control checklist; a check means your real pipeline has that control |
-| 分級 Levels   | L1／L2／L3 的意義、建議等級與在 Harness 裡的效果<br/>What L1 / L2 / L3 mean, the recommended level and its effect in the Harness                                                                    |
-| 對照 Map      | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters                                                                                    |
-| 工具 Tools    | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits                                                                                      |
+| 畫面 View     | 內容 Content                                                                                                                                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 總覽 Overview | 會被 AI 生成速度放大的缺陷、事故對到閘門、ASVS 5.0 等級比例，以及資料來源清單（同時列在下載的放行紀錄）<br/>Defects that generation speed amplifies, incidents mapped to gates, ASVS 5.0 level shares, and the list of sources (also appended to the downloaded release record) |
+| 管線 Pipeline | 設定受測系統，執行 Harness，看各閘門裁決、放行紀錄與「你們的管線缺口」<br/>Configure the system under test, run the Harness, see each gate's verdict, the release record and "your pipeline gaps"                                                                               |
+| 閘門 Gates    | G0–G6 的時機、對抗對象與控制項清單；勾選代表你們真實的管線已有該控制<br/>When each of G0–G6 runs, what it defends against, its control checklist; a check means your real pipeline has that control                                                                             |
+| 分級 Levels   | L1／L2／L3 的意義、建議等級與在 Harness 裡的效果<br/>What L1 / L2 / L3 mean, the recommended level and its effect in the Harness                                                                                                                                                |
+| 對照 Map      | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters                                                                                                                                                                |
+| 工具 Tools    | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits                                                                                                                                                                  |
 
-畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；中文與其他預設值不會出現在網址。受測系統設定、勾選與語系只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果存在 sessionStorage：重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
+畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；中文與其他預設值不會出現在網址。受測系統設定、勾選、語系與主題（鍵 `six-gate-theme`，`light` 或 `dark`，不寫進網址）只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果存在 sessionStorage：重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
 
-View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; Chinese and the other defaults stay out of the URL. The system settings, checks and locale are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run lives in sessionStorage: it survives a reload and is gone when the tab closes, and pressing Stop mid-run restores the previous result. Renaming the system, or changing a setting and changing it back, does not count as "settings changed".
+View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; Chinese and the other defaults stay out of the URL. The system settings, checks, locale and theme (key `six-gate-theme`, `light` or `dark`, never in the URL) are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run lives in sessionStorage: it survives a reload and is gone when the tab closes, and pressing Stop mid-run restores the previous result. Renaming the system, or changing a setting and changing it back, does not count as "settings changed".
 
 ## 雙語怎麼做 / How the bilingual UI works
 
@@ -167,18 +167,18 @@ flowchart TB
 
     subgraph SRC["src/ ─ 應用程式 App"]
         ROUTES["routes/<br/>__root.tsx・index.tsx<br/>api/csp-report.ts"]
-        COMP["components/<br/>shell・app-state・storage<br/>profile-form・ui<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
-        DATA["data/<br/>model.ts・engine.ts<br/>＋測試 tests"]
+        COMP["components/<br/>shell・app-state・storage<br/>profile-form・ui・tone<br/>getting-started・related-sites<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
+        DATA["data/<br/>model.ts・engine.ts<br/>finding-guidance.ts<br/>＋測試 tests"]
         I18N["i18n/<br/>locale.ts・context.tsx"]
         LIBA["lib/（本專案 app）<br/>error-component<br/>not-found-component<br/>og/site.json"]
         LIBP["lib/（平台 platform）<br/>auth/・app-data/<br/>multiplayer/・db.ts<br/>env.server.ts・preview-*.ts"]
-        SRCROOT["brand.ts・router.tsx<br/>csp-report.ts（＋測試）<br/>styles.css（＋測試）<br/>routeTree.gen.ts<br/>zod-jitless.ts"]
+        SRCROOT["brand.ts・theme.ts・router.tsx<br/>csp-report.ts（＋測試）<br/>styles.css（＋測試）<br/>routeTree.gen.ts<br/>zod-jitless.ts"]
         ROUTES ~~~ COMP ~~~ DATA ~~~ I18N ~~~ LIBA ~~~ LIBP ~~~ SRCROOT
     end
 
     subgraph TOOLS["scripts/・server/・public/"]
         SAPP["scripts/（本專案 app）<br/>run-tests・e2e<br/>security-headers<br/>og-card<br/>stryker-ignore-bi"]
-        SPLAT["scripts/（平台 platform）<br/>grok-pwa-plugin・grok-pwa-shared<br/>with-app-env・app-env-plugin<br/>browser-smoke・browser-guard<br/>preview・preview-thumbnail<br/>migrate・migration-plan<br/>brand-check・sign-out-plan<br/>check-auth-invariant<br/>write-atomic"]
+        SPLAT["scripts/（平台 platform）<br/>grok-pwa-plugin・grok-pwa-shared<br/>with-app-env・app-env-plugin<br/>browser-smoke・browser-guard<br/>browser-diagnostics<br/>preview・preview-thumbnail<br/>migrate・migration-plan<br/>brand-check・sign-out-plan<br/>check-auth-invariant<br/>write-atomic"]
         SERVER["server/（平台 platform）<br/>middleware/grok-pwa.ts<br/>virtual-grok-og-identity.d.ts"]
         PUBLIC["public/<br/>favicon.svg・og.jpg<br/>fonts/<br/>__grok/（平台 platform）"]
         SAPP ~~~ SPLAT ~~~ SERVER ~~~ PUBLIC
@@ -228,7 +228,7 @@ G0withSixGates/
 │   ├── og-card.mjs                 # 本專案 app：重製 public/og.jpg
 │   ├── stryker-ignore-bi.mjs       # 本專案 app：突變測試忽略 bi() 內的內容字串 / mutation ignore plugin
 │   ├── app-env-plugin.mjs、with-app-env.mjs(.test.mjs)          # 平台 platform
-│   ├── browser-smoke.mjs、browser-smoke-verdict.mjs(.test.mjs)、browser-guard.mjs
+│   ├── browser-smoke.mjs、browser-smoke-verdict.mjs(.test.mjs)、browser-guard.mjs、browser-diagnostics.mjs(.test.mjs)
 │   ├── preview.mjs(.test.mjs)、preview-thumbnail.mjs
 │   ├── migrate.mjs、migration-plan.mjs(.test.mjs)
 │   ├── brand-check.mjs(.test.mjs)、check-auth-invariant.mjs(.test.mjs)
@@ -239,6 +239,7 @@ G0withSixGates/
 │   └── virtual-grok-og-identity.d.ts
 ├── src/
 │   ├── brand.ts                    # 專案名稱與說明 / name and description
+│   ├── theme.ts(.test.ts)          # 主題鍵、theme-color 與開機腳本的單一來源 / single source for the theme key, theme-color and bootstrap script
 │   ├── router.tsx                  # getRouter()：錯誤與找不到畫面
 │   ├── csp-report.ts(.test.ts)     # CSP 回報摘要與限量讀取 / CSP report summaries and capped reads
 │   ├── routeTree.gen.ts            # TanStack Router 自動產生 / generated
@@ -246,9 +247,10 @@ G0withSixGates/
 │   ├── zod-jitless.ts              # 關閉 zod JIT（CSP 不允許 eval）
 │   ├── routes/__root.tsx、index.tsx、api/csp-report.ts
 │   ├── i18n/locale.ts(.test.ts)、context.tsx
-│   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)
+│   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)、finding-guidance.ts(.test.ts)
 │   ├── components/
-│   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx
+│   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx、tone.ts
+│   │   ├── getting-started.tsx、related-sites.tsx
 │   │   ├── storage.ts(.test.ts)
 │   │   ├── preview-host-bridge.tsx # 平台 platform
 │   │   └── views/overview.tsx、harness-view.tsx、gates-view.tsx、levels-view.tsx、map-view.tsx、tools-view.tsx
@@ -286,11 +288,11 @@ npm run test:mutation            # 突變測試，預設不跑，見下節 / mut
 
 其他 scripts：`build:dev`、`preview`、`preview:stop`、`db:migrate`、`check:auth`、`format`。
 
-`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。在 Grok 以外執行時，「Created with Grok」標章腳本會被 grok.com 擋下，console 會出現一筆 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`；這是預期中的，e2e 會略過它，`browser-smoke.mjs` 則會把它算成錯誤。
+`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。在 Grok 以外執行時，「Created with Grok」標章腳本會被 grok.com 擋下，console 會出現一筆 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`；這是預期中的，e2e 會略過它，`browser-smoke.mjs` 則把它列為警告。
 
 Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth`, `format`.
 
-`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure. Outside Grok the "Created with Grok" badge script is blocked by grok.com, leaving one `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` console error; that is expected, e2e skips it, and `browser-smoke.mjs` counts it as an error.
+`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure. Outside Grok the "Created with Grok" badge script is blocked by grok.com, leaving one `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` console error; that is expected, e2e skips it, and `browser-smoke.mjs` reports it as a warning.
 
 ### 突變測試 / Mutation testing
 
@@ -318,14 +320,14 @@ Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth
 
 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
 
-- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許自己與 Grok），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
+- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri 'none'`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許自己與 Grok），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
 - `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
 - **回報**：CSP 帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），一個請求只寫一行並限制筆數；本文邊讀邊計數，超過 16KB 回 413，chunked 請求也一樣；GET 回 405。端點本身沒有頻率限制，有需要時在 Vercel 防火牆設定。部署日誌裡 `[csp]` 開頭的就是違規紀錄。
 - `ENFORCE_RESOURCE_POLICY` 已設為 `true`。Grok 標章腳本的內容無法事先檢視，所以**每次部署後請確認「Created with Grok」標章正常、沒有 CSP 違規（console 或部署日誌的 `[csp]` 紀錄）**；若標章被擋，把旗標改回 `false` 就會退回觀察模式（資源限制改以 `Content-Security-Policy-Report-Only` 回報）。
 
 The production build adds security headers to the Vercel output config (`scripts/security-headers.mjs`); the dev server and the Grok live preview are unaffected.
 
-- **Enforced**: `frame-ancestors` (self and Grok only), `object-src 'none'`, `base-uri`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self and Grok only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
+- **Enforced**: `frame-ancestors` (self and Grok only), `object-src 'none'`, `base-uri 'none'`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self and Grok only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
 - `script-src` keeps `'unsafe-inline'`: TanStack Start's hydration script differs on every page, so hashes cannot cover it.
 - **Reporting**: the CSP carries `report-uri` and `report-to` (`Reporting-Endpoints`) pointing at `/api/csp-report`. The endpoint is unauthenticated, so it keeps only the directive, the blocked origin and the page (query strings stripped), writes one line per request with a capped count, counts the body while reading so anything past 16KB gets 413 even when chunked, and answers GET with 405. The endpoint has no rate limit of its own; add one in the Vercel firewall if needed. Lines starting with `[csp]` in the deployment logs are violations.
 - `ENFORCE_RESOURCE_POLICY` is now `true`. The Grok badge script cannot be inspected in advance, so **after every deploy check that the "Created with Grok" badge works and no CSP violations show up (in the console or as `[csp]` lines in the deployment logs)**; if the badge is blocked, set the flag back to `false` to return to observation mode (the resource limits go back to `Content-Security-Policy-Report-Only`).

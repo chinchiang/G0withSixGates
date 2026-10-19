@@ -1,0 +1,28 @@
+# 平台檔案與產物不格式化。
+# Platform files and build output are not formatted.
+.grok/
+public/__grok/
+src/lib/
+src/routeTree.gen.ts
+attachments/
+server/
+scripts/grok-pwa-*
+scripts/install-page.html
+.vercel/
+node_modules/
+screenshots/
+reports/
+.stryker-tmp/
+package-lock.json
+AGENTS.md
+tsconfig.json
+eslint.config.mjs
+
+# 其他平台檔案（AGENTS.md 規定不改）。
+# Other platform files (AGENTS.md says not to edit them).
+scripts/brand-check.mjs
+scripts/brand-check.test.mjs
+scripts/browser-smoke-verdict.test.mjs
+scripts/migrate.mjs
+scripts/write-atomic.mjs
+src/components/preview-host-bridge.tsx

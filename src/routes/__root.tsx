@@ -2,14 +2,8 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { APP_DESCRIPTION, APP_TITLE } from "@/brand";
+import { THEME_BOOTSTRAP, THEME_COLOR } from "@/theme";
 import appCss from "../styles.css?url";
-
-/**
- * 繪製前先套用記住的主題，避免淺色使用者看到深色閃一下。try/catch：隱私模式下讀 localStorage 可能丟錯。
- * Apply the remembered theme before first paint so light-theme users never see a dark flash.
- * try/catch: reading localStorage can throw in private mode.
- */
-const THEME_BOOTSTRAP = `try{if(localStorage.getItem("six-gate-theme")==="light"){document.documentElement.dataset.theme="light";var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","#ffffff")}}catch(e){}`;
 
 /**
  * 文件殼：head、樣式、<PreviewHostBridge />、<AuthProvider>。
@@ -25,7 +19,7 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_TITLE },
       { name: "description", content: `${APP_DESCRIPTION.zh} ${APP_DESCRIPTION.en}` },
-      { name: "theme-color", content: "#070b12" },
+      { name: "theme-color", content: THEME_COLOR.dark },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

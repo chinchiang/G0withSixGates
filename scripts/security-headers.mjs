@@ -56,7 +56,7 @@ const policy = (directives) =>
 export const STRUCTURAL_POLICY = policy({
   "frame-ancestors": ["'self'", ...GROK],
   "object-src": ["'none'"],
-  "base-uri": ["'self'"],
+  "base-uri": ["'none'"],
   "form-action": ["'self'", ...GROK],
 });
 

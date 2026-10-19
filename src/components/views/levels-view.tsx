@@ -2,7 +2,7 @@ import { ASVS_TOTAL, LEVEL_META, STACKS, displayName, type Level } from "@/data/
 import { recommendLevel } from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { ProfileForm } from "@/components/profile-form";
-import { Badge, Panel } from "@/components/ui";
+import { Badge, GhostButton, Panel } from "@/components/ui";
 import { LEVEL_TONE } from "@/components/tone";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
@@ -23,8 +23,6 @@ const T = {
   ),
   recommended: bi("目前建議", "Recommended now"),
   systemEyebrow: bi("這次系統", "This system"),
-  seeTools: bi("看", "See"),
-  toolsFor: bi("的工具組合", "toolchain"),
   branchEyebrow: bi("分支", "Fork"),
   branchTitle: bi("不要把沒有的技術也拿來驗", "Do not verify technology you do not have"),
   branch: [
@@ -37,8 +35,8 @@ const T = {
       "After dropping chapters, passing V8 must still mean the standard's V8. An organizational fork has to map back.",
     ),
     bi(
-      "文件化決策（允許哪些檔、什麼樣的逾時、誰能看哪一類資料）寫在各章第一節。驗證文件和驗證實作是兩件事。",
-      "Documented decisions (which files are allowed, what timeouts, who sees which data) live in each chapter's first section. Verifying the document and verifying the implementation are two different things.",
+      "文件化決策（允許哪些檔、什麼樣的逾時、誰能看哪一類資料）寫在多數章節的第一節。驗證文件和驗證實作是兩件事。",
+      "Documented decisions (which files are allowed, what timeouts, who sees which data) live in most chapters' first section. Verifying the document and verifying the implementation are two different things.",
     ),
     bi(
       "歐盟資安韌性法要的是漏洞處理與組成清單。G1 的 CycloneDX 是對接點，不是把整份 ASVS 換成合規清單。",
@@ -97,9 +95,9 @@ export function LevelsView() {
 
       <Panel eyebrow={t(T.systemEyebrow)} title={displayName(profile, locale)}>
         <ProfileForm />
-        <button type="button" onClick={() => setView("tools")} className="btn-ghost mt-4">
-          {t(T.seeTools)} {advice.level} {t(T.toolsFor)}
-        </button>
+        <GhostButton type="button" onClick={() => setView("tools")} className="mt-4">
+          {t(bi(`看 ${advice.level} 的工具組合`, `See the ${advice.level} toolchain`))}
+        </GhostButton>
       </Panel>
 
       <Panel eyebrow={t(T.branchEyebrow)} title={t(T.branchTitle)}>
@@ -113,7 +111,7 @@ export function LevelsView() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {STACKS.map((stack) => (
           <article key={stack.level} className={`zone-tile zone-stack ${LEVEL_TONE[stack.level]}`}>
-            <h3 className="zone-count">{stack.level}</h3>
+            <h2 className="zone-count">{stack.level}</h2>
             <p className="mt-1 text-sm font-semibold">{t(stack.title)}</p>
             <p className="mt-2 text-sm leading-6 text-muted">{t(stack.fit)}</p>
           </article>

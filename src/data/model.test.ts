@@ -1,7 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as model from "./model.ts";
-import { GATE_DOCS, MAX_QUERY, PRESETS, displayName, parseSearch } from "./model.ts";
+import {
+  GATE_DOCS,
+  MAX_QUERY,
+  NAME_MAX_LENGTH,
+  PRESETS,
+  displayName,
+  parseProfile,
+  parseSearch,
+} from "./model.ts";
 
 /**
  * 遞迴找出物件裡所有 `{ zh, en }`，確認兩種語言都有字。
@@ -119,5 +127,19 @@ describe("displayName", () => {
       displayName({ ...PRESETS.script, preset: "custom", name: "" }, "zh"),
       "對外客服知識庫",
     );
+  });
+});
+
+describe("parseProfile name", () => {
+  it("strips control characters and newlines", () => {
+    const parsed = parseProfile({ ...PRESETS.kb, name: "a\r\nb\u0000c\td" });
+    assert.equal(parsed.name, "abcd");
+  });
+
+  it("truncates by code point without splitting a surrogate pair", () => {
+    const parsed = parseProfile({ ...PRESETS.kb, name: "😀".repeat(NAME_MAX_LENGTH + 5) });
+    assert.equal(Array.from(parsed.name).length, NAME_MAX_LENGTH);
+    assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])/.test(parsed.name));
+    assert.ok(!/(?<![\ud800-\udbff])[\udc00-\udfff]/.test(parsed.name));
   });
 });
