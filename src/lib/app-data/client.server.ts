@@ -279,7 +279,7 @@ function tokenIdentityKey(token: string): string {
         }
       }
     } catch {
-      // Not a JWT payload — fall through to hashing the raw token below.
+      // Middle segment isn't base64url JSON — fall through to hashing the raw token below.
     }
   }
   return createHash("sha256").update(token).digest("base64url");

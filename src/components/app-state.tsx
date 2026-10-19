@@ -8,15 +8,27 @@ const PROFILE_KEY = "vibegate-profile-v1";
 const CHECK_KEY = "vibegate-checks-v1";
 
 const TOTAL_CONTROLS = GATE_DOCS.reduce((sum, doc) => sum + doc.controls.length, 0);
+const CONTROL_IDS = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
 
 const route = getRouteApi("/");
 
-/** 只留下布林值的項目；格式不對就當作沒存過。 */
+/** 只留下現存控制項的布林值；格式不對就當作沒存過。 */
 function parseChecks(value: unknown): Record<string, boolean> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
-    Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+    Object.entries(value).filter(
+      (entry): entry is [string, boolean] => CONTROL_IDS.has(entry[0]) && typeof entry[1] === "boolean",
+    ),
   );
+}
+
+/** 儲存被封鎖或已滿時照常運作，只是不保留。 */
+function save(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function checkProgressOf(checks: Record<string, boolean>): { done: number; total: number } {
@@ -56,14 +68,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    if (hydrated) save(PROFILE_KEY, profile);
   }, [profile, hydrated]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    localStorage.setItem(CHECK_KEY, JSON.stringify(checks));
+    if (hydrated) save(CHECK_KEY, checks);
   }, [checks, hydrated]);
+
+  const checkProgress = useMemo(() => checkProgressOf(checks), [checks]);
 
   const value = useMemo<AppState>(() => {
     return {
@@ -80,13 +92,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       checks,
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       replaceChecks: setChecks,
-      checkProgress: checkProgressOf(checks),
+      checkProgress,
       run,
       plan,
       startRun: () => setRun({ profile, at: new Date() }),
       clearRun: () => setRun(null),
     };
-  }, [view, gate, navigate, profile, checks, run, plan]);
+  }, [view, gate, navigate, profile, checks, checkProgress, run, plan]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
