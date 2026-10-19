@@ -9,7 +9,7 @@ import {
   SYMPTOMS,
   type Level,
 } from "@/data/model";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Badge, Panel } from "@/components/ui";
 
 const LEVELS = (["L1", "L2", "L3"] as Level[]).map((level) => ({

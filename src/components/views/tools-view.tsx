@@ -1,6 +1,6 @@
 import { DAST_TOOLS, RED_TOOLS, SAST_TOOLS, SCA_TOOLS, STACKS, type ToolCard } from "@/data/model";
 import { recommendLevel } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Badge, Panel } from "@/components/ui";
 
 export function ToolsView() {

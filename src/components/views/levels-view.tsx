@@ -1,6 +1,6 @@
 import { ASVS_TOTAL, LEVEL_META, STACKS, type Level } from "@/data/model";
 import { recommendLevel } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, Panel } from "@/components/ui";
 

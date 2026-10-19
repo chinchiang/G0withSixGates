@@ -6,7 +6,8 @@ import {
   ShieldCheck,
   Wrench,
 } from "lucide-react";
-import { AppStateProvider, useApp } from "@/components/app-state";
+import { AppStateProvider } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Overview } from "@/components/views/overview";
 import { HarnessView } from "@/components/views/harness-view";
 import { GatesView } from "@/components/views/gates-view";

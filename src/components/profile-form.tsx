@@ -12,7 +12,7 @@ import {
   type Sensitivity,
 } from "@/data/model";
 import { agencyOpen, recommendLevel, trifectaOpen, trifectaPresent } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Badge, Choice, ToggleRow } from "@/components/ui";
 
 const PRESET_ORDER = ["script", "kb", "platform", "hardened"] as const;

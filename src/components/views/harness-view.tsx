@@ -9,7 +9,7 @@ import {
   reportMarkdown,
   type Coverage,
 } from "@/data/engine";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CHAPTERS, GATES, GATE_NAME, MAP_ROWS, type GateId } from "@/data/model";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Badge, Panel } from "@/components/ui";
 
 export function MapView() {

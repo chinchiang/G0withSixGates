@@ -2,7 +2,7 @@ import { GATE_DOCS, GATES, GATE_TRACK, MAESTRO, GATE_NAME } from "@/data/model";
 import { caughtBy } from "@/data/engine";
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { useApp } from "@/components/app-state";
+import { useApp } from "@/components/app-context";
 import { Badge, Panel } from "@/components/ui";
 
 const LAYERS = [
