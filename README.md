@@ -67,6 +67,7 @@ flowchart TB
         APP["AppStateProvider<br/>app-state.tsx"]
         STORE[("localStorage<br/>storage.ts<br/>six-gate-profile<br/>six-gate-checks<br/>six-gate-locale<br/>six-gate-theme（淺色／深色 light／dark）<br/>舊鍵自動搬移 migrated")]
         RUNS[("sessionStorage<br/>six-gate-run<br/>最近一次執行 latest run")]
+        HRUN["harness-run.ts<br/>執行・逐道揭示・停止・過期<br/>run・reveal・stop・stale"]
         LOC["LocaleProvider<br/>useT()<br/>src/i18n/context.tsx"]
     end
 
@@ -88,7 +89,7 @@ flowchart TB
     USER -- "HTTPS" --> DEPLOY
     DEPLOY -- "HTML＋JS" --> ROUTE
     ROUTE -- "view・gate・lang" --> STATE
-    STATE -- "profile・checks・plan・locale" --> UI
+    STATE -- "profile・checks・harness・locale" --> UI
     UI -- "執行 Harness Run：buildPlan(profile)" --> RULES
     RULES -- "reportMarkdown(…, locale)" --> OUT
 
@@ -104,8 +105,8 @@ flowchart TB
    Vercel applies the security headers (production builds only), Nitro renders server-side, and the platform middleware injects PWA and share-card tags.
 2. **路由 Routing**：`getRouter()` 掛上錯誤與找不到畫面；`__root.tsx` 輸出 head 與 `PreviewHostBridge`；`index.tsx` 以 `parseSearch` 只留下合法的 `view`、`gate`、`lang` 與對照頁的 `tab`、`filter`、`q`；`api/csp-report.ts` 收瀏覽器送來的 CSP 違規回報。
    `getRouter()` wires the error and not-found screens; `__root.tsx` renders the head and `PreviewHostBridge`; `index.tsx` keeps only valid `view`, `gate`, `lang` and the map's `tab`, `filter` and `q` via `parseSearch`; `api/csp-report.ts` receives the browser's CSP violation reports.
-3. **狀態 State**：`AppStateProvider` 讀寫網址參數，經 `storage.ts` 安全讀寫 localStorage（含舊 `vibegate-*` 鍵搬移）與 sessionStorage（最近一次執行），並決定語系交給 `LocaleProvider`。
-   `AppStateProvider` reads and writes the URL params, persists to localStorage (including the `vibegate-*` migration) and sessionStorage (the latest run) through `storage.ts`, and hands the locale to `LocaleProvider`.
+3. **狀態 State**：`AppStateProvider` 讀寫網址參數，經 `storage.ts` 安全讀寫 localStorage（含舊 `vibegate-*` 鍵搬移），並決定語系交給 `LocaleProvider`。Harness 的執行、逐道揭示、停止、過期與 sessionStorage 存檔都在 `harness-run.ts`，畫面透過 `useApp().harness` 取用。
+   `AppStateProvider` reads and writes the URL params, persists to localStorage (including the `vibegate-*` migration) through `storage.ts`, and hands the locale to `LocaleProvider`. The Harness run, its reveal, Stop, staleness and the sessionStorage record live in `harness-run.ts`; views read them through `useApp().harness`.
 4. **介面 UI**：`AppShell` 提供導覽、中文／EN 切換與淺色／深色主題切換；在「管線」畫面按下執行 Harness，`ProfileForm` 的設定交回狀態層。
    `AppShell` provides navigation, the 中文 / EN switch and the light / dark theme toggle; pressing Run on the Pipeline view sends the `ProfileForm` settings back to state.
 5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決；`pipeline-gaps.ts` 的 `catchStatus` 依各發現的攔截條件對照閘門頁勾選，算出管線缺口；內容全部來自 `model.ts` 的雙語 `Bi`。
@@ -128,9 +129,9 @@ flowchart TB
 | 對照 Map      | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters                                                                                                                                                                |
 | 工具 Tools    | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits                                                                                                                                                                  |
 
-畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；明確選擇語系後會保留在網址；其他預設值不會出現在網址。受測系統設定、勾選、語系與主題（鍵 `six-gate-theme`，`light` 或 `dark`，不寫進網址）只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果與規則版本存在 sessionStorage：版本不同時需重新執行；重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
+畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；明確選擇語系後會保留在網址；其他預設值不會出現在網址。受測系統設定、勾選、語系與主題（鍵 `six-gate-theme`，`light` 或 `dark`，不寫進網址）只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果與規則版本存在 sessionStorage（`harness-run.ts`）：版本不同時需重新執行；重新整理還在，關掉分頁就清掉。裁決在按下執行時就已確定，閘門逐道揭示時按「停止」會還原成上一次的結果；揭示中離開管線頁等於看完，回來時直接全部顯示。只改系統名稱、或改了又改回來，不會被當成「設定已改」；設定改過時，管線頁與閘門頁都會標出裁決已過期。
 
-View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; an explicitly selected locale stays in the URL; other defaults stay out. The system settings, checks, locale and theme (key `six-gate-theme`, `light` or `dark`, never in the URL) are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run and rule version live in sessionStorage: a version mismatch requires a new run; it survives a reload and is gone when the tab closes, and pressing Stop mid-run restores the previous result. Renaming the system, or changing a setting and changing it back, does not count as "settings changed".
+View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; an explicitly selected locale stays in the URL; other defaults stay out. The system settings, checks, locale and theme (key `six-gate-theme`, `light` or `dark`, never in the URL) are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run and rule version live in sessionStorage (`harness-run.ts`): a version mismatch requires a new run; it survives a reload and is gone when the tab closes. The verdict is fixed when Run is pressed; pressing Stop while the gates are still being revealed restores the previous result, and leaving the Pipeline view mid-reveal counts as finishing it, so everything is shown on return. Renaming the system, or changing a setting and changing it back, does not count as "settings changed"; once the settings do change, both the Pipeline and Gates views mark the verdict as stale.
 
 ## 雙語怎麼做 / How the bilingual UI works
 
@@ -178,7 +179,7 @@ flowchart TB
 
     subgraph SRC["src/ ─ 應用程式 App"]
         ROUTES["routes/<br/>__root.tsx・index.tsx<br/>api/csp-report.ts"]
-        COMP["components/<br/>shell・app-state・storage<br/>profile-form・ui・tone<br/>getting-started・related-sites<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
+        COMP["components/<br/>shell・app-state・storage<br/>harness-run<br/>profile-form・ui・tone<br/>getting-started・related-sites<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
         DATA["data/<br/>model.ts・engine.ts<br/>pipeline-gaps.ts<br/>finding-guidance.ts<br/>＋測試 tests"]
         I18N["i18n/<br/>locale.ts・context.tsx"]
         LIBA["lib/（本專案 app）<br/>error-component<br/>not-found-component<br/>og/site.json"]
@@ -264,6 +265,7 @@ G0withSixGates/
 │   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx、tone.ts
 │   │   ├── getting-started.tsx、related-sites.tsx
 │   │   ├── storage.ts(.test.ts)
+│   │   ├── harness-run.ts(.test.ts)  # 執行生命週期：逐道揭示、停止、過期、存檔 / run lifecycle
 │   │   ├── preview-host-bridge.tsx # 平台 platform
 │   │   └── views/overview.tsx、harness-view.tsx、gates-view.tsx、levels-view.tsx、map-view.tsx、tools-view.tsx
 │   └── lib/
@@ -300,11 +302,11 @@ npm run test:mutation            # 突變測試，預設不跑，見下節 / mut
 
 其他 scripts：`build:dev`、`preview`、`preview:stop`、`db:migrate`、`check:auth`、`format`。
 
-`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。
+`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、閘門頁標出過期的裁決、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。
 
 Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth`, `format`.
 
-`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure.
+`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, the Gates view marking a stale verdict, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure.
 
 正式 HTTPS 部署可使用 `npm run test:e2e -- https://example.com/` 驗證頁面與靜態資源安全標頭，並執行瀏覽器互動測試；此測試也會向 CSP 回報端點送出測試資料。
 
@@ -315,7 +317,7 @@ For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks pag
 **預設關閉。** `npm test` 與每次 PR 的 CI 都不跑突變測試；要跑有兩種方式：本機執行 `npm run test:mutation`，或在 GitHub 的 Actions 分頁手動觸發「Mutation testing」工作流程（報告會上傳成 artifact）。
 
 - 工具是 [StrykerJS](https://stryker-mutator.io/)，完全在本機執行，不需要外部服務或金鑰。
-- 只突變純函式邏輯：`src/data/engine.ts`（規則引擎）、`src/data/pipeline-gaps.ts`（管線缺口）、`src/components/storage.ts`（儲存搬移）、`src/i18n/locale.ts`（雙語工具）。`model.ts` 幾乎全是內容資料，不列入。
+- 只突變純函式邏輯：`src/data/engine.ts`（規則引擎）、`src/data/pipeline-gaps.ts`（管線缺口）、`src/components/storage.ts`（儲存搬移）、`src/components/harness-run.ts`（執行生命週期）、`src/i18n/locale.ts`（雙語工具）。`model.ts` 幾乎全是內容資料，不列入。
 - `scripts/stryker-ignore-bi.mjs` 會跳過 `bi("中文", "English")` 裡的顯示文字；測試不該逐句斷言文案，留著只會灌水存活突變體。其他字串（例如 `=== "public"`）照常突變。
 - 每個突變體都要重跑一次邏輯測試（約 2 秒），七百多個突變體以 4 個並行約需十幾分鐘，所以不放進每次 PR 的流程。
 - 設定在 `stryker.config.json`；`thresholds.break` 為 `null`，分數低不會讓指令失敗，報告在 `reports/mutation/index.html`（不進版控）。存活的突變體就是測試沒有鎖住的行為，依此補測試或接受它。
@@ -323,7 +325,7 @@ For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks pag
 **Off by default.** Neither `npm test` nor the per-PR CI runs mutation testing. Run it locally with `npm run test:mutation`, or trigger the "Mutation testing" workflow by hand from the Actions tab on GitHub (the report is uploaded as an artifact).
 
 - The tool is [StrykerJS](https://stryker-mutator.io/); it runs entirely locally with no external service or key.
-- Only pure logic is mutated: `src/data/engine.ts` (rule engine), `src/data/pipeline-gaps.ts` (pipeline gaps), `src/components/storage.ts` (storage migration), `src/i18n/locale.ts` (locale helpers). `model.ts` is almost all content data and is left out.
+- Only pure logic is mutated: `src/data/engine.ts` (rule engine), `src/data/pipeline-gaps.ts` (pipeline gaps), `src/components/storage.ts` (storage migration), `src/components/harness-run.ts` (run lifecycle), `src/i18n/locale.ts` (locale helpers). `model.ts` is almost all content data and is left out.
 - `scripts/stryker-ignore-bi.mjs` skips the display text inside `bi("中文", "English")`; tests should not assert on every sentence, and keeping those mutants only inflates the survivor count. Other strings (such as `=== "public"`) are still mutated.
 - Every mutant reruns the logic tests (about 2 seconds); seven hundred-odd mutants at 4-way concurrency take ten-plus minutes, so it stays out of the per-PR pipeline.
 - Configuration lives in `stryker.config.json`; `thresholds.break` is `null`, so a low score never fails the command, and the report lands in `reports/mutation/index.html` (not tracked). Surviving mutants are behaviour the tests do not pin down: add a test or accept them.

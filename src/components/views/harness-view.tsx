@@ -7,10 +7,10 @@ import {
   STATUS_LABEL,
   reportFileName,
   reportMarkdown,
-  sameVerdictInputs,
 } from "@/data/engine";
 import { catchStatus, describeMissing, type CatchStatus } from "@/data/pipeline-gaps";
-import { useApp, type HarnessRun } from "@/components/app-state";
+import { useApp } from "@/components/app-state";
+import { STALE_NOTICE } from "@/components/harness-run";
 import { GettingStarted } from "@/components/getting-started";
 import { findingGuidance } from "@/data/finding-guidance";
 import { ProfileForm } from "@/components/profile-form";
@@ -58,10 +58,6 @@ const T = {
   verdict: bi("裁決", "Verdict"),
   blocks: bi("阻擋", "blocks"),
   advisories: bi("警示", "advisories"),
-  staleShort: bi(
-    "設定已改，這份裁決對不上目前的系統。",
-    "The settings changed; this verdict no longer matches the current system.",
-  ),
   stale: bi(
     "設定已改，這份裁決對不上目前的系統。請再跑一次。",
     "The settings changed; this verdict no longer matches the current system. Run it again.",
@@ -90,8 +86,8 @@ const T = {
 };
 
 export function HarnessView() {
-  const { profile, run, invalidRun, plan, startRun, restoreRun, checks, openGate, locale } =
-    useApp();
+  const { harness, checks, openGate, locale } = useApp();
+  const { phase, run, plan, stale, invalid, revealed, revealNext, finishReveal } = harness;
   const t = useT();
   // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。 Checks are live: tick one on the gates page and the gaps update on return.
   const statuses = useMemo(() => (plan ? catchStatus(plan, checks) : []), [plan, checks]);
@@ -100,40 +96,32 @@ export function HarnessView() {
     [statuses],
   );
   const missed = statuses.filter((item) => !item.caught);
-  // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。 Coming back to this view shows the last result at once, without replaying the animation.
-  // `visible` 只在動畫執行中有意義；其餘時間由 `revealed` 直接全部顯示。 `visible` only matters while the animation runs; otherwise `revealed` shows everything.
-  const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
-  const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reduced, setReduced] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [revealTick, setRevealTick] = useState(0);
-  // 停止是取消這一次，不是清掉一切：還原按下執行前的那份結果。
-  // Stop cancels this run rather than wiping everything: it puts back the result from before.
-  const previousRun = useRef<HarnessRun | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReduced(media.matches);
   }, []);
 
+  // 這頁只負責逐道揭示的節奏；揭示到哪一道、停止要還原哪一份都在 `harness-run.ts`。
+  // This view only paces the reveal; how far it has got and what Stop restores live in `harness-run.ts`.
   useEffect(() => {
-    if (!running || !plan) return;
-    if (visible >= plan.steps.length) {
-      setRunning(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setVisible((value) => value + 1), reduced ? 0 : 680);
+    if (phase !== "revealing") return;
+    const timer = window.setTimeout(revealNext, reduced ? 0 : 680);
     return () => window.clearTimeout(timer);
-  }, [running, visible, plan, reduced]);
+  }, [phase, revealed, reduced, revealNext]);
 
-  const phase = !run ? "idle" : running ? "running" : "done";
-  // 只改名稱或預設情境標記不影響規則，不算過期。 Renaming or the preset tag does not change the rules, so it is not stale.
-  const stale = phase === "done" && !!run && !sameVerdictInputs(run.profile, profile);
-  const activeIndex = phase === "running" ? visible : -1;
+  // 離開這頁等於看完揭示：裁決早已確定，回來時直接全部顯示。
+  // Leaving this view finishes the reveal: the verdict is already fixed, so coming back shows everything.
+  useEffect(() => finishReveal, [finishReveal]);
+
+  const activeIndex = phase === "revealing" ? revealed : -1;
   const previousPhase = useRef(phase);
   useEffect(() => {
-    if (previousPhase.current === "running" && phase === "done") {
+    if (previousPhase.current === "revealing" && phase === "done") {
       resultsRef.current?.focus({ preventScroll: true });
     }
     previousPhase.current = phase;
@@ -141,7 +129,7 @@ export function HarnessView() {
 
   // 閘門依序亮起時，螢幕閱讀器逐道聽到結果，最後聽到裁決。回到這頁時不重唸：初始內容不會被宣讀。
   // As gates light up, screen readers hear each result and then the verdict. Returning to the view does not re-announce.
-  const lastStep = plan && visible > 0 ? plan.steps[visible - 1] : null;
+  const lastStep = plan && revealed > 0 ? plan.steps[revealed - 1] : null;
   const missedNote =
     missed.length > 0
       ? t(
@@ -152,7 +140,7 @@ export function HarnessView() {
         )
       : "";
   const announcement =
-    phase === "running"
+    phase === "revealing"
       ? lastStep
         ? `${lastStep.gate} ${t(GATE_NAME[lastStep.gate])}: ${t(STATUS_LABEL[lastStep.status])}`
         : t(T.started)
@@ -160,16 +148,13 @@ export function HarnessView() {
         ? [
             `${t(T.verdict)}: ${t(RELEASE_LABEL[plan.release])}. ${plan.level}, ${plan.blockCount} ${t(T.blocks)}, ${plan.advisoryCount} ${t(T.advisories)}.`,
             missedNote,
-            stale ? t(T.staleShort) : "",
+            stale ? t(STALE_NOTICE) : "",
           ].join(" ")
         : "";
 
   function start() {
-    previousRun.current = run;
-    startRun();
-    setVisible(0);
+    harness.start();
     setOpenId(null);
-    setRunning(true);
     setRevealTick((value) => value + 1);
   }
 
@@ -182,12 +167,6 @@ export function HarnessView() {
     if (!revealTick || !el || el.getBoundingClientRect().top <= window.innerHeight / 2) return;
     el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
   }, [revealTick, reduced]);
-
-  function stop() {
-    restoreRun(previousRun.current);
-    setRunning(false);
-    setVisible(0);
-  }
 
   function download() {
     if (!plan || !run) return;
@@ -219,7 +198,7 @@ export function HarnessView() {
         </p>
       </div>
 
-      {invalidRun && (
+      {invalid && (
         <p role="status">
           {t(
             bi(
@@ -234,8 +213,8 @@ export function HarnessView() {
         <Panel eyebrow={t(T.systemEyebrow)} title={t(T.systemTitle)} headingId="scenario-settings">
           <ProfileForm />
           <div className="mt-4 flex flex-wrap gap-2">
-            {phase === "running" ? (
-              <GhostButton id="harness-run-control" type="button" onClick={stop}>
+            {phase === "revealing" ? (
+              <GhostButton id="harness-run-control" type="button" onClick={harness.stop}>
                 <Square className="size-4" />
                 {t(T.stop)}
               </GhostButton>
@@ -365,14 +344,14 @@ export function HarnessView() {
 
           <ol className="space-y-2">
             {(plan?.steps ?? []).map((item, index) => {
-              // 非執行中（重新整理後還原、停止後還原）一律全部顯示；只有動畫進行時才逐道亮起。
-              // Outside an animation (restored after a reload, restored by Stop) every step is shown; only a live run reveals them one by one.
-              const revealed = phase !== "running" || index < visible;
+              // 不在揭示中（重新整理後還原、停止後還原）一律全部顯示；只有揭示進行時才逐道亮起。
+              // Outside a reveal (restored after a reload, restored by Stop) every step is shown; only a live reveal lights them one by one.
+              const shown = phase !== "revealing" || index < revealed;
               const current = index === activeIndex;
               return (
                 <li
                   key={item.gate}
-                  className={`step-item ${revealed ? STATUS_TONE[item.status] : "tone-na"} ${
+                  className={`step-item ${shown ? STATUS_TONE[item.status] : "tone-na"} ${
                     current ? "is-current" : ""
                   }`}
                 >
@@ -387,14 +366,14 @@ export function HarnessView() {
                       </span>
                     </span>
                     <span className="ml-auto">
-                      {revealed ? (
+                      {shown ? (
                         <Badge tone={item.status}>{t(STATUS_LABEL[item.status])}</Badge>
                       ) : (
                         <Badge tone="neutral">{current ? t(T.running) : t(T.waiting)}</Badge>
                       )}
                     </span>
                   </div>
-                  {revealed && (
+                  {shown && (
                     <div className="mt-3 space-y-2">
                       <ul className="space-y-1 font-mono text-xs leading-5 text-muted">
                         {item.logs.map((line) => (

@@ -11,6 +11,7 @@ import { findingsCaughtWith } from "@/data/pipeline-gaps";
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
+import { STALE_NOTICE } from "@/components/harness-run";
 import { Badge, Panel } from "@/components/ui";
 import { TRACK_TONE, segStyle } from "@/components/tone";
 import { bi, joinList, quote, type Bi } from "@/i18n/locale";
@@ -91,8 +92,7 @@ export function GatesView() {
     toggleCheck,
     replaceChecks,
     checkProgress,
-    run,
-    plan,
+    harness: { run, plan, stale },
     setView,
     locale,
   } = useApp();
@@ -248,6 +248,7 @@ export function GatesView() {
                   ),
                 )
               : t(T.runHint)}
+            {stale && <> {t(STALE_NOTICE)}</>}
           </span>
           <button type="button" onClick={() => setView("harness")} className="min-h-11 text-accent">
             {run ? t(T.back) : t(T.go)}
