@@ -3,6 +3,28 @@
 把 Vibe Coding 的資安測試整理成 G0 威脅建模與 G1–G6 六道閘門的教學工具；Harness 依受測系統設定模擬各閘門的發現與放行裁決。
 A teaching tool that organizes vibe-coding security testing into G0 threat modeling plus six gates G1–G6; the Harness simulates each gate's findings and the release verdict from the system-under-test settings.
 
+## Harness 執行 Harness runs
+
+**執行（run）**：
+按一次「執行 Harness」，把當下的受測系統設定拍成快照並產生裁決。
+One press of "Run the Harness": a snapshot of the current system-under-test settings and the verdict it produces.
+_Avoid_：掃描（scan）、測試（test run）
+
+**裁決（verdict）**：
+一次執行的放行結論：阻擋、有條件放行或放行。
+A run's release conclusion: block, conditional release or pass.
+_Avoid_：結果（result）、判定（judgement）
+
+**過期（stale）**：
+目前的設定與執行時的快照在規則會讀到的地方不同，所以裁決對不上目前的系統。
+The current settings differ from the run's snapshot in something the rules read, so the verdict no longer matches the system.
+_Avoid_：失效（invalid）、過時（outdated）
+
+**逐道揭示（reveal）**：
+執行後各閘門依序亮起的畫面效果；裁決在按下執行時就已確定，揭示不會改變它。
+The on-screen effect of gates lighting up one by one after a run; the verdict is fixed when Run is pressed and the reveal never changes it.
+_Avoid_：執行中（running）、動畫（animation）
+
 ## 管線缺口 Pipeline gaps
 
 **發現（finding）**：
