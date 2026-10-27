@@ -14,7 +14,13 @@ import {
   type Exposure,
   type Sensitivity,
 } from "@/data/model";
-import { agencyOpen, recommendLevel, trifectaOpen, trifectaPresent } from "@/data/engine";
+import {
+  agencyOpen,
+  recommendLevel,
+  settingsThatApply,
+  trifectaPresent,
+  webSurface,
+} from "@/data/engine";
 import { useApp } from "@/components/app-state";
 import { Badge, Choice, ToggleRow } from "@/components/ui";
 import { bi, type Bi } from "@/i18n/locale";
@@ -63,8 +69,7 @@ const T = {
   diffHint: bi("全歷史改在夜間，不取消", "Full history moves to the nightly job, never cancelled"),
   defects: bi("示範程式的狀態", "State of the demo code"),
   mitigations: bi("設計期緩解（可複選）", "Design-time mitigations (multi-select)"),
-  triOpen: bi("三要素未切斷", "Trifecta not cut"),
-  triCut: bi("三要素已切斷", "Trifecta cut"),
+  triPresent: bi("三要素同時成立", "Trifecta present"),
   triAbsent: bi("三要素未同時成立", "Trifecta not present"),
   agency: bi("破壞性工具未經人工核可", "Destructive tools without human approval"),
   custom: bi("自訂", "Custom"),
@@ -74,10 +79,10 @@ export function ProfileForm() {
   const { profile, setProfile, patchProfile, locale } = useApp();
   const t = useT();
   const advice = recommendLevel(profile);
-  const open = trifectaOpen(profile);
-  const ai = profile.llm || profile.agent;
-  const apiImplied = profile.exposure !== "internal" || profile.llm;
-  const trifectaHint = (hint: Bi) => (ai ? t(hint) : t(T.needsAi));
+  const trifecta = trifectaPresent(profile);
+  // 哪些能力目前有作用由規則引擎決定；沒有作用的開關停用。 The rule engine decides which capabilities apply; the rest are disabled.
+  const applies = settingsThatApply(profile);
+  const trifectaHint = (on: boolean, hint: Bi) => (on ? t(hint) : t(T.needsAi));
 
   return (
     <div className="space-y-4">
@@ -156,9 +161,9 @@ export function ProfileForm() {
         />
         <ToggleRow
           label={t(T.api)}
-          hint={apiImplied ? t(T.apiImplied) : t(T.apiHint)}
-          on={apiImplied || profile.api}
-          disabled={apiImplied}
+          hint={applies.api ? t(T.apiHint) : t(T.apiImplied)}
+          on={webSurface(profile)}
+          disabled={!applies.api}
           onChange={(api) => patchProfile({ api })}
         />
         <ToggleRow label={t(T.llm)} on={profile.llm} onChange={(llm) => patchProfile({ llm })} />
@@ -169,30 +174,30 @@ export function ProfileForm() {
         />
         <ToggleRow
           label={t(T.privateData)}
-          hint={trifectaHint(T.privateHint)}
+          hint={trifectaHint(applies.privateData, T.privateHint)}
           on={profile.privateData}
-          disabled={!ai}
+          disabled={!applies.privateData}
           onChange={(privateData) => patchProfile({ privateData })}
         />
         <ToggleRow
           label={t(T.untrusted)}
-          hint={trifectaHint(T.untrustedHint)}
+          hint={trifectaHint(applies.untrusted, T.untrustedHint)}
           on={profile.untrusted}
-          disabled={!ai}
+          disabled={!applies.untrusted}
           onChange={(untrusted) => patchProfile({ untrusted })}
         />
         <ToggleRow
           label={t(T.egress)}
-          hint={trifectaHint(T.egressHint)}
+          hint={trifectaHint(applies.egress, T.egressHint)}
           on={profile.egress}
-          disabled={!ai}
+          disabled={!applies.egress}
           onChange={(egress) => patchProfile({ egress })}
         />
         <ToggleRow
           label={t(T.destructive)}
-          hint={profile.agent ? undefined : t(T.needsAgent)}
+          hint={applies.destructive ? undefined : t(T.needsAgent)}
           on={profile.destructive}
-          disabled={!profile.agent}
+          disabled={!applies.destructive}
           onChange={(destructive) => patchProfile({ destructive })}
         />
         <ToggleRow
@@ -252,8 +257,8 @@ export function ProfileForm() {
       <div className="rounded-xl border border-line bg-bg px-3 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="accent">{advice.level}</Badge>
-          <Badge tone={open ? "block" : "pass"}>
-            {open ? t(T.triOpen) : trifectaPresent(profile) ? t(T.triCut) : t(T.triAbsent)}
+          <Badge tone={trifecta ? "block" : "pass"}>
+            {trifecta ? t(T.triPresent) : t(T.triAbsent)}
           </Badge>
           {agencyOpen(profile) && <Badge tone="block">{t(T.agency)}</Badge>}
           {profile.preset === "custom" && <Badge tone="neutral">{t(T.custom)}</Badge>}

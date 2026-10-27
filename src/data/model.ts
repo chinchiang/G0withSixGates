@@ -134,8 +134,14 @@ export const MITIGATION_LABEL: Record<Mitigation, Bi> = {
 };
 
 export const MITIGATION_HINT: Record<Mitigation, Bi> = {
-  sandbox: bi("需驗證是否阻斷外洩", "Verify whether exfiltration is blocked"),
-  "egress-list": bi("需驗證是否阻斷外洩", "Verify whether exfiltration is blocked"),
+  sandbox: bi(
+    "不改變裁決：驗證限制後，請直接關掉對應的能力",
+    "Does not change the verdict: verify the restriction, then turn the capability off",
+  ),
+  "egress-list": bi(
+    "不改變裁決：驗證限制後，請直接關掉對應的能力",
+    "Does not change the verdict: verify the restriction, then turn the capability off",
+  ),
   hitl: bi("只管破壞性工具", "Only covers destructive tools"),
 };
 

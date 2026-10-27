@@ -134,9 +134,11 @@ describe("harness run lifecycle", () => {
     assert.equal(revealedCount(hydrated, planFor(hydrated.run)), STEPS);
   });
 
-  it("is stale only after the reveal, and only for a change the rules read", () => {
+  it("is stale only after the reveal, and only when the result would change", () => {
     assert.equal(isStale(done, PRESETS.kb), false);
     assert.equal(isStale(done, { ...PRESETS.kb, preset: "custom", name: "改過名字" }), false);
+    // 沙箱不改變裁決，切換它不算過期。 The sandbox never changes the verdict, so toggling it is not stale.
+    assert.equal(isStale(done, { ...PRESETS.kb, mitigations: ["sandbox", "egress-list"] }), false);
     assert.equal(isStale(done, PRESETS.platform), true);
     assert.equal(isStale(run(done, start(PRESETS.kb)), PRESETS.platform), false, "while revealing");
     assert.equal(isStale(INITIAL_HARNESS_RUN, PRESETS.platform), false);

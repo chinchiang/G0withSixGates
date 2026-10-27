@@ -55,7 +55,6 @@ export interface GateStep {
 export interface RunPlan {
   level: Level;
   reasons: Bi[];
-  trifectaOpen: boolean;
   steps: GateStep[];
   release: "block" | "conditional" | "pass";
   blockCount: number;
@@ -93,8 +92,35 @@ export function trifectaPresent(p: Profile): boolean {
   return (p.llm || p.agent) && p.privateData && p.untrusted && p.egress;
 }
 
-export function trifectaOpen(p: Profile): boolean {
-  return trifectaPresent(p);
+/** 有條件才有作用的系統能力。 The system capabilities that only apply under some settings. */
+export interface SettingsThatApply {
+  /** 不對外且沒有 LLM 時才有作用；否則一定有 Web 表面。 Applies only when internal without an LLM; otherwise there is always a web surface. */
+  api: boolean;
+  privateData: boolean;
+  untrusted: boolean;
+  egress: boolean;
+  destructive: boolean;
+}
+
+/**
+ * 在目前的其他設定下，哪些系統能力有作用（可能影響規則）。沒有列出的欄位一律有作用。
+ * 設計期緩解是使用者宣稱做了什麼的紀錄，不套用這個概念：沙箱與出向允許清單永遠不改變裁決，
+ * 但仍讓使用者切換，親手確認這一點。
+ *
+ * Which system capabilities apply (can affect the rules) under the other current settings; any field
+ * not listed always applies. Design-time mitigations record what the user claims to have done and are
+ * outside this concept: the sandbox and egress allow-list never change the verdict, yet stay
+ * toggleable so the user can see that for themselves.
+ */
+export function settingsThatApply(p: Profile): SettingsThatApply {
+  const ai = p.llm || p.agent;
+  return {
+    api: p.exposure === "internal" && !p.llm,
+    privateData: ai,
+    untrusted: ai,
+    egress: ai,
+    destructive: p.agent,
+  };
 }
 
 /**
@@ -106,12 +132,18 @@ export function agencyOpen(p: Profile): boolean {
 }
 
 /**
- * 兩份設定是否會得到同一份裁決。預設情境標記與系統名稱不影響規則，不算改動。
- * Whether two profiles yield the same verdict. The preset tag and the system name do not affect the rules.
+ * 兩份設定重新執行，是否得到完全相同的結果（裁決、發現與日誌）。系統名稱與預設情境標記只寫進日誌、
+ * 不影響規則，所以先對齊再比較。直接比較輸出，規則改了也不必另外維護一份「規則會讀哪些欄位」。
+ *
+ * Whether two profiles give exactly the same result (verdict, findings and logs). The system name and
+ * preset tag only appear in logs and do not affect the rules, so they are aligned first. Comparing the
+ * output means no separate list of "fields the rules read" has to follow rule changes.
  */
-export function sameVerdictInputs(a: Profile, b: Profile): boolean {
-  const key = ({ preset: _preset, name: _name, ...rest }: Profile) => JSON.stringify(rest);
-  return key(a) === key(b);
+export function sameResult(a: Profile, b: Profile): boolean {
+  return (
+    JSON.stringify(buildPlan(a)) ===
+    JSON.stringify(buildPlan({ ...b, name: a.name, preset: a.preset }))
+  );
 }
 
 export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
@@ -132,7 +164,7 @@ export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
       ),
     );
   }
-  if (trifectaOpen(p)) {
+  if (trifectaPresent(p)) {
     reasons.push(
       bi(
         "致命三要素同時成立，而且沒有切斷私有資料、不受信任內容或對外通訊。",
@@ -238,7 +270,7 @@ function depth(level: Level, partial: Omit<Finding, "severity">): Finding {
 
 export function buildPlan(p: Profile): RunPlan {
   const { level, reasons } = recommendLevel(p);
-  const open = trifectaOpen(p);
+  const trifecta = trifectaPresent(p);
   const vibe = p.defects === "vibe";
   const web = webSurface(p);
   const pii = p.sensitivity === "pii";
@@ -1048,7 +1080,7 @@ export function buildPlan(p: Profile): RunPlan {
         ),
       );
     }
-    if (open) {
+    if (trifecta) {
       findings.push({
         id: "g6-tri",
         gate: "G6",
@@ -1108,7 +1140,6 @@ export function buildPlan(p: Profile): RunPlan {
   return {
     level,
     reasons,
-    trifectaOpen: open,
     steps,
     release,
     blockCount,

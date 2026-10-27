@@ -1,4 +1,4 @@
-import { buildPlan, sameVerdictInputs, type RunPlan } from "../data/engine.ts";
+import { buildPlan, sameResult, type RunPlan } from "../data/engine.ts";
 import { RUN_RULE_VERSION, parseProfile, type Profile } from "../data/model.ts";
 import { bi, type Bi } from "../i18n/locale.ts";
 import {
@@ -104,14 +104,12 @@ export function planFor(run: HarnessRun | null): RunPlan | null {
 }
 
 /**
- * 揭示結束後，目前的設定在規則會讀到的地方與執行時的快照不同。只改名稱或預設情境標記不算。
- * After the reveal, the current settings differ from the run's snapshot in something the rules read.
- * Renaming or the preset tag alone does not count.
+ * 揭示結束後，用目前的設定重新執行會得到不同的結果。只改名稱或預設情境標記、切換不影響裁決的設計期緩解都不算。
+ * After the reveal, running again with the current settings would give a different result. Renaming,
+ * the preset tag or a design-time mitigation that never changes the verdict does not count.
  */
 export function isStale(state: HarnessRunState, profile: Profile): boolean {
-  return (
-    harnessPhase(state) === "done" && !!state.run && !sameVerdictInputs(state.run.profile, profile)
-  );
+  return harnessPhase(state) === "done" && !!state.run && !sameResult(state.run.profile, profile);
 }
 
 /**
