@@ -312,6 +312,27 @@ try {
     await close();
   });
 
+  await test("gates: a stale verdict says so after the settings change", async () => {
+    const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
+    const notice = "設定已改，這份裁決對不上目前的系統。";
+    await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "執行 Harness" }).click();
+    await page.getByText("不准放行。").waitFor();
+
+    await page.goto(url("?view=gates&gate=G0"), { waitUntil: "networkidle" });
+    await page.getByText("對照的是最近一次 Harness").waitFor();
+    assert.equal(await page.getByText(notice).count(), 0, "a fresh verdict is not stale");
+
+    // 改設定後，閘門頁的對照要標出過期。 After a settings change the gates page marks the comparison as stale.
+    await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
+    await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
+    await page.getByText(`${notice}請再跑一次。`).waitFor();
+    await page.goto(url("?view=gates&gate=G0"), { waitUntil: "networkidle" });
+    await page.getByText(notice).waitFor();
+    assert.deepEqual(errors, []);
+    await close();
+  });
+
   await test("map: tab, gate filter and search live in the URL", async () => {
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
     await page.goto(url("?view=map"), { waitUntil: "networkidle" });

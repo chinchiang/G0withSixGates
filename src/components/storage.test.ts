@@ -5,7 +5,6 @@ import {
   PROFILE_KEY,
   loadWithMigration,
   parseChecks,
-  parseRun,
   remove,
   save,
   type KeyValueStore,
@@ -71,6 +70,13 @@ describe("storage migration", () => {
       PRESETS.kb,
     );
     assert.doesNotThrow(() => save(PROFILE_KEY, PRESETS.kb, throwing));
+    const refusesRemove: KeyValueStore = {
+      ...throwing,
+      removeItem: () => {
+        throw new Error("denied");
+      },
+    };
+    assert.doesNotThrow(() => remove(PROFILE_KEY, refusesRemove));
   });
 });
 
@@ -87,50 +93,5 @@ describe("parseChecks", () => {
     assert.deepEqual(parseChecks(null, known), {});
     assert.deepEqual(parseChecks([true], known), {});
     assert.deepEqual(parseChecks("x", known), {});
-  });
-});
-
-describe("stored runs", () => {
-  it("round-trips a run and treats broken data as no run", () => {
-    const store = memoryStore();
-    const at = new Date("2026-10-04T02:00:00.000Z");
-    save("run", { profile: PRESETS.kb, at: at.toISOString(), version: 2 }, store);
-    const run = loadWithMigration("run", (raw) => parseRun(raw, parseProfile), null, store);
-    assert.deepEqual(run, { profile: PRESETS.kb, at });
-    for (const raw of [
-      null,
-      "x",
-      [],
-      { profile: PRESETS.kb, at: at.toISOString() },
-      { profile: PRESETS.kb, at: at.toISOString(), version: 1 },
-      { profile: {}, at: at.toISOString(), version: 2 },
-      { profile: { ...PRESETS.kb, egress: "false" }, at: at.toISOString(), version: 2 },
-      { profile: PRESETS.kb },
-      { profile: PRESETS.kb, at: "nope" },
-      { at: at.toISOString() },
-    ]) {
-      assert.equal(parseRun(raw, parseProfile), null, JSON.stringify(raw));
-    }
-    remove("run", store);
-    assert.deepEqual(store.data, {});
-  });
-
-  it("skips quietly when storage throws", () => {
-    const broken: KeyValueStore = {
-      getItem: () => {
-        throw new Error("denied");
-      },
-      setItem: () => {
-        throw new Error("denied");
-      },
-      removeItem: () => {
-        throw new Error("denied");
-      },
-    };
-    assert.doesNotThrow(() => remove("run", broken));
-    assert.equal(
-      loadWithMigration("run", (raw) => parseRun(raw, parseProfile), null, broken),
-      null,
-    );
   });
 });

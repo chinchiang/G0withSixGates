@@ -1,16 +1,11 @@
 import { ArrowDown, Check } from "lucide-react";
 import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
+import type { HarnessPhase } from "@/components/harness-run";
 
-export function GettingStarted({
-  phase,
-  stale,
-}: {
-  phase: "idle" | "running" | "done";
-  stale: boolean;
-}) {
+export function GettingStarted({ phase, stale }: { phase: HarnessPhase; stale: boolean }) {
   const t = useT();
-  const current = phase === "done" && !stale ? 2 : phase === "running" ? 1 : 0;
+  const current = phase === "done" && !stale ? 2 : phase === "revealing" ? 1 : 0;
   const steps = [
     {
       target: "scenario-settings",

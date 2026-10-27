@@ -1,15 +1,34 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  type ReactNode,
+} from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import {
   DEFAULT_PROFILE,
-  RUN_RULE_VERSION,
   GATE_DOCS,
   parseProfile,
   type GateId,
   type Profile,
   type ViewId,
 } from "@/data/model";
-import { buildPlan, type RunPlan } from "@/data/engine";
+import type { RunPlan } from "@/data/engine";
+import {
+  INITIAL_HARNESS_RUN,
+  harnessPhase,
+  harnessRunReducer,
+  isStale,
+  loadRun,
+  planFor,
+  revealedCount,
+  saveRun,
+  type HarnessPhase,
+  type HarnessRun,
+} from "@/components/harness-run";
 import { DEFAULT_LOCALE, HTML_LANG, isLocale, type Locale } from "@/i18n/locale";
 import { THEME_COLOR, type Theme } from "@/theme";
 import { LocaleProvider } from "@/i18n/context";
@@ -17,22 +36,19 @@ import {
   CHECK_KEY,
   LOCALE_KEY,
   PROFILE_KEY,
-  RUN_KEY,
   THEME_KEY,
   isTheme,
   loadWithMigration,
   parseChecks,
-  parseRun,
   readString,
-  remove,
   save,
   sessionStore,
   writeString,
 } from "@/components/storage";
 
 /**
- * 共用狀態：網址參數（view、gate、lang）、localStorage 存檔、最近一次執行與 plan。
- * Shared state: URL params (view, gate, lang), localStorage saves, the latest run and its plan.
+ * 共用狀態：網址參數（view、gate、lang）、localStorage 存檔，以及 Harness 執行（見 `harness-run.ts`）。
+ * Shared state: URL params (view, gate, lang), localStorage saves and the Harness run (see `harness-run.ts`).
  */
 
 const route = getRouteApi("/");
@@ -43,9 +59,23 @@ const CONTROL_IDS: ReadonlySet<string> = new Set(
 
 export type { Theme };
 
-export interface HarnessRun {
-  profile: Profile;
-  at: Date;
+/**
+ * 最近一次執行與它的逐道揭示。動作的先後順序（例如停止要還原哪一份）由 `harness-run.ts` 負責。
+ * The latest run and its reveal. Ordering rules (such as what Stop restores) belong to `harness-run.ts`.
+ */
+export interface Harness {
+  phase: HarnessPhase;
+  run: HarnessRun | null;
+  /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 Latest verdict; the gates page uses it to show what each control catches. */
+  plan: RunPlan | null;
+  stale: boolean;
+  invalid: boolean;
+  /** 已揭示的閘門數。 Gates revealed so far. */
+  revealed: number;
+  start: () => void;
+  stop: () => void;
+  revealNext: () => void;
+  finishReveal: () => void;
 }
 
 interface AppState {
@@ -65,13 +95,7 @@ interface AppState {
   /** 整份換掉，用於清除全部與復原。 Replace everything; used by clear-all and undo. */
   replaceChecks: (next: Record<string, boolean>) => void;
   checkProgress: { done: number; total: number };
-  run: HarnessRun | null;
-  invalidRun: boolean;
-  /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 Latest verdict; the gates page uses it to show what each control catches. */
-  plan: RunPlan | null;
-  startRun: () => void;
-  /** 換回指定的執行結果（停止時還原上一次，沒有就是 null）。 Put back a given run (stop restores the previous one, or null). */
-  restoreRun: (run: HarnessRun | null) => void;
+  harness: Harness;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -83,15 +107,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const gate = search.gate ?? "G0";
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
-  const [run, setRun] = useState<HarnessRun | null>(null);
-  const [invalidRun, setInvalidRun] = useState(false);
+  const [harnessState, dispatch] = useReducer(harnessRunReducer, INITIAL_HARNESS_RUN);
   const [hydrated, setHydrated] = useState(false);
   // 沒有 ?lang= 時用上次記住的語系；伺服器端渲染一律先用預設。
   // Without ?lang= use the remembered locale; server rendering always starts with the default.
   const [storedLocale, setStoredLocale] = useState<Locale>(DEFAULT_LOCALE);
   const locale: Locale = search.lang ?? storedLocale;
   const [theme, setThemeState] = useState<Theme>("dark");
-  const plan = useMemo(() => (run ? buildPlan(run.profile) : null), [run]);
+  const plan = useMemo(() => planFor(harnessState.run), [harnessState.run]);
+  // 不依賴設定的動作只建立一次，計時器與卸載清理才不會因每次渲染而重設。
+  // Actions that do not depend on the settings are created once, so the reveal timer and unmount cleanup do not reset on every render.
+  const harnessActions = useMemo(
+    () => ({
+      stop: () => dispatch({ type: "stop" }),
+      revealNext: () => dispatch({ type: "revealNext" }),
+      finishReveal: () => dispatch({ type: "finishReveal" }),
+    }),
+    [],
+  );
 
   useEffect(() => {
     setProfileState(loadWithMigration(PROFILE_KEY, parseProfile, DEFAULT_PROFILE));
@@ -100,11 +133,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (isLocale(remembered)) setStoredLocale(remembered);
     const rememberedTheme = readString(THEME_KEY);
     if (isTheme(rememberedTheme)) setThemeState(rememberedTheme);
-    const store = sessionStore();
-    const saved = readString(RUN_KEY, store);
-    const restored = loadWithMigration(RUN_KEY, (raw) => parseRun(raw, parseProfile), null, store);
-    setInvalidRun(saved !== null && restored === null);
-    setRun(restored);
+    dispatch({ type: "hydrate", ...loadRun(sessionStore()) });
     setHydrated(true);
   }, []);
 
@@ -116,16 +145,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (hydrated) save(CHECK_KEY, checks);
   }, [checks, hydrated]);
 
+  // 按下執行就存檔：重新整理後直接看到完成的結果。 Saved as soon as Run is pressed, so a reload shows the finished result.
   useEffect(() => {
-    if (!hydrated) return;
-    if (run)
-      save(
-        RUN_KEY,
-        { profile: run.profile, at: run.at.toISOString(), version: RUN_RULE_VERSION },
-        sessionStore(),
-      );
-    else remove(RUN_KEY, sessionStore());
-  }, [run, hydrated]);
+    if (hydrated) saveRun(harnessState.run, sessionStore());
+  }, [harnessState.run, hydrated]);
 
   useEffect(() => {
     document.documentElement.lang = HTML_LANG[locale];
@@ -185,16 +208,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       toggleCheck: (id) => setChecks((current) => ({ ...current, [id]: !current[id] })),
       replaceChecks: setChecks,
       checkProgress: { done, total },
-      run,
-      invalidRun,
-      plan,
-      startRun: () => {
-        setInvalidRun(false);
-        setRun({ profile, at: new Date() });
+      harness: {
+        phase: harnessPhase(harnessState),
+        run: harnessState.run,
+        plan,
+        stale: isStale(harnessState, profile),
+        invalid: harnessState.invalid,
+        revealed: revealedCount(harnessState, plan),
+        start: () => dispatch({ type: "start", profile, at: new Date() }),
+        ...harnessActions,
       },
-      restoreRun: setRun,
     };
-  }, [view, gate, locale, theme, navigate, profile, checks, run, invalidRun, plan]);
+  }, [view, gate, locale, theme, navigate, profile, checks, harnessState, plan, harnessActions]);
 
   return (
     <Ctx.Provider value={value}>
