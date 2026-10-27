@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { bi, biAlt, biList, isLocale, joinAlt, joinList, pick, yesNo } from "./locale.ts";
+import { bi, biAlt, biList, isLocale, joinAlt, joinList, pick, quote, yesNo } from "./locale.ts";
 
 describe("locale helpers", () => {
   it("picks the string for the locale", () => {
@@ -16,6 +16,11 @@ describe("locale helpers", () => {
     assert.equal(joinAlt("en", ["a", "b"]), "a / b");
     assert.deepEqual(biList([bi("甲", "a"), bi("乙", "b")]), bi("甲、乙", "a, b"));
     assert.deepEqual(biAlt([bi("甲", "a"), bi("乙", "b")]), bi("甲／乙", "a / b"));
+  });
+
+  it("quotes text with the locale's quotation marks", () => {
+    assert.equal(quote("zh", "甲、乙"), "「甲、乙」");
+    assert.equal(quote("en", "a, b"), "“a, b”");
   });
 
   it("recognises only the two supported locales", () => {

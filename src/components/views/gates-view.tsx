@@ -7,13 +7,13 @@ import {
   TRACK_LABEL,
   displayName,
 } from "@/data/model";
-import { caughtBy } from "@/data/engine";
+import { findingsCaughtWith } from "@/data/pipeline-gaps";
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { useApp } from "@/components/app-state";
 import { Badge, Panel } from "@/components/ui";
 import { TRACK_TONE, segStyle } from "@/components/tone";
-import { bi, joinList } from "@/i18n/locale";
+import { bi, joinList, quote } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
 /**
@@ -41,6 +41,7 @@ const T = {
   controlsEyebrow: bi("控制項", "Controls"),
   controlsTitle: bi("這道閘門要能勾完", "This gate should be fully checked"),
   catches: bi("本次 Harness 會攔下", "Caught in this Harness run"),
+  together: bi("需搭配", "together with"),
   process: bi(
     "流程性控制項：管線該有，但示範發現不會因為它被攔下。",
     "Process control: your pipeline should have it, but no demo finding is caught by it.",
@@ -176,7 +177,7 @@ export function GatesView() {
         <ul className="space-y-2">
           {doc.controls.map((item) => {
             const on = Boolean(checks[item.id]);
-            const caught = plan ? caughtBy(plan, item.id) : [];
+            const caught = plan ? findingsCaughtWith(plan, item.id) : [];
             return (
               <li key={item.id}>
                 <button
@@ -200,7 +201,16 @@ export function GatesView() {
                         {t(T.catches)}:{" "}
                         {joinList(
                           locale,
-                          caught.map((finding) => t(finding.title)),
+                          caught.map(({ finding, partners }) => {
+                            if (partners.length === 0) return t(finding.title);
+                            const names = joinList(
+                              locale,
+                              partners.map((partner) => quote(locale, t(partner.text))),
+                            );
+                            return locale === "zh"
+                              ? `${t(finding.title)}（${t(T.together)}${names}）`
+                              : `${t(finding.title)} (${t(T.together)} ${names})`;
+                          }),
                         )}
                       </span>
                     )}

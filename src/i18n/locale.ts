@@ -52,6 +52,14 @@ export function joinAlt(locale: Locale, items: readonly string[]): string {
   return items.join(ALT_SEP[locale]);
 }
 
+/**
+ * 引用一段本身可能含有分隔符號的文字：中文用「」，英文用彎引號。
+ * Quote text that may itself contain separators: 「」 in Chinese, curly quotes in English.
+ */
+export function quote(locale: Locale, text: string): string {
+  return locale === "zh" ? `「${text}」` : `“${text}”`;
+}
+
 /** 把多個 `Bi` 併成一個列表 `Bi`。 Join several `Bi` values into one list `Bi`. */
 export function biList(items: readonly Bi[]): Bi {
   return bi(

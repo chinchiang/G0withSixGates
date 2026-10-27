@@ -5,18 +5,17 @@ import {
   DEMO_NOTICE,
   RELEASE_LABEL,
   STATUS_LABEL,
-  coverage,
   reportFileName,
   reportMarkdown,
   sameVerdictInputs,
-  type Coverage,
 } from "@/data/engine";
+import { catchStatus, describeMissing, type CatchStatus } from "@/data/pipeline-gaps";
 import { useApp, type HarnessRun } from "@/components/app-state";
 import { GettingStarted } from "@/components/getting-started";
 import { findingGuidance } from "@/data/finding-guidance";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
-import { bi, joinAlt } from "@/i18n/locale";
+import { bi } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
 /**
@@ -75,7 +74,7 @@ const T = {
   ),
   running: bi("執行中", "Running"),
   waiting: bi("等待", "Waiting"),
-  covered: bi("管線已涵蓋", "Pipeline covers it"),
+  caught: bi("管線攔得下", "Pipeline catches it"),
   missed: bi("管線會漏掉", "Pipeline would miss it"),
   catching: bi(
     "對應控制項（威脅模型須同時完成資料流與風險盤點）",
@@ -97,12 +96,12 @@ export function HarnessView() {
     useApp();
   const t = useT();
   // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。 Checks are live: tick one on the gates page and the gaps update on return.
-  const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
-  const coverageById = useMemo(
-    () => new Map(covered.map((item) => [item.finding.id, item])),
-    [covered],
+  const statuses = useMemo(() => (plan ? catchStatus(plan, checks) : []), [plan, checks]);
+  const statusById = useMemo(
+    () => new Map(statuses.map((item) => [item.finding.id, item])),
+    [statuses],
   );
-  const missed = covered.filter((item) => !item.caught);
+  const missed = statuses.filter((item) => !item.caught);
   // 換頁回來時，上一次的結果直接全部顯示，不重播動畫。 Coming back to this view shows the last result at once, without replaying the animation.
   // `visible` 只在動畫執行中有意義；其餘時間由 `revealed` 直接全部顯示。 `visible` only matters while the animation runs; otherwise `revealed` shows everything.
   const [visible, setVisible] = useState(() => plan?.steps.length ?? 0);
@@ -352,7 +351,7 @@ export function HarnessView() {
                   {t(
                     bi(
                       "教學操作：完成修正設定後按「重新執行」。勾選控制項只會更新管線缺口，不會把阻擋項改成通過。",
-                      'In this demo, update the remediation settings and select "Run again". Checklist changes update coverage only; they never turn a blocking finding into a pass.',
+                      'In this demo, update the remediation settings and select "Run again". Checklist changes update the pipeline gaps only; they never turn a blocking finding into a pass.',
                     ),
                   )}
                 </p>
@@ -405,11 +404,11 @@ export function HarnessView() {
                         ))}
                       </ul>
                       {item.findings.map((finding) => {
-                        const cov = coverageById.get(finding.id);
-                        return cov ? (
+                        const status = statusById.get(finding.id);
+                        return status ? (
                           <FindingCard
                             key={finding.id}
-                            cov={cov}
+                            status={status}
                             expanded={openId === finding.id}
                             onToggle={() => setOpenId(openId === finding.id ? null : finding.id)}
                             onOpenGate={openGate}
@@ -423,7 +422,9 @@ export function HarnessView() {
             })}
           </ol>
 
-          {phase === "done" && <GapPanel covered={covered} missed={missed} onOpenGate={openGate} />}
+          {phase === "done" && (
+            <GapPanel statuses={statuses} missed={missed} onOpenGate={openGate} />
+          )}
         </div>
       </div>
     </div>
@@ -431,18 +432,18 @@ export function HarnessView() {
 }
 
 function FindingCard({
-  cov,
+  status,
   expanded,
   onToggle,
   onOpenGate,
 }: {
-  cov: Coverage;
+  status: CatchStatus;
   expanded: boolean;
   onToggle: () => void;
   onOpenGate: (gate: GateId) => void;
 }) {
   const t = useT();
-  const { finding } = cov;
+  const { finding } = status;
   const guidance = findingGuidance(finding.id);
   return (
     <div className="finding-card rounded-md border border-line bg-bg">
@@ -459,9 +460,9 @@ function FindingCard({
         </span>
         <span className="text-sm">{t(finding.title)}</span>
         <span
-          className={`ml-auto shrink-0 pt-0.5 text-xs ${cov.caught ? "text-muted" : "badge-transition-up"}`}
+          className={`ml-auto shrink-0 pt-0.5 text-xs ${status.caught ? "text-muted" : "badge-transition-up"}`}
         >
-          {cov.caught ? t(T.covered) : t(T.missed)}
+          {status.caught ? t(T.caught) : t(T.missed)}
         </span>
       </button>
       <div
@@ -488,11 +489,11 @@ function FindingCard({
         <p className="font-mono text-xs text-faint">
           {t(finding.tool)} · {t(finding.asvs)} · {t(finding.cwe)}
         </p>
-        {cov.controls.length > 0 && (
+        {status.controls.length > 0 && (
           <div>
             <p className="text-xs text-muted">{t(T.catching)}</p>
             <ul className="mt-1">
-              {cov.controls.map((control) => (
+              {status.controls.map((control) => (
                 <li key={control.id}>
                   <button
                     type="button"
@@ -531,55 +532,49 @@ function FindingCard({
 }
 
 function GapPanel({
-  covered,
+  statuses,
   missed,
   onOpenGate,
 }: {
-  covered: Coverage[];
-  missed: Coverage[];
+  statuses: CatchStatus[];
+  missed: CatchStatus[];
   onOpenGate: (gate: GateId) => void;
 }) {
   const { locale } = useApp();
   const t = useT();
   const title =
-    covered.length === 0
+    statuses.length === 0
       ? t(T.noFindings)
       : missed.length === 0
         ? t(
             bi(
-              `本次 ${covered.length} 個發現，你們的管線都攔得下`,
-              `All ${covered.length} findings this run would be caught by your pipeline`,
+              `本次 ${statuses.length} 個發現，你們的管線都攔得下`,
+              `All ${statuses.length} findings this run would be caught by your pipeline`,
             ),
           )
         : t(
             bi(
-              `本次 ${covered.length} 個發現中，有 ${missed.length} 個可能會漏掉`,
-              `${missed.length} of the ${covered.length} findings this run may slip through`,
+              `本次 ${statuses.length} 個發現中，有 ${missed.length} 個可能會漏掉`,
+              `${missed.length} of the ${statuses.length} findings this run may slip through`,
             ),
           );
   return (
     <Panel eyebrow={t(T.gapsEyebrow)} title={title}>
       {missed.length > 0 && (
         <ul className="space-y-2">
-          {missed.map(({ finding, controls }) => (
-            <li key={finding.id}>
+          {missed.map((status) => (
+            <li key={status.finding.id}>
               <button
                 type="button"
-                onClick={() =>
-                  onOpenGate(controls.find((item) => !item.checked)?.gate ?? finding.gate)
-                }
+                onClick={() => onOpenGate(status.missing[0]?.gate ?? status.finding.gate)}
                 className="gap-item tone-advisory w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
               >
                 <span className="flex items-start gap-2 text-sm">
-                  <span className="font-mono text-accent">{finding.gate}</span>
-                  {t(finding.title)}
+                  <span className="font-mono text-accent">{status.finding.gate}</span>
+                  {t(status.finding.title)}
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-muted">
-                  {t(T.missing)}:{" "}
-                  {joinAlt(
-                    locale,
-                    controls.filter((item) => !item.checked).map((item) => t(item.text)),
-                  )}
+                  {t(T.missing)}: {describeMissing(status, locale)}
                 </span>
               </button>
             </li>
