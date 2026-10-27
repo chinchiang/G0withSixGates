@@ -557,7 +557,7 @@ describe("SSRF escalates the IMDSv2 gap", () => {
 });
 
 describe("the IDOR and alg:none are separate findings", () => {
-  it("a JWT test alone does not cover the two-account check", () => {
+  it("a JWT test alone does not catch the two-account bypass", () => {
     const plan = buildPlan(PRESETS.kb);
     assert.ok(ids(plan).includes("g5-idor"));
     assert.ok(ids(plan).includes("g5-jwt"));

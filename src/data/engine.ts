@@ -792,8 +792,8 @@ export function buildPlan(p: Profile): RunPlan {
         cwe: bi("營運對照：CWE-639", "Operational reference: CWE-639"),
         asvs: bi("V8 授權", "V8 Authorization"),
       },
-      // 越權與 alg:none 是兩個發現：只做 JWT 測試不算涵蓋雙帳號越權。
-      // The IDOR and alg:none are separate findings: a JWT test alone does not cover the two-account check.
+      // 越權與 alg:none 是兩個發現：只做 JWT 測試攔不下雙帳號越權。
+      // The IDOR and alg:none are separate findings: a JWT test alone does not catch the two-account bypass.
       {
         id: "g5-jwt",
         gate: "G5",
@@ -1287,15 +1287,15 @@ export function reportMarkdown(
       lines.push(`  - ${t(R.fix)}${colon}${t(item.fix)}`);
       lines.push(`  - ${t(R.retest)}${colon}${t(guidance.retest)}`);
       lines.push(`  - ${t(item.tool)}｜${t(item.asvs)}｜${t(item.cwe)}`);
-      const cov = statuses.get(item.id);
-      if (cov) {
-        const marks = cov.controls
+      const status = statuses.get(item.id);
+      if (status) {
+        const marks = status.controls
           .map((c) => `${c.checked ? "✓" : "✗"} ${c.gate} ${t(c.text)}`)
           .join(semi);
         lines.push(
           locale === "zh"
-            ? `  - ${t(R.yours)}：${t(cov.caught ? R.caught : R.missed)}（${marks}）`
-            : `  - ${t(R.yours)}: ${t(cov.caught ? R.caught : R.missed)} (${marks})`,
+            ? `  - ${t(R.yours)}：${t(status.caught ? R.caught : R.missed)}（${marks}）`
+            : `  - ${t(R.yours)}: ${t(status.caught ? R.caught : R.missed)} (${marks})`,
         );
       }
     }

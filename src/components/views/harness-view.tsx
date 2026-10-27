@@ -76,10 +76,8 @@ const T = {
   waiting: bi("等待", "Waiting"),
   caught: bi("管線攔得下", "Pipeline catches it"),
   missed: bi("管線會漏掉", "Pipeline would miss it"),
-  catching: bi(
-    "對應控制項（威脅模型須同時完成資料流與風險盤點）",
-    "Related controls (threat modeling requires both data-flow and risk analysis)",
-  ),
+  catchAny: bi("攔截條件：任一項勾選即可", "Catch requirement: check any one of these"),
+  catchAll: bi("攔截條件：須全部勾選", "Catch requirement: check all of these"),
   checked: bi("（已勾選）", " (checked)"),
   unchecked: bi("（未勾選）", " (unchecked)"),
   gapsEyebrow: bi("你們的管線缺口", "Your pipeline gaps"),
@@ -491,7 +489,9 @@ function FindingCard({
         </p>
         {status.controls.length > 0 && (
           <div>
-            <p className="text-xs text-muted">{t(T.catching)}</p>
+            <p className="text-xs text-muted">
+              {t(status.requirement.mode === "all" ? T.catchAll : T.catchAny)}
+            </p>
             <ul className="mt-1">
               {status.controls.map((control) => (
                 <li key={control.id}>

@@ -11,7 +11,7 @@ import type { Finding, RunPlan } from "./engine.ts";
  * release record all read it from this module.
  */
 
-export type CatchRule = { readonly all: readonly string[] } | { readonly any: readonly string[] };
+type CatchRule = { readonly all: readonly string[] } | { readonly any: readonly string[] };
 
 /**
  * 每個發現的攔截條件：`any` 任一勾選即攔下，`all` 須全部勾選。威脅模型須同時具備資料流與風險盤點。
