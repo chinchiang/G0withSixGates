@@ -3,6 +3,28 @@
 把 Vibe Coding 的資安測試整理成 G0 威脅建模與 G1–G6 六道閘門的教學工具；Harness 依受測系統設定模擬各閘門的發現與放行裁決。
 A teaching tool that organizes vibe-coding security testing into G0 threat modeling plus six gates G1–G6; the Harness simulates each gate's findings and the release verdict from the system-under-test settings.
 
+## 受測系統 System under test
+
+**致命三要素（lethal trifecta）**：
+有 LLM 或 Agent 的系統同時接觸私有資料、不受信任內容，並能對外通訊。
+A system with an LLM or agent that has private data, untrusted content and egress at the same time.
+_Avoid_：三要素外洩（trifecta leak）
+
+**切斷（cut a leg）**：
+驗證限制之後，關掉致命三要素中的一項能力；沙箱或出向允許清單本身不算切斷。
+Turning off one capability of the lethal trifecta after verifying the restriction; a sandbox or egress allow-list alone does not cut a leg.
+_Avoid_：緩解（mitigate）、阻斷（block）
+
+**設計期緩解（design-time mitigation）**：
+受測系統設定裡的沙箱隔離、出向允許清單與人工核可；只有人工核可會改變裁決，而且只對破壞性工具有效。
+The sandbox, egress allow-list and human approval in the system settings; only human approval changes the verdict, and only for destructive tools.
+_Avoid_：防護（protection）、控制項（control）
+
+**有作用（applies）**：
+在目前的其他設定下，某項系統能力（例如對外通訊、破壞性工具）可能影響規則。設計期緩解是使用者宣稱做了什麼的紀錄，不套用這個概念。
+A system capability (such as egress or destructive tools) that can affect the rules given the other current settings. Design-time mitigations record what the user claims to have done and are outside this concept.
+_Avoid_：啟用（enabled）、有效（effective）
+
 ## Harness 執行 Harness runs
 
 **執行（run）**：
@@ -16,8 +38,8 @@ A run's release conclusion: block, conditional release or pass.
 _Avoid_：結果（result）、判定（judgement）
 
 **過期（stale）**：
-目前的設定與執行時的快照在規則會讀到的地方不同，所以裁決對不上目前的系統。
-The current settings differ from the run's snapshot in something the rules read, so the verdict no longer matches the system.
+用目前的設定重新執行，會得到和那次執行不同的結果，所以裁決對不上目前的系統；只改系統名稱不算。
+Running again with the current settings would give a different result from that run, so the verdict no longer matches the system; renaming the system alone does not count.
 _Avoid_：失效（invalid）、過時（outdated）
 
 **逐道揭示（reveal）**：

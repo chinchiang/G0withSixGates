@@ -228,6 +228,17 @@ try {
     await verdict.waitFor();
     await page.screenshot({ path: join(SHOTS, "e2e-harness.png"), fullPage: true });
 
+    // 沙箱不改變裁決：切換後不算設定已改。 The sandbox never changes the verdict, so toggling it is not a settings change.
+    const sandbox = page.getByRole("switch", { name: /沙箱隔離/ });
+    await sandbox.click();
+    assert.equal(await sandbox.getAttribute("aria-checked"), "true");
+    assert.equal(
+      await page.getByText("設定已改", { exact: false }).count(),
+      0,
+      "the sandbox made the verdict stale",
+    );
+    await sandbox.click();
+
     // 結果存在 sessionStorage：重新整理還在。 The run lives in sessionStorage and survives a reload.
     await page.reload({ waitUntil: "networkidle" });
     await verdict.waitFor();

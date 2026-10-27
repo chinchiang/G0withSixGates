@@ -9,8 +9,8 @@ import {
   recommendLevel,
   reportFileName,
   reportMarkdown,
-  sameVerdictInputs,
-  trifectaOpen,
+  sameResult,
+  settingsThatApply,
   trifectaPresent,
   webSurface,
   type RunPlan,
@@ -117,7 +117,7 @@ describe("presets", () => {
 describe("design-time mitigations", () => {
   it("a sandbox does not itself cut the trifecta or replace human approval", () => {
     const p: Profile = { ...fixedPlatform, mitigations: ["sandbox"] };
-    assert.equal(trifectaOpen(p), true);
+    assert.equal(trifectaPresent(p), true);
     assert.equal(agencyOpen(p), true);
     assert.equal(recommendLevel(p).level, "L3");
     assert.ok(ids(buildPlan(p)).includes("g4-tool"));
@@ -126,7 +126,7 @@ describe("design-time mitigations", () => {
   it("human approval alone does not cut the trifecta", () => {
     const p: Profile = { ...fixedPlatform, mitigations: ["hitl"] };
     assert.equal(agencyOpen(p), false);
-    assert.equal(trifectaOpen(p), true);
+    assert.equal(trifectaPresent(p), true);
     const found = ids(buildPlan(p));
     assert.ok(found.includes("g0-tri"));
     assert.ok(found.includes("g6-tri"));
@@ -141,7 +141,7 @@ describe("design-time mitigations", () => {
       untrusted: true,
       egress: true,
     };
-    assert.equal(trifectaOpen(p), false);
+    assert.equal(trifectaPresent(p), false);
     assert.equal(recommendLevel(p).level, "L2");
     assert.ok(!ids(buildPlan(p)).includes("g0-tri"));
   });
@@ -353,7 +353,7 @@ describe("invariants over every profile", () => {
       const label = JSON.stringify(p);
 
       if (agencyOpen(p)) assert.equal(status(plan, "G4"), "block", label);
-      if (trifectaOpen(p)) {
+      if (trifectaPresent(p)) {
         assert.equal(status(plan, "G0"), "block", label);
         assert.equal(status(plan, "G6"), "block", label);
       }
@@ -567,12 +567,85 @@ describe("the IDOR and alg:none are separate findings", () => {
   });
 });
 
-describe("stale verdicts", () => {
-  it("only count a change to a rule input", () => {
+describe("same result", () => {
+  it("ignores the name, the preset tag, the sandbox and the egress allow-list", () => {
     const renamed: Profile = { ...PRESETS.kb, preset: "custom", name: "改過名字" };
-    assert.equal(sameVerdictInputs(PRESETS.kb, renamed), true);
-    assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, diffOnly: false }), false);
-    assert.equal(sameVerdictInputs(PRESETS.kb, { ...PRESETS.kb, critical: true }), false);
+    assert.equal(sameResult(PRESETS.kb, renamed), true);
+    assert.equal(
+      sameResult(PRESETS.platform, { ...PRESETS.platform, mitigations: ["sandbox"] }),
+      true,
+    );
+    assert.equal(
+      sameResult(PRESETS.kb, { ...PRESETS.kb, mitigations: [] }),
+      true,
+      "dropping the egress allow-list from the kb preset",
+    );
+  });
+
+  it("counts human approval only for an agent with destructive tools", () => {
+    const withApproval = (p: Profile): Profile => ({ ...p, mitigations: ["hitl"] });
+    assert.ok(PRESETS.platform.agent && PRESETS.platform.destructive);
+    assert.equal(sameResult(PRESETS.platform, withApproval(PRESETS.platform)), false);
+    assert.equal(sameResult(PRESETS.kb, withApproval(PRESETS.kb)), true);
+  });
+
+  it("counts a change the rules read", () => {
+    assert.equal(sameResult(PRESETS.kb, { ...PRESETS.kb, diffOnly: false }), false);
+    assert.equal(sameResult(PRESETS.kb, { ...PRESETS.kb, critical: true }), false);
+  });
+});
+
+describe("settings that apply", () => {
+  it("follows the web surface, the model or agent, and the agent", () => {
+    const internal: Profile = { ...PRESETS.script, exposure: "internal", llm: false, agent: false };
+    assert.deepEqual(settingsThatApply(internal), {
+      api: true,
+      privateData: false,
+      untrusted: false,
+      egress: false,
+      destructive: false,
+    });
+    assert.equal(settingsThatApply({ ...internal, exposure: "public" }).api, false);
+    assert.equal(settingsThatApply({ ...internal, llm: true }).api, false);
+    assert.equal(settingsThatApply({ ...internal, llm: true }).egress, true);
+    assert.equal(settingsThatApply({ ...internal, llm: true }).destructive, false);
+    assert.deepEqual(settingsThatApply({ ...internal, agent: true }), {
+      api: true,
+      privateData: true,
+      untrusted: true,
+      egress: true,
+      destructive: true,
+    });
+  });
+
+  // 停用的開關不能藏起有影響的設定：沒作用的能力，以及永遠不改變裁決的沙箱與出向允許清單，切換後結果都要相同。
+  // A disabled toggle must never hide a setting that matters: flipping a capability that does not apply,
+  // or the sandbox and egress allow-list that never change the verdict, must leave the result unchanged.
+  it("flipping anything that does not apply never changes the result", () => {
+    const toggle = (list: Mitigation[], item: Mitigation) =>
+      MITIGATIONS.filter((m) => (m === item ? !list.includes(m) : list.includes(m)));
+    // 完整窮舉約 50 秒，所以每 7 種取 1 種；7 與內層迴圈長度互質，抽樣仍輪過每種開關組合。
+    // The full sweep takes about 50 s, so every 7th profile is checked; 7 is coprime with the inner loop
+    // lengths, so the sample still cycles through every flag combination.
+    let flips = 0;
+    let index = 0;
+    for (const p of everyProfile()) {
+      if (index++ % 7 !== 0) continue;
+      const applies = settingsThatApply(p);
+      for (const key of Object.keys(applies) as (keyof typeof applies)[]) {
+        if (applies[key]) continue;
+        flips++;
+        assert.ok(sameResult(p, { ...p, [key]: !p[key] }), `${key} in ${JSON.stringify(p)}`);
+      }
+      for (const item of ["sandbox", "egress-list"] as const) {
+        flips++;
+        assert.ok(
+          sameResult(p, { ...p, mitigations: toggle(p.mitigations, item) }),
+          `${item} in ${JSON.stringify(p)}`,
+        );
+      }
+    }
+    assert.ok(flips > 0);
   });
 });
 
