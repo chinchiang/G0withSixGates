@@ -11,6 +11,20 @@ An interactive teaching tool that organizes security testing for vibe coding int
 >
 > The Harness is a **demo simulation**: findings and evidence are teaching examples generated from the scenario you pick; nothing real is scanned. Chapter references are a teaching summary; verify against the standard itself.
 
+## GitHub Pages 部署 / GitHub Pages deployment
+
+GitHub Pages 是建議的部署方式。將變更合併至 `main` 後，GitHub Actions 的 **Deploy GitHub Pages** 工作流程會建置並測試靜態網站，再部署至 Pages；首次使用請在 repository 的 **Settings → Pages → Build and deployment → Source** 選擇 **GitHub Actions**。專案網址通常是 `https://<owner>.github.io/<repository>/`。工作流程依 repository 名稱設定網址前綴，使用者或組織的 `<owner>.github.io` repository 則使用根路徑。
+
+GitHub Pages is the recommended deployment. On pushes to `main`, **Deploy GitHub Pages** builds and tests the static site before deployment. Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions** once. The usual URL is `https://<owner>.github.io/<repository>/`; user or organization `<owner>.github.io` repositories use the root path.
+
+靜態版的情境、清單、語系、結果與下載功能都在瀏覽器運作。GitHub Pages 不提供伺服器端 CSP 回報 API 或 Vercel 的自訂 HTTP 安全標頭，也不提供伺服器產生的 PWA 安裝教學；若需要這些功能，仍可選用下文描述的伺服器版本。下方架構圖與安全標頭章節描述的是該伺服器版本，不適用於 GitHub Pages。
+
+Scenarios, checklists, language, results and downloads run in the browser on the static site. GitHub Pages does not provide the server-side CSP reporting endpoint, Vercel custom HTTP security headers or the server-generated PWA installation tutorial. The server build remains available if those features are needed; the architecture diagram and security-header section below describe that build, not GitHub Pages.
+
+本機可用 `npm run build:pages` 建置，以及 `npm run test:pages` 測試已建置的靜態網站。測試需要 Playwright Chromium。若需模擬專案子路徑，建置和測試時將 `GITHUB_REPOSITORY` 設為 `owner/repository`。
+
+Run `npm run build:pages` and `npm run test:pages` locally to build and test the static site; the test requires Playwright Chromium. Set `GITHUB_REPOSITORY` to `owner/repository` for both commands to simulate a project subpath.
+
 ## 使用方式 / Getting started
 
 1. 從首頁進入管線，先選擇預設情境，再調整受測系統條件。管線畫面內的三步引導可直接跳到設定、執行按鈕與結果。
@@ -24,10 +38,6 @@ An interactive teaching tool that organizes security testing for vibe coding int
 鍵盤換頁後焦點會移到主標題，完成驗證後移到結果區；手機上的七個閘門選項會換行顯示。頁尾提供法規觀測與每日威脅情報的相關網站連結。
 
 Navigation moves keyboard focus to the page heading; completing a run moves it to the results. All seven gate options wrap on narrow screens. Related regulatory and daily threat-intelligence sites are linked from the footer.
-
-瀏覽器檢查會將平台品牌腳本的兩種已知外部載入失敗另列為警告：來源必須精確符合 `https://grok.com/grok-app-builder/extensions.js`，且錯誤為 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` 或 `ERR_CERT_AUTHORITY_INVALID`。警告仍會保留於輸出；其他網址、應用程式錯誤與未預期的失敗都會讓檢查失敗。此分類不會修改腳本載入方式，也不會停用憑證驗證。
-
-Browser checks record two known external platform-badge load failures as warnings only when the source exactly matches `https://grok.com/grok-app-builder/extensions.js` and the error is `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` or `ERR_CERT_AUTHORITY_INVALID`. Warnings remain in the output; other URLs, application errors and unexpected failures still fail validation. This classification does not change script loading or disable certificate verification.
 
 ## 🏛️ 系統架構與流程 / Architecture Overview
 
@@ -117,9 +127,9 @@ flowchart TB
 | 對照 Map      | 白箱與黑箱的雙向對照，以及 ASVS 十七章<br/>The two-way white-box / black-box map and the seventeen ASVS chapters                                                                                                                                                                |
 | 工具 Tools    | SAST、SCA、DAST、AI 紅隊工具的定位與限制<br/>Where SAST, SCA, DAST and AI red-team tools fit, and their limits                                                                                                                                                                  |
 
-畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；中文與其他預設值不會出現在網址。受測系統設定、勾選、語系與主題（鍵 `six-gate-theme`，`light` 或 `dark`，不寫進網址）只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果存在 sessionStorage：重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
+畫面、閘門與語系寫在網址裡（例如 `?view=gates&gate=G3&lang=en`），對照頁的分頁、閘門篩選與搜尋字也是（例如 `?view=map&tab=chapters&filter=G5&q=授權`），都可以直接分享；明確選擇語系後會保留在網址；其他預設值不會出現在網址。受測系統設定、勾選、語系與主題（鍵 `six-gate-theme`，`light` 或 `dark`，不寫進網址）只存在瀏覽器的 localStorage，舊版 `vibegate-*` 鍵會在第一次載入時自動搬到 `six-gate-*`。最近一次 Harness 結果與規則版本存在 sessionStorage：版本不同時需重新執行；重新整理還在，關掉分頁就清掉；執行中按「停止」會還原成上一次的結果。只改系統名稱、或改了又改回來，不會被當成「設定已改」。
 
-View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; Chinese and the other defaults stay out of the URL. The system settings, checks, locale and theme (key `six-gate-theme`, `light` or `dark`, never in the URL) are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run lives in sessionStorage: it survives a reload and is gone when the tab closes, and pressing Stop mid-run restores the previous result. Renaming the system, or changing a setting and changing it back, does not count as "settings changed".
+View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`), and so do the map's tab, gate filter and query (for example `?view=map&tab=chapters&filter=G5&q=authorization`), so links can be shared; an explicitly selected locale stays in the URL; other defaults stay out. The system settings, checks, locale and theme (key `six-gate-theme`, `light` or `dark`, never in the URL) are stored only in the browser's localStorage; the old `vibegate-*` keys are migrated to `six-gate-*` on first load. The latest Harness run and rule version live in sessionStorage: a version mismatch requires a new run; it survives a reload and is gone when the tab closes, and pressing Stop mid-run restores the previous result. Renaming the system, or changing a setting and changing it back, does not count as "settings changed".
 
 ## 雙語怎麼做 / How the bilingual UI works
 
@@ -131,29 +141,29 @@ Every display string is a `Bi = { zh, en }` (`src/i18n/locale.ts`). Content (`mo
 
 規則都在 `src/data/engine.ts`，重點如下：
 
-- **分級**：高衝擊領域（金流、醫療核心、關鍵基礎設施）、對外且有個資、致命三要素未切斷、破壞性工具沒有人工核可，任一項成立就是 L3；有個資、有 LLM、超出內部使用或有 Agent 則是 L2；其餘 L1。
-- **致命三要素**（私有資料、不受信任內容、對外通訊）只在有 LLM 或 Agent 時成立。沙箱或出向允許清單可以切斷一腳，人工核可不算。未切斷時 G0 與 G6 都阻擋。
+- **分級**：高衝擊領域（金流、醫療核心、關鍵基礎設施）、對外且有個資、致命三要素未切斷、破壞性工具沒有人工核可，任一項成立就是 L3；有個資或業務資料、有 LLM、超出內部使用或有 Agent 則是 L2；其餘 L1。
+- **致命三要素**（私有資料、不受信任內容、對外通訊）只在有 LLM 或 Agent 時成立。沙箱或出向允許清單不保證切斷一腳；應驗證限制後調整對應能力，人工核可不算。未切斷時 G0 與 G6 都阻擋。
 - **破壞性工具**只認人工核可，沙箱不能取代。
 - **示範程式的狀態**分三段：仍有缺陷、剩縱深項（只剩 CSP 強制、重設密碼限速這類項目；L1／L2 警示，L3 阻擋）、已整治。
 - **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，有 Web 表面的專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
-- **SSRF 升級**：程式仍有缺陷、有 Web 表面、有 LLM 或 Agent 且能對外通訊，又沒有沙箱或出向允許清單時，G5 的抓取工具會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
+- **SSRF 升級**：程式仍有缺陷、有 Web 表面、有 LLM 或 Agent 且能對外通訊，時，G5 的抓取工具會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
 - **越權與 `alg:none` 是兩個發現**：只做 JWT 測試不算涵蓋雙帳號越權。
 - **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額）一律升為阻擋；L1／L2 只警示。公開端點完全沒有配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
 - **未文件化的威脅模型**在 L3 阻擋，其他等級警示。
-- **管線缺口**：每個發現都對到攔得下它的控制項（`FINDING_CONTROLS`），任一項在閘門頁已勾就算你們的管線涵蓋。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
+- **管線缺口**：每個發現都對到攔得下它的控制項（`FINDING_CONTROLS`），多數項目任一對應控制可涵蓋；威脅模型須同時勾選資料流與風險盤點。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
 The rules live in `src/data/engine.ts`:
 
-- **Level**: a high-impact domain (payments, core healthcare, critical infrastructure), public with personal data, an uncut lethal trifecta, or destructive tools without human approval each force L3; personal data, an LLM, exposure beyond internal use or an agent give L2; everything else is L1.
-- **Lethal trifecta** (private data, untrusted content, egress) only counts with an LLM or agent. A sandbox or egress allow-list cuts a leg; human approval does not. While uncut, G0 and G6 both block.
+- **Level**: a high-impact domain (payments, core healthcare, critical infrastructure), public with personal data, an uncut lethal trifecta, or destructive tools without human approval each force L3; personal or business data, an LLM, exposure beyond internal use or an agent give L2; everything else is L1.
+- **Lethal trifecta** (private data, untrusted content, egress) only counts with an LLM or agent. A sandbox or egress allow-list does not by itself cut a leg; verify restrictions and update the corresponding capability; human approval does not. While uncut, G0 and G6 both block.
 - **Destructive tools** accept only human approval; a sandbox is no substitute.
 - **Demo code state** has three stages: still defective, depth items left (only items such as enforced CSP and password-reset rate limits; advisories at L1 / L2, blocks at L3), remediated.
 - **G1 / G2 findings follow how the code was written**, not whether the system under test has a model: while defective, a project with a web surface gets hallucinated packages and a malicious postinstall, a batch script gets a look-alike package inside its cooling-off period; both can hard-code secrets.
-- **SSRF escalation**: when the code is still defective, there is a web surface, an LLM or agent, and egress, with no sandbox or egress allow-list, G5's fetch tool reaches cloud metadata and G3's IMDSv2 blocks at every level.
+- **SSRF escalation**: when the code is still defective, there is a web surface, an LLM or agent, and egress, G5's fetch tool reaches cloud metadata and G3's IMDSv2 blocks at every level.
 - **The IDOR and `alg:none` are separate findings**: a JWT test alone does not cover the two-account authorization check.
 - **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints) escalate to blocks; L1 / L2 only warn. A public endpoint with no quota at all blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
 - **An undocumented threat model** blocks at L3 and warns elsewhere.
-- **Pipeline gaps**: every finding maps to the controls that would catch it (`FINDING_CONTROLS`); any one checked on the gates page counts as covered. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
+- **Pipeline gaps**: every finding maps to the controls that would catch it (`FINDING_CONTROLS`); most findings need one checked control; the threat model needs both data-flow and risk analysis. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
 
 ## 📦 目錄結構 / Directory layout
 
@@ -288,11 +298,15 @@ npm run test:mutation            # 突變測試，預設不跑，見下節 / mut
 
 其他 scripts：`build:dev`、`preview`、`preview:stop`、`db:migrate`、`check:auth`、`format`。
 
-`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。在 Grok 以外執行時，「Created with Grok」標章腳本會被 grok.com 擋下，console 會出現一筆 `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`；這是預期中的，e2e 會略過它，`browser-smoke.mjs` 則把它列為警告。
+`npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。
 
 Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth`, `format`.
 
-`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure. Outside Grok the "Created with Grok" badge script is blocked by grok.com, leaving one `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin` console error; that is expected, e2e skips it, and `browser-smoke.mjs` reports it as a warning.
+`npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure.
+
+正式 HTTPS 部署可使用 `npm run test:e2e -- https://example.com/` 驗證頁面與靜態資源安全標頭，並執行瀏覽器互動測試；此測試也會向 CSP 回報端點送出測試資料。
+
+For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks page and static-asset security headers and runs browser interactions; it also sends test data to the CSP report endpoint.
 
 ### 突變測試 / Mutation testing
 
@@ -320,24 +334,26 @@ Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth
 
 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
 
-- **強制**：`frame-ancestors`（只允許自己與 Grok 嵌入）、`object-src 'none'`、`base-uri 'none'`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許自己與 Grok），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
+- **強制**：`frame-ancestors`（只允許本站嵌入）、`object-src 'none'`、`base-uri 'none'`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許本站），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
 - `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
 - **回報**：CSP 帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），一個請求只寫一行並限制筆數；本文邊讀邊計數，超過 16KB 回 413，chunked 請求也一樣；GET 回 405。端點本身沒有頻率限制，有需要時在 Vercel 防火牆設定。部署日誌裡 `[csp]` 開頭的就是違規紀錄。
-- `ENFORCE_RESOURCE_POLICY` 已設為 `true`。Grok 標章腳本的內容無法事先檢視，所以**每次部署後請確認「Created with Grok」標章正常、沒有 CSP 違規（console 或部署日誌的 `[csp]` 紀錄）**；若標章被擋，把旗標改回 `false` 就會退回觀察模式（資源限制改以 `Content-Security-Policy-Report-Only` 回報）。
 
 The production build adds security headers to the Vercel output config (`scripts/security-headers.mjs`); the dev server and the Grok live preview are unaffected.
 
-- **Enforced**: `frame-ancestors` (self and Grok only), `object-src 'none'`, `base-uri 'none'`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self and Grok only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
+- **Enforced**: `frame-ancestors` (self only), `object-src 'none'`, `base-uri 'none'`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
 - `script-src` keeps `'unsafe-inline'`: TanStack Start's hydration script differs on every page, so hashes cannot cover it.
 - **Reporting**: the CSP carries `report-uri` and `report-to` (`Reporting-Endpoints`) pointing at `/api/csp-report`. The endpoint is unauthenticated, so it keeps only the directive, the blocked origin and the page (query strings stripped), writes one line per request with a capped count, counts the body while reading so anything past 16KB gets 413 even when chunked, and answers GET with 405. The endpoint has no rate limit of its own; add one in the Vercel firewall if needed. Lines starting with `[csp]` in the deployment logs are violations.
-- `ENFORCE_RESOURCE_POLICY` is now `true`. The Grok badge script cannot be inspected in advance, so **after every deploy check that the "Created with Grok" badge works and no CSP violations show up (in the console or as `[csp]` lines in the deployment logs)**; if the badge is blocked, set the flag back to `false` to return to observation mode (the resource limits go back to `Content-Security-Policy-Report-Only`).
+
+正式建置不再載入 Grok 品牌腳本；CSP 不再為 Grok 網域設特別允許，正式站台僅允許本站嵌入。
+
+Production builds do not load the Grok branding script; CSP has no Grok-specific allowances and permits framing only by the same origin.
 
 ## 平台檔案 / Platform files
 
 這個專案用 Grok App Builder 建立，部署時由平台在 Vercel 上執行 `npm run build`。以下檔案屬於平台，不要刪除或改寫（本次雙語化也不動它們）：
 
 - `AGENTS.md` 與 `.grok/`：給 Grok 代理的工作合約、技能與 `app-env.json`
-- `public/__grok/`、`server/`、`scripts/grok-pwa-*`：PWA 與「Created with Grok」標章
+- `public/__grok/`、`server/`、`scripts/grok-pwa-*`：PWA 與分享卡片
 - `src/lib/` 下的 auth、app-data、db、multiplayer 助手與 `migrations/`：本 app 未啟用 auth 與 db；`.grok/app-env.json` 把 `VITE_AUTH_ENABLED` 設為 `"false"`，但部署端的旗標由平台決定（見 `scripts/with-app-env.mjs`），上線後請確認
 - `startup.sh`：Grok 沙箱重啟時用的啟動腳本（平台固定從 `/workspace/startup.sh` 執行；腳本以自己所在的目錄為準，本機也能用）
 - `src/routes/__root.tsx` 裡的 `<PreviewHostBridge />`
@@ -345,7 +361,7 @@ The production build adds security headers to the Vercel output config (`scripts
 This project was created with Grok App Builder; the platform runs `npm run build` on Vercel at deploy time. The following files belong to the platform and must not be deleted or rewritten (the bilingual pass leaves them untouched):
 
 - `AGENTS.md` and `.grok/`: the Grok agent's contract, skills and `app-env.json`
-- `public/__grok/`, `server/`, `scripts/grok-pwa-*`: PWA and the "Created with Grok" badge
+- `public/__grok/`, `server/`, `scripts/grok-pwa-*`: PWA and sharing cards
 - The auth, app-data, db and multiplayer helpers under `src/lib/` and `migrations/`: auth and db are off in this app; `.grok/app-env.json` sets `VITE_AUTH_ENABLED` to `"false"`, but the deployed flag is the platform's (see `scripts/with-app-env.mjs`), so check it after deploy
 - `startup.sh`: the restart script for the Grok sandbox (the platform always runs `/workspace/startup.sh`; the script resolves its own directory, so it works locally too)
 - `<PreviewHostBridge />` in `src/routes/__root.tsx`

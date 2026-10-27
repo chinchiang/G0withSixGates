@@ -111,7 +111,7 @@ function Frame() {
         <div className="header-inner">
           <button type="button" onClick={() => setView("overview")} className="brand-home">
             <span className="brand-mark">
-              <img src="/favicon.svg" alt="" width="28" height="28" />
+              <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="28" height="28" />
             </span>
             <span className="min-w-0 text-left">
               <span className="brand-title block text-lg font-semibold tracking-tight">

@@ -227,6 +227,16 @@ export const FINDING_GUIDANCE: Record<string, FindingGuidance> = {
       "Rerun direct and indirect injection cases; inspect responses, tool calls and egress logs rather than relying on guardrail claims.",
     ),
   },
+  "g6-indirect": {
+    impact: bi(
+      "外部內容可能誘導未授權動作或資料外洩。",
+      "External content may induce unauthorized actions or exfiltration.",
+    ),
+    retest: bi(
+      "使用惡意文件複測並檢查工具呼叫與外洩通道。",
+      "Retest malicious documents and inspect tool calls and exfiltration paths.",
+    ),
+  },
   "g6-dow": {
     impact: bi(
       "大量或過長請求可能耗盡模型預算，拖慢服務或產生非預期費用。",

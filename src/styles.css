@@ -1,39 +1,40 @@
 @import "tailwindcss";
+@source ".";
 
 @font-face {
   font-family: "IBM Plex Sans";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/plex-sans-400.woff2") format("woff2");
+  src: url("../public/fonts/plex-sans-400.woff2") format("woff2");
 }
 @font-face {
   font-family: "IBM Plex Sans";
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url("/fonts/plex-sans-500.woff2") format("woff2");
+  src: url("../public/fonts/plex-sans-500.woff2") format("woff2");
 }
 @font-face {
   font-family: "IBM Plex Sans";
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url("/fonts/plex-sans-600.woff2") format("woff2");
+  src: url("../public/fonts/plex-sans-600.woff2") format("woff2");
 }
 @font-face {
   font-family: "IBM Plex Mono";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/plex-mono-400.woff2") format("woff2");
+  src: url("../public/fonts/plex-mono-400.woff2") format("woff2");
 }
 @font-face {
   font-family: "IBM Plex Mono";
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url("/fonts/plex-mono-500.woff2") format("woff2");
+  src: url("../public/fonts/plex-mono-500.woff2") format("woff2");
 }
 
 /*
@@ -481,7 +482,8 @@
 }
 .tab[aria-pressed="true"],
 .tab[aria-current="page"],
-.chip[aria-pressed="true"] {
+.chip[aria-pressed="true"],
+.chip[aria-checked="true"] {
   border-color: var(--color-accent);
   background: linear-gradient(
     135deg,

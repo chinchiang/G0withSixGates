@@ -17,19 +17,9 @@ const directives = (policy) =>
     }),
   );
 
-test("never blocks the Grok badge script or Grok embedding (platform contract)", () => {
-  const res = directives(RESOURCE_POLICY);
-  for (const name of [
-    "script-src",
-    "style-src",
-    "img-src",
-    "connect-src",
-    "frame-src",
-    "font-src",
-  ]) {
-    assert.ok(res[name].includes("https://grok.com"), `${name} must allow https://grok.com`);
-  }
-  assert.ok(directives(STRUCTURAL_POLICY)["frame-ancestors"].includes("https://grok.com"));
+test("does not grant special access to Grok origins", () => {
+  assert.doesNotMatch(RESOURCE_POLICY, /grok\.com/);
+  assert.doesNotMatch(STRUCTURAL_POLICY, /grok\.com/);
 });
 
 test("structural directives are enforced; resource limits start as report-only", () => {

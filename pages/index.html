@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="G0 威脅建模與六道資安閘門的互動教學工具。" />
+    <meta name="theme-color" content="#070b12" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <title>六扇門 | Six-Gate for Vibe Code</title>
+    <script>
+      try {
+        if (localStorage.getItem("six-gate-theme") === "light")
+          document.documentElement.dataset.theme = "light";
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

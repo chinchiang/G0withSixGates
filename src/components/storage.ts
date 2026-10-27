@@ -11,6 +11,8 @@
  * mode or a full quota just skips persistence instead of crashing the app.
  */
 
+import { RUN_RULE_VERSION } from "../data/model.ts";
+
 export const PROFILE_KEY = "six-gate-profile-v1";
 export const CHECK_KEY = "six-gate-checks-v1";
 export const LOCALE_KEY = "six-gate-locale";
@@ -114,10 +116,28 @@ export interface StoredRun<P> {
  */
 export function parseRun<P>(raw: unknown, parseProfile: (raw: unknown) => P): StoredRun<P> | null {
   if (!raw || typeof raw !== "object") return null;
-  const { profile, at } = raw as Record<string, unknown>;
+  const { profile, at, version } = raw as Record<string, unknown>;
+  if (version !== RUN_RULE_VERSION) return null;
   const time = typeof at === "string" ? new Date(at) : null;
-  if (!profile || !time || Number.isNaN(time.getTime())) return null;
-  return { profile: parseProfile(profile), at: time };
+  if (
+    !profile ||
+    typeof profile !== "object" ||
+    Array.isArray(profile) ||
+    !time ||
+    Number.isNaN(time.getTime())
+  )
+    return null;
+  const parsed = parseProfile(profile);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const original = profile as Record<string, unknown>;
+  const normalized = parsed as Record<string, unknown>;
+  if (
+    Object.keys(normalized).some(
+      (key) => JSON.stringify(original[key]) !== JSON.stringify(normalized[key]),
+    )
+  )
+    return null;
+  return { profile: parsed, at: time };
 }
 
 export function readString(

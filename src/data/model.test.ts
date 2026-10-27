@@ -100,7 +100,7 @@ describe("parseSearch", () => {
   });
 
   it("drops the defaults so they stay out of the URL", () => {
-    assert.deepEqual(parseSearch({ view: "overview", lang: "zh" }), NONE);
+    assert.deepEqual(parseSearch({ view: "overview", lang: "zh" }), { ...NONE, lang: "zh" });
   });
 });
 

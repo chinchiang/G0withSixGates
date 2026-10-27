@@ -94,13 +94,17 @@ describe("stored runs", () => {
   it("round-trips a run and treats broken data as no run", () => {
     const store = memoryStore();
     const at = new Date("2026-10-04T02:00:00.000Z");
-    save("run", { profile: PRESETS.kb, at: at.toISOString() }, store);
+    save("run", { profile: PRESETS.kb, at: at.toISOString(), version: 2 }, store);
     const run = loadWithMigration("run", (raw) => parseRun(raw, parseProfile), null, store);
     assert.deepEqual(run, { profile: PRESETS.kb, at });
     for (const raw of [
       null,
       "x",
       [],
+      { profile: PRESETS.kb, at: at.toISOString() },
+      { profile: PRESETS.kb, at: at.toISOString(), version: 1 },
+      { profile: {}, at: at.toISOString(), version: 2 },
+      { profile: { ...PRESETS.kb, egress: "false" }, at: at.toISOString(), version: 2 },
       { profile: PRESETS.kb },
       { profile: PRESETS.kb, at: "nope" },
       { at: at.toISOString() },

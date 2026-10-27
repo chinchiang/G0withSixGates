@@ -55,6 +55,8 @@ jobs:
       - run: npm run build
       - run: npm run preview:restart
       - run: npm run test:e2e
+      - run: npm run build:pages
+      - run: npm run test:pages
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

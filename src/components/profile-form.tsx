@@ -46,8 +46,11 @@ const T = {
   privateHint: bi("致命三要素之一", "One leg of the lethal trifecta"),
   untrusted: bi("會吃不受信任內容", "Consumes untrusted content"),
   untrustedHint: bi("網頁、信件、PDF、上傳檔", "Web pages, mail, PDFs, uploads"),
-  egress: bi("能對外通訊或執行動作", "Can call out or take actions"),
-  egressHint: bi("HTTP、寫入、呼叫外部 API", "HTTP, writes, external API calls"),
+  egress: bi("能將資料傳到外部", "Can send data externally"),
+  egressHint: bi(
+    "HTTP、外部 API 與其他資料傳送通道",
+    "HTTP, external APIs and other data-transfer paths",
+  ),
   needsAi: bi("需有 LLM 或 Agent 才算數", "Only counts with an LLM or agent"),
   destructive: bi("工具可刪改或執行 SQL", "Tools can delete, modify or run SQL"),
   needsAgent: bi("需先有 Agent 工具", "Needs agent tools first"),
@@ -84,6 +87,7 @@ export function ProfileForm() {
         {PRESET_ORDER.map((id) => (
           <Choice
             role="radio"
+            first={profile.preset === "custom" && id === "script"}
             key={id}
             active={profile.preset === id}
             // 選預設情境時名稱跟著語系走；之後改任何欄位就變成自訂。

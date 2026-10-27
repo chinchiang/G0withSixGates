@@ -16,7 +16,7 @@
   },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
-    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
+    "build": "node scripts/with-app-env.mjs vite build && node scripts/check-built-headers.mjs && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -29,7 +29,9 @@
     "test:mutation": "stryker run",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:pages": "vite build --config vite.pages.config.ts",
+    "test:pages": "node scripts/pages-e2e.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

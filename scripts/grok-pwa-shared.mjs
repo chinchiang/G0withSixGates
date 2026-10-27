@@ -208,8 +208,7 @@ export function readGrokProjectId() {
 }
 
 export function readGrokExtensionsEnabled() {
-  const fromProcess = typeof process !== "undefined" ? process.env?.VITE_GROK_EXTENSIONS : "";
-  return String(fromProcess ?? "").trim() !== "0";
+  return false;
 }
 
 export function readXCreator() {
@@ -232,7 +231,7 @@ export function grokXCreatorHeadTags(creator = readXCreator(), creatorId = readX
   ];
 }
 
-/** Platform "Created with Grok" banner — injected into every HTML document. */
+/** Optional platform metadata; the branding script is disabled. */
 export function grokExtensionsHeadTags(projectId = readGrokProjectId()) {
   const id = escapeHtml(projectId);
   const tags = [];

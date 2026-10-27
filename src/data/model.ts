@@ -9,6 +9,8 @@ import { bi, isLocale, type Bi, type Locale } from "../i18n/locale.ts";
  * identifiers and rules live in engine.ts.
  */
 
+export const RUN_RULE_VERSION = 2;
+
 export type GateId = "G0" | "G1" | "G2" | "G3" | "G4" | "G5" | "G6";
 export type Level = "L1" | "L2" | "L3";
 export type Severity = "block" | "advisory";
@@ -66,7 +68,7 @@ export const MAX_QUERY = 100;
 export function parseSearch(search: Record<string, unknown>): AppSearch {
   const view = VIEWS.find((item) => item === search.view);
   const gate = GATES.find((item) => item === search.gate);
-  const lang = isLocale(search.lang) && search.lang !== "zh" ? search.lang : undefined;
+  const lang = isLocale(search.lang) ? search.lang : undefined;
   const raw = typeof search.q === "string" || typeof search.q === "number" ? String(search.q) : "";
   const q = raw.slice(0, MAX_QUERY);
   return {
@@ -132,8 +134,8 @@ export const MITIGATION_LABEL: Record<Mitigation, Bi> = {
 };
 
 export const MITIGATION_HINT: Record<Mitigation, Bi> = {
-  sandbox: bi("切斷三要素", "Cuts the trifecta"),
-  "egress-list": bi("切斷三要素", "Cuts the trifecta"),
+  sandbox: bi("需驗證是否阻斷外洩", "Verify whether exfiltration is blocked"),
+  "egress-list": bi("需驗證是否阻斷外洩", "Verify whether exfiltration is blocked"),
   hitl: bi("只管破壞性工具", "Only covers destructive tools"),
 };
 
@@ -382,6 +384,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g0-maestro",
+        process: true,
         text: bi(
           "含 Agent 的系統已用 MAESTRO 七層對到閘門",
           "Agent systems map the seven MAESTRO layers back to gates",
@@ -651,6 +654,7 @@ export const GATE_DOCS: GateDoc[] = [
       },
       {
         id: "g4-allow",
+        process: true,
         text: bi(
           "Agent 工具為允許清單，delete 與任意 SQL 不對通用助手開放",
           "Agent tools are allow-listed; delete and arbitrary SQL are not exposed to a general assistant",
@@ -825,17 +829,16 @@ export const GATE_DOCS: GateDoc[] = [
 ];
 
 /**
- * Harness 每個發現由哪些控制項攔得下。任一項已在閘門頁勾選，就算你們的管線涵蓋。
+ * Harness 每個發現對應的控制項；威脅模型須同時具備資料流與風險盤點。
  * 跨閘門的配對（例如 G5 雙帳號測試也攔得下 G4 的越權）照對照表列入。
  *
- * Which controls would catch each Harness finding. If any one is checked on the
- * gates page, your pipeline counts as covering it. Cross-gate pairs (G5's
+ * Controls related to each finding. Threat modeling requires both data-flow and risk analysis. Cross-gate pairs (G5's
  * two-account test also catches G4's authorization gap) follow the map.
  */
 export const FINDING_CONTROLS: Record<string, string[]> = {
-  "g0-tri": ["g0-tri", "g0-maestro"],
+  "g0-tri": ["g0-tri"],
   "g0-model": ["g0-dfd", "g0-stride"],
-  "g1-slop": ["g1-exist", "g1-typo"],
+  "g1-slop": ["g1-exist"],
   "g1-hook": ["g1-hook", "g1-cool"],
   "g1-cool": ["g1-cool", "g1-typo"],
   "g2-key": ["g2-hook", "g2-push"],
@@ -846,7 +849,7 @@ export const FINDING_CONTROLS: Record<string, string[]> = {
   "g3-csp": ["g3-csp"],
   "g4-bola": ["g4-owner", "g4-rls", "g4-depth", "g5-bola"],
   "g4-pii": ["g4-pii"],
-  "g4-tool": ["g4-allow", "g4-hitl"],
+  "g4-tool": ["g4-hitl"],
   "g4-rules": ["g4-rules"],
   "g5-idor": ["g5-bola"],
   "g5-jwt": ["g5-jwt"],
@@ -854,9 +857,10 @@ export const FINDING_CONTROLS: Record<string, string[]> = {
   "g5-mfa": ["g5-mfa"],
   "g5-debug": ["g5-debug"],
   "g5-rate": ["g5-rate"],
-  "g6-pi": ["g6-direct", "g6-indirect"],
+  "g6-pi": ["g6-direct"],
+  "g6-indirect": ["g6-indirect"],
   "g6-dow": ["g6-dow"],
-  "g6-tri": ["g6-indirect", "g0-tri"],
+  "g6-tri": ["g0-tri"],
 };
 
 export interface MaestroRow {
@@ -1859,8 +1863,8 @@ export const LEVEL_META: Record<
       "Defense in depth and the hard controls. Used to prove the highest assurance to users, not as a day-one starting point.",
     ),
     who: bi(
-      "對外個資、金流、醫療核心、關鍵基礎設施，以及能改正式資料的 Agent。",
-      "Public personal data, payments, core healthcare, critical infrastructure, and agents that can change production data.",
+      "對外個資、金流、醫療核心、關鍵基礎設施，或具未核可破壞性工具的 Agent。",
+      "Public personal data, payments, core healthcare, critical infrastructure, or agents with unapproved destructive tools.",
     ),
     harness: bi(
       "未文件化的威脅模型與所有縱深項一律阻擋。",

@@ -78,8 +78,8 @@ const T = {
   covered: bi("管線已涵蓋", "Pipeline covers it"),
   missed: bi("管線會漏掉", "Pipeline would miss it"),
   catching: bi(
-    "攔下它的控制項（任一項已勾就算涵蓋）",
-    "Controls that catch it (any one checked counts as covered)",
+    "對應控制項（威脅模型須同時完成資料流與風險盤點）",
+    "Related controls (threat modeling requires both data-flow and risk analysis)",
   ),
   checked: bi("（已勾選）", " (checked)"),
   unchecked: bi("（未勾選）", " (unchecked)"),
@@ -93,7 +93,8 @@ const T = {
 };
 
 export function HarnessView() {
-  const { profile, run, plan, startRun, restoreRun, checks, openGate, locale } = useApp();
+  const { profile, run, invalidRun, plan, startRun, restoreRun, checks, openGate, locale } =
+    useApp();
   const t = useT();
   // 勾選是即時的：在閘門頁補勾後回來，缺口會跟著更新。 Checks are live: tick one on the gates page and the gaps update on return.
   const covered = useMemo(() => (plan ? coverage(plan, checks) : []), [plan, checks]);
@@ -221,6 +222,16 @@ export function HarnessView() {
         </p>
       </div>
 
+      {invalidRun && (
+        <p role="status">
+          {t(
+            bi(
+              "先前結果的規則版本不符或資料損壞，請重新執行。",
+              "The previous result uses an incompatible rule version or is invalid; run again.",
+            ),
+          )}
+        </p>
+      )}
       <GettingStarted phase={phase} stale={stale} />
       <div className="harness-layout">
         <Panel eyebrow={t(T.systemEyebrow)} title={t(T.systemTitle)} headingId="scenario-settings">
@@ -554,7 +565,9 @@ function GapPanel({
             <li key={finding.id}>
               <button
                 type="button"
-                onClick={() => onOpenGate(controls[0]?.gate ?? finding.gate)}
+                onClick={() =>
+                  onOpenGate(controls.find((item) => !item.checked)?.gate ?? finding.gate)
+                }
                 className="gap-item tone-advisory w-full rounded-md border border-line bg-bg px-3 py-2 text-left"
               >
                 <span className="flex items-start gap-2 text-sm">
@@ -565,7 +578,7 @@ function GapPanel({
                   {t(T.missing)}:{" "}
                   {joinAlt(
                     locale,
-                    controls.map((item) => t(item.text)),
+                    controls.filter((item) => !item.checked).map((item) => t(item.text)),
                   )}
                 </span>
               </button>

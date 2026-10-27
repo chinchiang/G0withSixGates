@@ -111,16 +111,16 @@ describe("presets", () => {
   });
 
   it("lets a fully remediated high-privilege platform pass at L3", () => {
-    const plan = buildPlan(fixedPlatform);
+    const plan = buildPlan({ ...fixedPlatform, egress: false });
     assert.equal(plan.level, "L3");
     assert.equal(plan.release, "pass", ids(plan).join(","));
   });
 });
 
 describe("design-time mitigations", () => {
-  it("a sandbox cuts the trifecta but does not replace human approval", () => {
+  it("a sandbox does not itself cut the trifecta or replace human approval", () => {
     const p: Profile = { ...fixedPlatform, mitigations: ["sandbox"] };
-    assert.equal(trifectaOpen(p), false);
+    assert.equal(trifectaOpen(p), true);
     assert.equal(agencyOpen(p), true);
     assert.equal(recommendLevel(p).level, "L3");
     assert.ok(ids(buildPlan(p)).includes("g4-tool"));
@@ -151,6 +151,16 @@ describe("design-time mitigations", () => {
 });
 
 describe("surface and level", () => {
+  it("recommends L2 for internal business data", () => {
+    assert.equal(recommendLevel({ ...PRESETS.script, sensitivity: "business" }).level, "L2");
+  });
+
+  it("does not generate indirect injection without untrusted content", () => {
+    const plan = buildPlan({ ...PRESETS.kb, untrusted: false });
+    assert.ok(ids(plan).includes("g6-pi"));
+    assert.ok(!ids(plan).includes("g6-indirect"));
+  });
+
   it("an internal HTTP API still runs G4 and G5 at L1", () => {
     const p: Profile = { ...PRESETS.script, api: true };
     const plan = buildPlan(p);
@@ -425,6 +435,30 @@ describe("pipeline coverage", () => {
     );
   });
 
+  it("requires both threat-model controls and distinguishes injection tests", () => {
+    const one = coverage(plan, { "g0-dfd": true, "g6-indirect": true });
+    assert.equal(one.find((item) => item.finding.id === "g0-model")?.caught, false);
+    assert.equal(one.find((item) => item.finding.id === "g6-pi")?.caught, false);
+    assert.equal(one.find((item) => item.finding.id === "g6-indirect")?.caught, true);
+    const both = coverage(plan, { "g0-dfd": true, "g0-stride": true, "g6-direct": true });
+    assert.equal(both.find((item) => item.finding.id === "g0-model")?.caught, true);
+    assert.equal(both.find((item) => item.finding.id === "g6-pi")?.caught, true);
+  });
+
+  it("the release record lists only unchecked threat-model controls as missing", () => {
+    const record = reportMarkdown(
+      PRESETS.kb,
+      plan,
+      new Date("2026-10-04T02:00:00Z"),
+      { "g0-dfd": true },
+      "zh",
+    );
+    const line = record.split("\n").find((item) => item.includes("尚未文件化威脅模型：缺"));
+    assert.ok(line);
+    assert.ok(line.includes("STRIDE"));
+    assert.ok(!line.includes("資料流圖"));
+  });
+
   it("finds what a control catches in the run", () => {
     assert.deepEqual(
       caughtBy(plan, "g5-bola").map((f) => f.id),
@@ -571,11 +605,11 @@ describe("SSRF escalates the IMDSv2 gap", () => {
     assert.equal(find(plan, "g3-imds")?.severity, "block");
   });
 
-  it("an egress allow-list or sandbox removes the SSRF and keeps IMDSv2 advisory", () => {
+  it("an egress allow-list or sandbox alone does not prove SSRF is prevented", () => {
     for (const mitigation of ["egress-list", "sandbox"] as const) {
       const plan = buildPlan({ ...fetcher, mitigations: [mitigation] });
-      assert.equal(find(plan, "g5-ssrf"), undefined, mitigation);
-      assert.equal(find(plan, "g3-imds")?.severity, "advisory", mitigation);
+      assert.equal(find(plan, "g5-ssrf")?.severity, "block", mitigation);
+      assert.equal(find(plan, "g3-imds")?.severity, "block", mitigation);
     }
   });
 });

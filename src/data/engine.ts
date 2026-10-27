@@ -1,6 +1,7 @@
 import { findingGuidance } from "./finding-guidance.ts";
 import { bi, biList, joinAlt, pick, yesNo, type Bi, type Locale } from "../i18n/locale.ts";
 import {
+  RUN_RULE_VERSION,
   DEFECT_LABEL,
   EXPOSURE_LABEL,
   FINDING_CONTROLS,
@@ -92,16 +93,8 @@ export function trifectaPresent(p: Profile): boolean {
   return (p.llm || p.agent) && p.privateData && p.untrusted && p.egress;
 }
 
-/**
- * 只有沙箱與出向允許清單能切斷一腳。人工核可擋不住安靜的外洩。
- * Only a sandbox or an egress allow-list cuts a leg. Human approval does not stop a quiet exfiltration.
- */
-function cutLabels(p: Profile): Bi[] {
-  return p.mitigations.filter((item) => item !== "hitl").map((item) => MITIGATION_LABEL[item]);
-}
-
 export function trifectaOpen(p: Profile): boolean {
-  return trifectaPresent(p) && cutLabels(p).length === 0;
+  return trifectaPresent(p);
 }
 
 /**
@@ -164,6 +157,9 @@ export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
         "Personal data calls for standard practice even when not public.",
       ),
     );
+  }
+  if (p.sensitivity === "business") {
+    reasons.push(bi("內部業務資料需要標準實踐。", "Business data calls for standard practice."));
   }
   if (p.llm) {
     reasons.push(
@@ -246,10 +242,9 @@ export function buildPlan(p: Profile): RunPlan {
   const vibe = p.defects === "vibe";
   const web = webSurface(p);
   const pii = p.sensitivity === "pii";
-  const cut = biList(cutLabels(p));
-  // 模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單時，G5 會打到雲端中繼資料，G3 的 IMDSv2 跟著升級。
-  // A model-callable HTTP tool with no sandbox or egress allow-list lets G5 reach cloud metadata, which escalates G3's IMDSv2.
-  const ssrf = vibe && web && (p.llm || p.agent) && p.egress && cutLabels(p).length === 0;
+  // 示範情境中，模型可對外通訊時，G5 假設抓取工具可到達中繼資料。
+  // The demo assumes a model-callable tool with egress can reach metadata.
+  const ssrf = vibe && web && (p.llm || p.agent) && p.egress;
   const toolchain =
     level === "L1"
       ? bi("Semgrep 社群版、Trivy、Gitleaks、ZAP", "Semgrep Community, Trivy, Gitleaks, ZAP")
@@ -288,13 +283,6 @@ export function buildPlan(p: Profile): RunPlan {
             "No model or agent, so the lethal trifecta does not apply.",
           ),
     );
-  } else if (!open) {
-    g0logs.push(
-      bi(
-        `三要素同時出現，已用「${cut.zh}」切斷至少一腳。`,
-        `The trifecta is present; "${cut.en}" cuts at least one leg.`,
-      ),
-    );
   } else {
     g0logs.push(
       bi(
@@ -312,12 +300,12 @@ export function buildPlan(p: Profile): RunPlan {
         "The agent or app can read private data, consume untrusted content and talk to the outside at once. Indirect prompt injection can send the data out.",
       ),
       evidence: bi(
-        "私有資料＝是；不受信任內容＝是；對外通訊＝是；沙箱與出向允許清單＝皆無。",
-        "Private data = yes; untrusted content = yes; egress = yes; sandbox and egress allow-list = none.",
+        "私有資料＝是；不受信任內容＝是；對外通訊＝是。",
+        "Private data = yes; untrusted content = yes; egress = yes.",
       ),
       fix: bi(
-        "用沙箱或出向允許清單切斷至少一腳。只加人工核可擋不住安靜的外洩。",
-        "Cut at least one leg with a sandbox or an egress allow-list. Human approval alone does not stop a quiet exfiltration.",
+        "限制私有資料、不受信任內容或外洩通道，並驗證限制有效；沙箱或允許清單本身不保證阻斷外洩。",
+        "Restrict private data, untrusted content or exfiltration paths and verify the restriction; a sandbox or allow-list alone is not a guarantee.",
       ),
       tool: bi("MAESTRO／威脅建模", "MAESTRO / threat modeling"),
       cwe: bi("營運對照：LLM01 提示詞注入", "Operational reference: LLM01 prompt injection"),
@@ -836,8 +824,8 @@ export function buildPlan(p: Profile): RunPlan {
         severity: "block",
         title: bi("抓取工具打得到雲端中繼資料", "Fetch tool reaches cloud metadata"),
         detail: bi(
-          "模型可呼叫的 HTTP 工具沒有沙箱或出向允許清單。一段注入的網址就能讓它讀出執行個體憑證。",
-          "The model-callable HTTP tool has no sandbox or egress allow-list. One injected URL makes it read the instance credentials.",
+          "示範中的 HTTP 工具可到達雲端中繼資料。一段注入的網址可能讓它讀出執行個體憑證。",
+          "The demo HTTP tool can reach cloud metadata. An injected URL can expose instance credentials.",
         ),
         evidence: bi(
           'fetch_url("http://169.254.169.254/latest/meta-data/iam/security-credentials/") → 200，回應含角色名稱。',
@@ -978,15 +966,10 @@ export function buildPlan(p: Profile): RunPlan {
         gate: "G6",
         severity: "block",
         title: bi("提示詞注入抽出系統政策", "Prompt injection extracts the system policy"),
-        detail: p.untrusted
-          ? bi(
-              "直接越獄成功，且上傳文件中的間接指令讓模型嘗試外連。",
-              "The direct jailbreak succeeded, and indirect instructions in an uploaded document made the model attempt an outbound call.",
-            )
-          : bi(
-              "直接越獄成功，系統提示詞被複述到回覆。",
-              "The direct jailbreak succeeded; the system prompt was echoed into the reply.",
-            ),
+        detail: bi(
+          "直接越獄成功，系統提示詞被複述到回覆。",
+          "The direct jailbreak succeeded; the system prompt was echoed.",
+        ),
         evidence: bi(
           "promptfoo：jailbreak 案例失敗。回應含「系統政策：你必須…」。",
           'promptfoo: the jailbreak case failed. The reply contains "System policy: you must…".',
@@ -1002,6 +985,28 @@ export function buildPlan(p: Profile): RunPlan {
           "V1 output handling; V15 architecture (no LLM chapter)",
         ),
       });
+      if (p.untrusted)
+        findings.push({
+          id: "g6-indirect",
+          gate: "G6",
+          severity: "block",
+          title: bi("外部文件觸發間接注入", "External document triggers indirect injection"),
+          detail: bi(
+            "不受信任文件中的指令改變模型行為。",
+            "Instructions in an untrusted document redirect the model.",
+          ),
+          evidence: bi(
+            "示範文件使模型嘗試執行未授權動作。",
+            "The demo document causes an unauthorized action attempt.",
+          ),
+          fix: bi(
+            "限制工具權限與資料流，並測試不受信任內容。",
+            "Restrict tool permissions and data flows and test untrusted content.",
+          ),
+          tool: bi("promptfoo", "promptfoo"),
+          cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
+          asvs: bi("V15 架構", "V15 architecture"),
+        });
       const dow: Omit<Finding, "severity"> = {
         id: "g6-dow",
         gate: "G6",
@@ -1058,20 +1063,13 @@ export function buildPlan(p: Profile): RunPlan {
         ),
         evidence: bi("G0 裁決：致命三要素未切斷。", "G0 verdict: lethal trifecta not cut."),
         fix: bi(
-          "先在 G0 用沙箱或出向允許清單切斷一腳，再複測間接注入。",
-          "Cut a leg in G0 with a sandbox or egress allow-list first, then retest indirect injection.",
+          "先在 G0 限制資料或外洩通道，再複測間接注入。",
+          "Restrict data or exfiltration paths in G0, then retest indirect injection.",
         ),
         tool: bi("Harness 政策", "Harness policy"),
         cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
         asvs: bi("V15.1 文件化安全決策", "V15.1 Documented security decisions"),
       });
-    } else if (trifectaPresent(p)) {
-      logs.push(
-        bi(
-          `三要素已用「${cut.zh}」切斷：複測間接注入是否仍能外連。`,
-          `The trifecta is cut by "${cut.en}": retesting whether indirect injection can still call out.`,
-        ),
-      );
     }
     g6 = step(GATES[6], logs, findings);
   }
@@ -1139,7 +1137,7 @@ export function catchingControls(findingId: string): ControlRef[] {
 export interface Coverage {
   finding: Finding;
   controls: (ControlRef & { checked: boolean })[];
-  /** 任一個攔得下的控制項已勾選，就算你們的管線涵蓋。 Covered if any catching control is checked. */
+  /** 控制組合全部滿足時才算涵蓋。 Covered only when a complete control combination is checked. */
   caught: boolean;
 }
 
@@ -1147,6 +1145,8 @@ export interface Coverage {
  * 用閘門頁的勾選（你們真實的管線）對照這次 Harness 的發現。
  * Compare this Harness run's findings against the gates-page checks (your real pipeline).
  */
+const CONTROL_GROUPS: Record<string, string[][]> = { "g0-model": [["g0-dfd", "g0-stride"]] };
+
 export function coverage(plan: RunPlan, checks: Record<string, boolean>): Coverage[] {
   return plan.steps.flatMap((s) =>
     s.findings.map((finding) => {
@@ -1154,7 +1154,13 @@ export function coverage(plan: RunPlan, checks: Record<string, boolean>): Covera
         ...item,
         checked: Boolean(checks[item.id]),
       }));
-      return { finding, controls, caught: controls.some((item) => item.checked) };
+      return {
+        finding,
+        controls,
+        caught: (CONTROL_GROUPS[finding.id] ?? controls.map((item) => [item.id])).some(
+          (group) => group.length > 0 && group.every((id) => Boolean(checks[id])),
+        ),
+      };
     }),
   );
 }
@@ -1231,8 +1237,8 @@ const R = {
   missed: bi("會漏掉", "would miss"),
   gaps: bi("## 你們的管線缺口", "## Your pipeline gaps"),
   gapsNote: bi(
-    "依閘門頁的勾選估算。勾選代表你們真實的管線已有該控制，任一項攔得下就算涵蓋。",
-    "Estimated from the gates-page checks. A check means your real pipeline has that control; any one catching control counts as covered.",
+    "依閘門頁勾選估算；威脅模型須同時具備資料流與風險盤點。",
+    "Estimated from gates-page checks; a threat model needs both data-flow and risk analysis.",
   ),
   noFindings: bi("- 本次沒有發現項。", "- No findings this run."),
   footer: bi(
@@ -1293,6 +1299,8 @@ export function reportMarkdown(
 
   const lines: string[] = [
     t(R.title),
+    ``,
+    locale === "zh" ? `規則版本：${RUN_RULE_VERSION}` : `Rule version: ${RUN_RULE_VERSION}`,
     ``,
     `> ${t(DEMO_NOTICE)}`,
     ``,
@@ -1356,7 +1364,7 @@ export function reportMarkdown(
     for (const item of missed) {
       const controls = joinAlt(
         locale,
-        item.controls.map((c) => t(c.text)),
+        item.controls.filter((c) => !c.checked).map((c) => t(c.text)),
       );
       lines.push(
         locale === "zh"

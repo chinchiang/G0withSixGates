@@ -69,6 +69,7 @@ export function Choice({
   children,
   className = "",
   role,
+  first = false,
 }: {
   active?: boolean;
   onClick: () => void;
@@ -76,6 +77,7 @@ export function Choice({
   className?: string;
   /** "radio"：放在 role="radiogroup" 裡的單選；預設是 aria-pressed 切換鈕。 "radio": single-select inside role="radiogroup"; the default is an aria-pressed toggle. */
   role?: "radio";
+  first?: boolean;
 }) {
   if (role === "radio") {
     return (
@@ -83,6 +85,22 @@ export function Choice({
         type="button"
         role="radio"
         aria-checked={!!active}
+        tabIndex={active || first ? 0 : -1}
+        onKeyDown={(event) => {
+          if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
+          const group = event.currentTarget.closest('[role="radiogroup"]');
+          const radios = Array.from(
+            group?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [],
+          );
+          const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+          const next =
+            radios[(radios.indexOf(event.currentTarget) + delta + radios.length) % radios.length];
+          if (next) {
+            event.preventDefault();
+            next.focus();
+            next.click();
+          }
+        }}
         onClick={onClick}
         className={`chip ${className}`}
       >

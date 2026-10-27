@@ -21,7 +21,8 @@
  * URL are recorded separately as external warnings; other errors still fail.
  */
 import assert from "node:assert/strict";
-import { request } from "node:http";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -72,6 +73,7 @@ async function openPage(browser, viewport, reducedMotion = "reduce") {
 /** 用原始 HTTP 送請求，才能送出沒有 content-length 的 chunked 本文。 */
 function send(path, { method = "GET", chunks = [], headers = {} } = {}) {
   return new Promise((resolve, reject) => {
+    const request = BASE.protocol === "https:" ? httpsRequest : httpRequest;
     const req = request(new URL(path, BASE), { method, headers }, (res) => {
       res.resume();
       res.on("end", () => resolve(res.statusCode));
@@ -157,6 +159,59 @@ try {
       await close();
     });
   }
+
+  if (BASE.protocol === "https:") {
+    await test("deployed HTTPS responses include the expected security headers", async () => {
+      const { page, close } = await openPage(browser, VIEWPORTS.desktop);
+      const response = await page.goto(url(), { waitUntil: "networkidle" });
+      assert.ok(response?.ok());
+      const headers = response.headers();
+      assert.match(headers["content-security-policy"] ?? "", /frame-ancestors 'self'/);
+      assert.doesNotMatch(headers["content-security-policy"] ?? "", /grok\.com/);
+      assert.equal(headers["x-content-type-options"], "nosniff");
+      assert.match(headers["strict-transport-security"] ?? "", /max-age=/);
+      const asset = await page.locator('link[rel="stylesheet"]').first().getAttribute("href");
+      assert.ok(asset, "missing stylesheet");
+      const assetResponse = await page.request.get(new URL(asset, BASE).href);
+      assert.ok(assetResponse.ok());
+      assert.equal(assetResponse.headers()["x-content-type-options"], "nosniff");
+      assert.ok(assetResponse.headers()["content-security-policy"]);
+      await close();
+    });
+  }
+
+  await test("production HTML does not load the Grok branding script", async () => {
+    const { page, close } = await openPage(browser, VIEWPORTS.desktop);
+    const requests = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(url(), { waitUntil: "networkidle" });
+    assert.equal(await page.locator('script[src*="grok-app-builder/extensions.js"]').count(), 0);
+    assert.ok(!requests.some((request) => request.includes("grok-app-builder/extensions.js")));
+    await close();
+  });
+
+  await test("language, radio keyboard and obsolete runs", async () => {
+    const { page, close } = await openPage(browser, VIEWPORTS.desktop);
+    await page.goto(url(), { waitUntil: "networkidle" });
+    await page.evaluate(() => {
+      localStorage.setItem("six-gate-locale", "en");
+      sessionStorage.setItem(
+        "six-gate-run-v1",
+        JSON.stringify({ version: 1, profile: {}, at: new Date().toISOString() }),
+      );
+    });
+    await page.goto(url("?view=harness&lang=zh"), { waitUntil: "networkidle" });
+    await page.getByText("先前結果的規則版本不符或資料損壞，請重新執行。").waitFor();
+    assert.equal(await page.locator("html").getAttribute("lang"), "zh-Hant-TW");
+    const group = page.getByRole("radiogroup", { name: "預設情境" });
+    const selected = group.getByRole("radio", { checked: true });
+    await selected.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await group.getByRole("radio", { checked: true }).count(), 1);
+    assert.equal(await group.locator('[role="radio"][tabindex="0"]').count(), 1);
+    assert.equal(await group.locator('[role="radio"]:focus').getAttribute("aria-checked"), "true");
+    await close();
+  });
 
   await test("harness: runs, stops back to the previous verdict, and stops to idle on the first run", async () => {
     // 要保留逐道亮起的動畫，才來得及在執行中按下停止。

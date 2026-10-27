@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { getRouteApi } from "@tanstack/react-router";
 import {
   DEFAULT_PROFILE,
+  RUN_RULE_VERSION,
   GATE_DOCS,
   parseProfile,
   type GateId,
@@ -65,6 +66,7 @@ interface AppState {
   replaceChecks: (next: Record<string, boolean>) => void;
   checkProgress: { done: number; total: number };
   run: HarnessRun | null;
+  invalidRun: boolean;
   /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 Latest verdict; the gates page uses it to show what each control catches. */
   plan: RunPlan | null;
   startRun: () => void;
@@ -82,6 +84,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [run, setRun] = useState<HarnessRun | null>(null);
+  const [invalidRun, setInvalidRun] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   // 沒有 ?lang= 時用上次記住的語系；伺服器端渲染一律先用預設。
   // Without ?lang= use the remembered locale; server rendering always starts with the default.
@@ -97,7 +100,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (isLocale(remembered)) setStoredLocale(remembered);
     const rememberedTheme = readString(THEME_KEY);
     if (isTheme(rememberedTheme)) setThemeState(rememberedTheme);
-    setRun(loadWithMigration(RUN_KEY, (raw) => parseRun(raw, parseProfile), null, sessionStore()));
+    const store = sessionStore();
+    const saved = readString(RUN_KEY, store);
+    const restored = loadWithMigration(RUN_KEY, (raw) => parseRun(raw, parseProfile), null, store);
+    setInvalidRun(saved !== null && restored === null);
+    setRun(restored);
     setHydrated(true);
   }, []);
 
@@ -111,7 +118,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (run) save(RUN_KEY, { profile: run.profile, at: run.at.toISOString() }, sessionStore());
+    if (run)
+      save(
+        RUN_KEY,
+        { profile: run.profile, at: run.at.toISOString(), version: RUN_RULE_VERSION },
+        sessionStore(),
+      );
     else remove(RUN_KEY, sessionStore());
   }, [run, hydrated]);
 
@@ -149,7 +161,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setStoredLocale(next);
         writeString(LOCALE_KEY, next);
         navigate({
-          search: (prev) => ({ ...prev, lang: next === DEFAULT_LOCALE ? undefined : next }),
+          search: (prev) => ({ ...prev, lang: next }),
         });
       },
       theme,
@@ -174,11 +186,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       replaceChecks: setChecks,
       checkProgress: { done, total },
       run,
+      invalidRun,
       plan,
-      startRun: () => setRun({ profile, at: new Date() }),
+      startRun: () => {
+        setInvalidRun(false);
+        setRun({ profile, at: new Date() });
+      },
       restoreRun: setRun,
     };
-  }, [view, gate, locale, theme, navigate, profile, checks, run, plan]);
+  }, [view, gate, locale, theme, navigate, profile, checks, run, invalidRun, plan]);
 
   return (
     <Ctx.Provider value={value}>
