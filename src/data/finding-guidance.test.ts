@@ -1,12 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { FINDING_CONTROLS, PRESETS } from "./model.ts";
+import { PRESETS } from "./model.ts";
+import { CATCH_REQUIREMENTS } from "./pipeline-gaps.ts";
 import { buildPlan, reportMarkdown } from "./engine.ts";
 import { FINDING_GUIDANCE, findingGuidance } from "./finding-guidance.ts";
 
 describe("actionable finding guidance", () => {
   it("covers every registered finding in both languages", () => {
-    assert.deepEqual(Object.keys(FINDING_GUIDANCE).sort(), Object.keys(FINDING_CONTROLS).sort());
+    assert.deepEqual(Object.keys(FINDING_GUIDANCE).sort(), Object.keys(CATCH_REQUIREMENTS).sort());
     for (const [id, guide] of Object.entries(FINDING_GUIDANCE)) {
       for (const locale of ["zh", "en"] as const) {
         assert.ok(guide.impact[locale].length > 15, `${id}: impact/${locale}`);

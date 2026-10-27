@@ -33,3 +33,7 @@ attachments/*.gif
 # Mutation-testing scratch and reports (npm run test:mutation)
 .stryker-tmp/
 reports/
+
+# 架構審視等本機報告草稿，不進版控
+# Local report drafts such as architecture reviews; never tracked
+scratch/

@@ -3,9 +3,6 @@ import assert from "node:assert/strict";
 import {
   agencyOpen,
   buildPlan,
-  catchingControls,
-  caughtBy,
-  coverage,
   escapeMarkdown,
   localDate,
   localStamp,
@@ -21,7 +18,6 @@ import {
 import {
   DEFECT_STATES,
   SOURCES,
-  FINDING_CONTROLS,
   GATE_DOCS,
   MITIGATIONS,
   PRESETS,
@@ -31,6 +27,7 @@ import {
   type Profile,
   type Sensitivity,
 } from "./model.ts";
+import { CATCH_REQUIREMENTS, catchRequirement, catchStatus } from "./pipeline-gaps.ts";
 
 // 時間相關的斷言固定在台灣時區，不受跑測試的機器影響。
 // Time assertions are pinned to Taiwan's time zone so they do not depend on the machine running them.
@@ -387,16 +384,20 @@ describe("invariants over every profile", () => {
     // Every finding that can appear has a catching control, and the map carries no stale entries.
     const controlIds = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
     for (const id of produced) {
-      const controls = catchingControls(id);
+      const { controls } = catchRequirement(id);
       assert.ok(controls.length > 0, `${id} has no catching control`);
       for (const item of controls)
         assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
     }
-    assert.deepEqual(Object.keys(FINDING_CONTROLS).sort(), [...produced].sort());
+    assert.deepEqual(Object.keys(CATCH_REQUIREMENTS).sort(), [...produced].sort());
 
     // 每個控制項不是攔得下某個發現，就是明確標成流程性控制項；兩者不重疊。
     // Every control either catches some finding or is explicitly a process control, never both.
-    const referenced = new Set(Object.values(FINDING_CONTROLS).flat());
+    const referenced = new Set(
+      Object.keys(CATCH_REQUIREMENTS).flatMap((id) =>
+        catchRequirement(id).controls.map((item) => item.id),
+      ),
+    );
     for (const doc of GATE_DOCS) {
       for (const item of doc.controls) {
         assert.notEqual(
@@ -406,65 +407,6 @@ describe("invariants over every profile", () => {
         );
       }
     }
-  });
-});
-
-describe("pipeline coverage", () => {
-  const plan = buildPlan(PRESETS.kb);
-
-  it("treats every finding as missed when nothing is checked", () => {
-    const result = coverage(plan, {});
-    assert.equal(result.length, plan.blockCount + plan.advisoryCount);
-    assert.ok(result.every((item) => !item.caught));
-  });
-
-  it("any one checked control covers a finding, including cross-gate pairs", () => {
-    const byId = new Map(
-      coverage(plan, { "g2-push": true, "g5-bola": true }).map((c) => [c.finding.id, c]),
-    );
-    assert.equal(byId.get("g2-key")?.caught, true);
-    assert.equal(byId.get("g4-bola")?.caught, true);
-    assert.equal(byId.get("g5-idor")?.caught, true);
-    assert.equal(byId.get("g3-xss")?.caught, false);
-    assert.deepEqual(
-      byId.get("g2-key")?.controls.map((c) => [c.id, c.checked]),
-      [
-        ["g2-hook", false],
-        ["g2-push", true],
-      ],
-    );
-  });
-
-  it("requires both threat-model controls and distinguishes injection tests", () => {
-    const one = coverage(plan, { "g0-dfd": true, "g6-indirect": true });
-    assert.equal(one.find((item) => item.finding.id === "g0-model")?.caught, false);
-    assert.equal(one.find((item) => item.finding.id === "g6-pi")?.caught, false);
-    assert.equal(one.find((item) => item.finding.id === "g6-indirect")?.caught, true);
-    const both = coverage(plan, { "g0-dfd": true, "g0-stride": true, "g6-direct": true });
-    assert.equal(both.find((item) => item.finding.id === "g0-model")?.caught, true);
-    assert.equal(both.find((item) => item.finding.id === "g6-pi")?.caught, true);
-  });
-
-  it("the release record lists only unchecked threat-model controls as missing", () => {
-    const record = reportMarkdown(
-      PRESETS.kb,
-      plan,
-      new Date("2026-10-04T02:00:00Z"),
-      { "g0-dfd": true },
-      "zh",
-    );
-    const line = record.split("\n").find((item) => item.includes("尚未文件化威脅模型：缺"));
-    assert.ok(line);
-    assert.ok(line.includes("STRIDE"));
-    assert.ok(!line.includes("資料流圖"));
-  });
-
-  it("finds what a control catches in the run", () => {
-    assert.deepEqual(
-      caughtBy(plan, "g5-bola").map((f) => f.id),
-      ["g4-bola", "g5-idor"],
-    );
-    assert.deepEqual(caughtBy(plan, "g1-sbom"), []);
   });
 });
 
@@ -512,7 +454,7 @@ describe("reportMarkdown", () => {
     assert.match(md, /程式狀態：剩縱深項/);
     assert.match(md, /## G3 靜態分析（白箱／警示）/);
     assert.doesNotMatch(md, /／(pass|block|advisory|na)）/);
-    assert.match(md, /你們的管線：已涵蓋（✓ G3 CSP/);
+    assert.match(md, /你們的管線：攔得下（✓ G3 CSP/);
     assert.match(md, /你們的管線：會漏掉（✗ G5 /);
     assert.match(md, /## 你們的管線缺口/);
     assert.match(md, /本次 2 個發現中，有 1 個可能會漏掉/);
@@ -531,7 +473,7 @@ describe("reportMarkdown", () => {
     assert.match(md, /- System: Remediated support knowledge base/);
     assert.match(md, /Design-time mitigations: Egress allow-list/);
     assert.match(md, /## G3 Static analysis \(White-box \/ Advisory\)/);
-    assert.match(md, /Your pipeline: covered \(✓ G3 CSP/);
+    assert.match(md, /Your pipeline: caught \(✓ G3 CSP/);
     assert.match(md, /1 of the 2 findings this run may slip through/);
     // 沒有殘留的中文。 No Chinese left over.
     assert.doesNotMatch(md, /[\u4e00-\u9fff]/);
@@ -615,13 +557,13 @@ describe("SSRF escalates the IMDSv2 gap", () => {
 });
 
 describe("the IDOR and alg:none are separate findings", () => {
-  it("a JWT test alone does not cover the two-account check", () => {
+  it("a JWT test alone does not catch the two-account bypass", () => {
     const plan = buildPlan(PRESETS.kb);
     assert.ok(ids(plan).includes("g5-idor"));
     assert.ok(ids(plan).includes("g5-jwt"));
-    const covered = coverage(plan, { "g5-jwt": true });
-    assert.equal(covered.find((item) => item.finding.id === "g5-jwt")?.caught, true);
-    assert.equal(covered.find((item) => item.finding.id === "g5-idor")?.caught, false);
+    const statuses = catchStatus(plan, { "g5-jwt": true });
+    assert.equal(statuses.find((item) => item.finding.id === "g5-jwt")?.caught, true);
+    assert.equal(statuses.find((item) => item.finding.id === "g5-idor")?.caught, false);
   });
 });
 

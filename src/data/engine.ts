@@ -1,12 +1,11 @@
 import { findingGuidance } from "./finding-guidance.ts";
+import { catchStatus, describeMissing } from "./pipeline-gaps.ts";
 import { bi, biList, joinAlt, pick, yesNo, type Bi, type Locale } from "../i18n/locale.ts";
 import {
   RUN_RULE_VERSION,
   DEFECT_LABEL,
   EXPOSURE_LABEL,
-  FINDING_CONTROLS,
   GATES,
-  GATE_DOCS,
   GATE_NAME,
   GATE_TRACK,
   MITIGATION_LABEL,
@@ -23,12 +22,13 @@ import {
 } from "./model.ts";
 
 /**
- * Harness 規則引擎（示範模擬，純函式）：分級、各閘門的發現、裁決、管線涵蓋、放行紀錄。
+ * Harness 規則引擎（示範模擬，純函式）：分級、各閘門的發現、裁決、放行紀錄。管線缺口在 `pipeline-gaps.ts`。
  * 所有文字都是 `Bi`，判定本身與語系無關。
  *
  * The Harness rule engine (a demo simulation, pure functions): level, per-gate
- * findings, the verdict, pipeline coverage and the release record. All text is
- * `Bi`; the decisions themselves do not depend on the locale.
+ * findings, the verdict and the release record; pipeline gaps live in
+ * `pipeline-gaps.ts`. All text is `Bi`; the decisions themselves do not depend
+ * on the locale.
  */
 
 export interface Finding {
@@ -792,8 +792,8 @@ export function buildPlan(p: Profile): RunPlan {
         cwe: bi("營運對照：CWE-639", "Operational reference: CWE-639"),
         asvs: bi("V8 授權", "V8 Authorization"),
       },
-      // 越權與 alg:none 是兩個發現：只做 JWT 測試不算涵蓋雙帳號越權。
-      // The IDOR and alg:none are separate findings: a JWT test alone does not cover the two-account check.
+      // 越權與 alg:none 是兩個發現：只做 JWT 測試攔不下雙帳號越權。
+      // The IDOR and alg:none are separate findings: a JWT test alone does not catch the two-account bypass.
       {
         id: "g5-jwt",
         gate: "G5",
@@ -1117,61 +1117,6 @@ export function buildPlan(p: Profile): RunPlan {
   };
 }
 
-export interface ControlRef {
-  id: string;
-  gate: GateId;
-  text: Bi;
-}
-
-const CONTROLS: Record<string, ControlRef> = Object.fromEntries(
-  GATE_DOCS.flatMap((doc) =>
-    doc.controls.map((item): [string, ControlRef] => [item.id, { ...item, gate: doc.id }]),
-  ),
-);
-
-/** 攔得下這個發現的控制項。 The controls that would catch this finding. */
-export function catchingControls(findingId: string): ControlRef[] {
-  return (FINDING_CONTROLS[findingId] ?? []).map((id) => CONTROLS[id]);
-}
-
-export interface Coverage {
-  finding: Finding;
-  controls: (ControlRef & { checked: boolean })[];
-  /** 控制組合全部滿足時才算涵蓋。 Covered only when a complete control combination is checked. */
-  caught: boolean;
-}
-
-/**
- * 用閘門頁的勾選（你們真實的管線）對照這次 Harness 的發現。
- * Compare this Harness run's findings against the gates-page checks (your real pipeline).
- */
-const CONTROL_GROUPS: Record<string, string[][]> = { "g0-model": [["g0-dfd", "g0-stride"]] };
-
-export function coverage(plan: RunPlan, checks: Record<string, boolean>): Coverage[] {
-  return plan.steps.flatMap((s) =>
-    s.findings.map((finding) => {
-      const controls = catchingControls(finding.id).map((item) => ({
-        ...item,
-        checked: Boolean(checks[item.id]),
-      }));
-      return {
-        finding,
-        controls,
-        caught: (CONTROL_GROUPS[finding.id] ?? controls.map((item) => [item.id])).some(
-          (group) => group.length > 0 && group.every((id) => Boolean(checks[id])),
-        ),
-      };
-    }),
-  );
-}
-
-/** 這次 Harness 裡，這個控制項攔得下哪些發現。 Which findings in this run the control would catch. */
-export function caughtBy(plan: RunPlan, controlId: string): Finding[] {
-  return plan.steps
-    .flatMap((s) => s.findings)
-    .filter((finding) => FINDING_CONTROLS[finding.id]?.includes(controlId));
-}
-
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
@@ -1233,7 +1178,7 @@ const R = {
   retest: bi("重新驗證條件", "Retest criteria"),
   fix: bi("修正方式", "Remediation"),
   yours: bi("你們的管線", "Your pipeline"),
-  covered: bi("已涵蓋", "covered"),
+  caught: bi("攔得下", "caught"),
   missed: bi("會漏掉", "would miss"),
   gaps: bi("## 你們的管線缺口", "## Your pipeline gaps"),
   gapsNote: bi(
@@ -1284,18 +1229,18 @@ export function reportMarkdown(
   const named = (text: string) => text.split(rawName).join(safeName);
   const ai = p.llm || p.agent;
   const tri = (value: boolean) => (ai ? yn(value) : t(NOT_APPLICABLE));
-  const covered = new Map(coverage(plan, checks).map((item) => [item.finding.id, item]));
-  const missed = [...covered.values()].filter((item) => !item.caught);
+  const statuses = new Map(catchStatus(plan, checks).map((item) => [item.finding.id, item]));
+  const missed = [...statuses.values()].filter((item) => !item.caught);
   const gapSummary =
-    covered.size === 0
+    statuses.size === 0
       ? t(R.noFindings)
       : missed.length === 0
         ? locale === "zh"
-          ? `- 本次 ${covered.size} 個發現，你們的管線都攔得下。`
-          : `- All ${covered.size} findings this run would be caught by your pipeline.`
+          ? `- 本次 ${statuses.size} 個發現，你們的管線都攔得下。`
+          : `- All ${statuses.size} findings this run would be caught by your pipeline.`
         : locale === "zh"
-          ? `- 本次 ${covered.size} 個發現中，有 ${missed.length} 個可能會漏掉：`
-          : `- ${missed.length} of the ${covered.size} findings this run may slip through:`;
+          ? `- 本次 ${statuses.size} 個發現中，有 ${missed.length} 個可能會漏掉：`
+          : `- ${missed.length} of the ${statuses.size} findings this run may slip through:`;
 
   const lines: string[] = [
     t(R.title),
@@ -1342,15 +1287,15 @@ export function reportMarkdown(
       lines.push(`  - ${t(R.fix)}${colon}${t(item.fix)}`);
       lines.push(`  - ${t(R.retest)}${colon}${t(guidance.retest)}`);
       lines.push(`  - ${t(item.tool)}｜${t(item.asvs)}｜${t(item.cwe)}`);
-      const cov = covered.get(item.id);
-      if (cov) {
-        const marks = cov.controls
+      const status = statuses.get(item.id);
+      if (status) {
+        const marks = status.controls
           .map((c) => `${c.checked ? "✓" : "✗"} ${c.gate} ${t(c.text)}`)
           .join(semi);
         lines.push(
           locale === "zh"
-            ? `  - ${t(R.yours)}：${t(cov.caught ? R.covered : R.missed)}（${marks}）`
-            : `  - ${t(R.yours)}: ${t(cov.caught ? R.covered : R.missed)} (${marks})`,
+            ? `  - ${t(R.yours)}：${t(status.caught ? R.caught : R.missed)}（${marks}）`
+            : `  - ${t(R.yours)}: ${t(status.caught ? R.caught : R.missed)} (${marks})`,
         );
       }
     }
@@ -1362,13 +1307,10 @@ export function reportMarkdown(
   lines.push(gapSummary);
   if (missed.length > 0) {
     for (const item of missed) {
-      const controls = joinAlt(
-        locale,
-        item.controls.filter((c) => !c.checked).map((c) => t(c.text)),
-      );
+      const controls = describeMissing(item, locale);
       lines.push(
         locale === "zh"
-          ? `  - ${item.finding.gate} ${t(item.finding.title)}：缺 ${controls}`
+          ? `  - ${item.finding.gate} ${t(item.finding.title)}：缺${controls}`
           : `  - ${item.finding.gate} ${t(item.finding.title)}: missing ${controls}`,
       );
     }

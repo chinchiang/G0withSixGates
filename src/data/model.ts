@@ -828,41 +828,6 @@ export const GATE_DOCS: GateDoc[] = [
   },
 ];
 
-/**
- * Harness 每個發現對應的控制項；威脅模型須同時具備資料流與風險盤點。
- * 跨閘門的配對（例如 G5 雙帳號測試也攔得下 G4 的越權）照對照表列入。
- *
- * Controls related to each finding. Threat modeling requires both data-flow and risk analysis. Cross-gate pairs (G5's
- * two-account test also catches G4's authorization gap) follow the map.
- */
-export const FINDING_CONTROLS: Record<string, string[]> = {
-  "g0-tri": ["g0-tri"],
-  "g0-model": ["g0-dfd", "g0-stride"],
-  "g1-slop": ["g1-exist"],
-  "g1-hook": ["g1-hook", "g1-cool"],
-  "g1-cool": ["g1-cool", "g1-typo"],
-  "g2-key": ["g2-hook", "g2-push"],
-  "g2-hist": ["g2-hist"],
-  "g3-xss": ["g3-taint", "g6-xss"],
-  "g3-cmd": ["g3-param"],
-  "g3-imds": ["g3-iac"],
-  "g3-csp": ["g3-csp"],
-  "g4-bola": ["g4-owner", "g4-rls", "g4-depth", "g5-bola"],
-  "g4-pii": ["g4-pii"],
-  "g4-tool": ["g4-hitl"],
-  "g4-rules": ["g4-rules"],
-  "g5-idor": ["g5-bola"],
-  "g5-jwt": ["g5-jwt"],
-  "g5-ssrf": ["g5-ssrf"],
-  "g5-mfa": ["g5-mfa"],
-  "g5-debug": ["g5-debug"],
-  "g5-rate": ["g5-rate"],
-  "g6-pi": ["g6-direct"],
-  "g6-indirect": ["g6-indirect"],
-  "g6-dow": ["g6-dow"],
-  "g6-tri": ["g0-tri"],
-};
-
 export interface MaestroRow {
   layer: string;
   name: Bi;
