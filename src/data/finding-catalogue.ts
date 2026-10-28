@@ -795,3 +795,22 @@ export function finding<K extends FindingId>(
   const { depth: _depth, variants, ...text }: CatalogueEntry = FINDING_CATALOGUE[id];
   return { id, severity, ...text, ...(variant ? variants?.[variant as string] : undefined) };
 }
+
+/**
+ * 發現卡與放行紀錄共用的欄位，固定順序；排版與標點由各自決定。
+ * The fields the finding card and the release record share, in a fixed order; each side does its own layout and punctuation.
+ */
+export function findingRows(item: Finding): { label: Bi; value: Bi }[] {
+  return [
+    { label: bi("問題原因", "Cause"), value: item.detail },
+    { label: bi("可能影響", "Potential impact"), value: item.impact },
+    { label: bi("示範證據", "Demo evidence"), value: item.evidence },
+    { label: bi("修正方式", "Remediation"), value: item.fix },
+    { label: bi("重新驗證條件", "Retest criteria"), value: item.retest },
+  ];
+}
+
+/** 發現的參考資訊：工具、ASVS、CWE。 A finding's references: tool, ASVS, CWE. */
+export function findingRefs(item: Finding): Bi[] {
+  return [item.tool, item.asvs, item.cwe];
+}

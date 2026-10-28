@@ -8,7 +8,8 @@ import {
   reportFileName,
   reportMarkdown,
 } from "@/data/engine";
-import { catchStatus, describeMissing, type CatchStatus } from "@/data/pipeline-gaps";
+import { catchStatus, describeMissing, gapSummary, type CatchStatus } from "@/data/pipeline-gaps";
+import { findingRefs, findingRows } from "@/data/finding-catalogue";
 import { useApp } from "@/components/app-state";
 import { STALE_NOTICE } from "@/components/harness-run";
 import { GettingStarted } from "@/components/getting-started";
@@ -76,8 +77,8 @@ const T = {
   checked: bi("（已勾選）", " (checked)"),
   unchecked: bi("（未勾選）", " (unchecked)"),
   gapsEyebrow: bi("你們的管線缺口", "Your pipeline gaps"),
-  noFindings: bi("本次沒有發現項", "No findings this run"),
-  missing: bi("缺", "Missing"),
+  // 中文直接接引號，英文接冒號。 Chinese runs straight into the quotes; English takes a colon.
+  missing: bi("缺", "Missing: "),
   gapsNote: bi(
     "依閘門頁的勾選估算：勾選代表你們真實的管線已有該控制。點一項就會打開對應的閘門清單。",
     "Estimated from the gates-page checks: a check means your real pipeline has that control. Click an item to open its gate checklist.",
@@ -448,22 +449,14 @@ function FindingCard({
         className="space-y-3 border-t border-line px-3 py-3 text-sm leading-6 text-muted"
       >
         <dl className="finding-guidance">
-          {[
-            { label: bi("問題原因", "Cause"), value: finding.detail },
-            { label: bi("可能影響", "Potential impact"), value: finding.impact },
-            { label: bi("示範證據", "Demo evidence"), value: finding.evidence },
-            { label: bi("修正方式", "Remediation"), value: finding.fix },
-            { label: bi("重新驗證條件", "Retest criteria"), value: finding.retest },
-          ].map((row) => (
+          {findingRows(finding).map((row) => (
             <div key={row.label.en}>
               <dt className="text-xs font-semibold text-fg">{t(row.label)}</dt>
               <dd className="mt-1">{t(row.value)}</dd>
             </div>
           ))}
         </dl>
-        <p className="font-mono text-xs text-faint">
-          {t(finding.tool)} · {t(finding.asvs)} · {t(finding.cwe)}
-        </p>
+        <p className="font-mono text-xs text-faint">{findingRefs(finding).map(t).join(" · ")}</p>
         {status.controls.length > 0 && (
           <div>
             <p className="text-xs text-muted">
@@ -519,24 +512,8 @@ function GapPanel({
 }) {
   const { locale } = useApp();
   const t = useT();
-  const title =
-    statuses.length === 0
-      ? t(T.noFindings)
-      : missed.length === 0
-        ? t(
-            bi(
-              `本次 ${statuses.length} 個發現，你們的管線都攔得下`,
-              `All ${statuses.length} findings this run would be caught by your pipeline`,
-            ),
-          )
-        : t(
-            bi(
-              `本次 ${statuses.length} 個發現中，有 ${missed.length} 個可能會漏掉`,
-              `${missed.length} of the ${statuses.length} findings this run may slip through`,
-            ),
-          );
   return (
-    <Panel eyebrow={t(T.gapsEyebrow)} title={title}>
+    <Panel eyebrow={t(T.gapsEyebrow)} title={t(gapSummary(statuses))}>
       {missed.length > 0 && (
         <ul className="space-y-2">
           {missed.map((status) => (
@@ -551,7 +528,8 @@ function GapPanel({
                   {t(status.finding.title)}
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-muted">
-                  {t(T.missing)}: {describeMissing(status, locale)}
+                  {t(T.missing)}
+                  {describeMissing(status, locale)}
                 </span>
               </button>
             </li>

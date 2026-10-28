@@ -7,6 +7,7 @@ import {
   catchStatus,
   describeMissing,
   findingsCaughtWith,
+  gapSummary,
 } from "./pipeline-gaps.ts";
 
 const CONTROL_IDS = GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id));
@@ -75,6 +76,38 @@ describe("pipeline gaps", () => {
       describeMissing(key, "en"),
       /^“[^”]+gitleaks[^”]+” \/ “Remote push protection[^”]+”$/,
     );
+  });
+
+  it("sums up the run without trailing punctuation", () => {
+    const allChecked = Object.fromEntries(CONTROL_IDS.map((id) => [id, true]));
+    assert.deepEqual(gapSummary([]), {
+      zh: "本次沒有發現項",
+      en: "No findings this run",
+    });
+    assert.deepEqual(gapSummary(catchStatus(plan, allChecked)), {
+      zh: "本次 14 個發現，你們的管線都攔得下",
+      en: "All 14 findings this run would be caught by your pipeline",
+    });
+    assert.deepEqual(gapSummary(catchStatus(plan, { "g2-push": true, "g5-bola": true })), {
+      zh: "本次 14 個發現中，有 11 個可能會漏掉",
+      en: "11 of the 14 findings this run may slip through",
+    });
+  });
+
+  it("ends the release record's summary with a full stop, or a colon before the misses", () => {
+    const allChecked = Object.fromEntries(CONTROL_IDS.map((id) => [id, true]));
+    const at = new Date("2026-10-04T02:00:00Z");
+    for (const locale of ["zh", "en"] as const) {
+      const [stop, colon] = locale === "zh" ? ["。", "："] : [".", ":"];
+      for (const [checks, end] of [
+        [allChecked, stop],
+        [{}, colon],
+      ] as const) {
+        const record = reportMarkdown(PRESETS.kb, plan, at, checks, locale).split("\n");
+        const summary = gapSummary(catchStatus(plan, checks))[locale];
+        assert.ok(record.includes(`- ${summary}${end}`), `${locale} ${end}`);
+      }
+    }
   });
 
   it("the release record lists only unchecked threat-model controls as missing", () => {

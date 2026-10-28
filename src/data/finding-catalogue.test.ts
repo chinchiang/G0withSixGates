@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { PRESETS } from "./model.ts";
 import { buildPlan, reportMarkdown } from "./engine.ts";
-import { FINDING_CATALOGUE, finding, type FindingId } from "./finding-catalogue.ts";
+import { FINDING_CATALOGUE, finding, findingRows, type FindingId } from "./finding-catalogue.ts";
 
 const TEXT = ["title", "detail", "evidence", "fix", "tool", "cwe", "asvs", "impact", "retest"];
 
@@ -44,15 +44,30 @@ describe("finding catalogue", () => {
     assert.match(retest("g4-bola"), /兩個不同帳號/);
     assert.match(retest("g5-jwt"), /過期權杖都被拒絕/);
   });
-  it("retains causes, impacts and retest criteria in both downloaded records", () => {
+  it("lists cause, impact, evidence, fix and retest in that order", () => {
+    const item = finding("g2-key", "block", "ai");
+    assert.deepEqual(
+      findingRows(item).map((row) => [row.label.zh, row.label.en, row.value]),
+      [
+        ["問題原因", "Cause", item.detail],
+        ["可能影響", "Potential impact", item.impact],
+        ["示範證據", "Demo evidence", item.evidence],
+        ["修正方式", "Remediation", item.fix],
+        ["重新驗證條件", "Retest criteria", item.retest],
+      ],
+    );
+  });
+  it("puts every row's label and value in both downloaded records", () => {
     const profile = PRESETS.platform;
     const plan = buildPlan(profile);
     for (const locale of ["zh", "en"] as const) {
       const record = reportMarkdown(profile, plan, new Date("2026-10-16T04:00:00Z"), {}, locale);
+      const colon = locale === "zh" ? "：" : ": ";
       for (const item of plan.steps.flatMap((step) => step.findings)) {
-        assert.ok(record.includes(item.detail[locale]), item.id);
-        assert.ok(record.includes(item.impact[locale]), item.id);
-        assert.ok(record.includes(item.retest[locale]), item.id);
+        for (const row of findingRows(item)) {
+          const line = `  - ${row.label[locale]}${colon}${row.value[locale]}`;
+          assert.ok(record.split("\n").includes(line), `${item.id} / ${row.label.en} / ${locale}`);
+        }
       }
     }
   });
