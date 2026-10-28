@@ -30,10 +30,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      # 格式與正式相依套件的已知高風險漏洞。
-      # Formatting, and known high-severity vulnerabilities in production dependencies.
+      # 格式與正式相依套件的已知高風險漏洞；放行的公告與理由在 scripts/audit-allowlist.mjs。
+      # Formatting, and known high-severity vulnerabilities in production dependencies; allowed
+      # advisories and their reasons live in scripts/audit-allowlist.mjs.
       - run: npm run format:check
-      - run: npm audit --omit=dev --audit-level=high
+      - run: node scripts/audit-gate.mjs
       - run: npm test
       # 建置會接著跑 db:migrate；沒有 DATABASE_URL 時 migrate 腳本會略過。
       # build chains db:migrate; without DATABASE_URL the migrate script skips.
