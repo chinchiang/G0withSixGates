@@ -70,6 +70,20 @@ async function openPage(browser, viewport, reducedMotion = "reduce") {
   return { page, errors, close: () => context.close() };
 }
 
+/**
+ * 等水合後的副作用跑完。設定只在水合後才存進 localStorage，而且和 `saveRun` 屬於同一批副作用，
+ * 所以在全新的瀏覽器環境裡，這個鍵一出現就代表副作用都跑過了；之後重新載入時鍵已存在，不能再拿來等。
+ * 在這之前寫進 storage 的資料，會被讀走或被 `saveRun(null)` 刪掉。
+ *
+ * Wait for the post-hydration effects. The profile is saved to localStorage only after hydration, in
+ * the same batch of effects as `saveRun`, so in a fresh browser context the key appearing means they
+ * have all run; after a reload the key already exists and cannot be waited on. Storage written before
+ * this point is read or removed by `saveRun(null)`.
+ */
+async function waitForHydration(page) {
+  await page.waitForFunction(() => localStorage.getItem("six-gate-profile-v1") !== null);
+}
+
 /** 用原始 HTTP 送請求，才能送出沒有 content-length 的 chunked 本文。 */
 function send(path, { method = "GET", chunks = [], headers = {} } = {}) {
   return new Promise((resolve, reject) => {
@@ -108,6 +122,9 @@ try {
       const { page, errors, close } = await openPage(browser, viewport);
       for (const view of VIEWS) {
         await page.goto(url(`?view=${view}&lang=en`), { waitUntil: "networkidle" });
+        // 伺服器端一律渲染 zh-Hant-TW，`<html lang>` 由水合後的副作用改；等它改了再斷言。
+        // The server always renders zh-Hant-TW and a post-hydration effect sets `<html lang>`; wait for it.
+        await page.waitForFunction(() => document.documentElement.lang !== "zh-Hant-TW");
         assert.equal(await page.getAttribute("html", "lang"), "en", view);
         const main = await page.locator("main").innerText();
         assert.ok(/[A-Za-z]{4,}/.test(main), `${view} has no English text`);
@@ -193,6 +210,7 @@ try {
   await test("language, radio keyboard and obsolete runs", async () => {
     const { page, close } = await openPage(browser, VIEWPORTS.desktop);
     await page.goto(url(), { waitUntil: "networkidle" });
+    await waitForHydration(page);
     await page.evaluate(() => {
       localStorage.setItem("six-gate-locale", "en");
       sessionStorage.setItem(
