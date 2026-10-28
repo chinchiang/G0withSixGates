@@ -12,7 +12,6 @@ import { catchStatus, describeMissing, type CatchStatus } from "@/data/pipeline-
 import { useApp } from "@/components/app-state";
 import { STALE_NOTICE } from "@/components/harness-run";
 import { GettingStarted } from "@/components/getting-started";
-import { findingGuidance } from "@/data/finding-guidance";
 import { ProfileForm } from "@/components/profile-form";
 import { Badge, GhostButton, Panel, TextButton } from "@/components/ui";
 import { bi } from "@/i18n/locale";
@@ -68,7 +67,7 @@ const T = {
     "預設情境是對外客服知識庫。「已整治的客服知識庫」只剩縱深警示，會得到有條件放行；程式狀態改成「已整治」才會完全放行。高權限平台在 G0 就被三要素擋下，要切斷三要素並加上人工核可。",
     'The default scenario is the public support knowledge base. "Remediated support knowledge base" has only depth advisories left and gets a conditional release; set the code state to "Remediated" for a full release. The high-privilege platform is stopped at G0 by the trifecta; cut it and add human approval.',
   ),
-  running: bi("執行中", "Running"),
+  revealing: bi("揭示中", "Revealing"),
   waiting: bi("等待", "Waiting"),
   caught: bi("管線攔得下", "Pipeline catches it"),
   missed: bi("管線會漏掉", "Pipeline would miss it"),
@@ -369,7 +368,7 @@ export function HarnessView() {
                       {shown ? (
                         <Badge tone={item.status}>{t(STATUS_LABEL[item.status])}</Badge>
                       ) : (
-                        <Badge tone="neutral">{current ? t(T.running) : t(T.waiting)}</Badge>
+                        <Badge tone="neutral">{current ? t(T.revealing) : t(T.waiting)}</Badge>
                       )}
                     </span>
                   </div>
@@ -421,7 +420,6 @@ function FindingCard({
 }) {
   const t = useT();
   const { finding } = status;
-  const guidance = findingGuidance(finding.id);
   return (
     <div className="finding-card rounded-md border border-line bg-bg">
       <button
@@ -452,10 +450,10 @@ function FindingCard({
         <dl className="finding-guidance">
           {[
             { label: bi("問題原因", "Cause"), value: finding.detail },
-            { label: bi("可能影響", "Potential impact"), value: guidance.impact },
+            { label: bi("可能影響", "Potential impact"), value: finding.impact },
             { label: bi("示範證據", "Demo evidence"), value: finding.evidence },
             { label: bi("修正方式", "Remediation"), value: finding.fix },
-            { label: bi("重新驗證條件", "Retest criteria"), value: guidance.retest },
+            { label: bi("重新驗證條件", "Retest criteria"), value: finding.retest },
           ].map((row) => (
             <div key={row.label.en}>
               <dt className="text-xs font-semibold text-fg">{t(row.label)}</dt>

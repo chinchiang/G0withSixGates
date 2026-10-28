@@ -54,6 +54,11 @@ Harness 一次執行中某道閘門指出的一個示範問題，帶有嚴重度
 A demo problem one gate reports in a Harness run, with a severity and evidence.
 _Avoid_：問題（issue）、漏洞（vulnerability）
 
+**縱深項（depth item）**：
+屬於縱深防禦的發現，例如 IMDSv2、CSP 強制與速率限制；L1／L2 只警示，L3 升為阻擋。若有更直接的風險，例如 SSRF 打得到中繼資料、公開端點完全沒有配額，就不分等級阻擋。
+A finding that belongs to defense in depth, such as IMDSv2, an enforced CSP or rate limits; L1 / L2 only warn and L3 escalates it to a block. With a more direct risk, such as an SSRF that reaches instance metadata or a public endpoint with no quota at all, it blocks at every level.
+_Avoid_：次要項（minor item）、低風險項（low-risk item）
+
 **控制項（control）**：
 閘門清單上的一項防護措施；勾選代表使用者真實的管線已具備它。
 One safeguard on a gate's checklist; checking it means the user's real pipeline has it.

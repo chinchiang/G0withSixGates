@@ -52,10 +52,6 @@ describe("pipeline gaps", () => {
     assert.equal(both.get("g6-pi")?.caught, true);
   });
 
-  it("never catches an unregistered finding", () => {
-    assert.deepEqual(catchRequirement("no-such-finding"), { mode: "any", controls: [] });
-  });
-
   it("lists missing all-of controls and offers any-of controls as alternatives", () => {
     const none = byId({});
     const model = none.get("g0-model");

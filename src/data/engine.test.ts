@@ -27,7 +27,8 @@ import {
   type Profile,
   type Sensitivity,
 } from "./model.ts";
-import { CATCH_REQUIREMENTS, catchRequirement, catchStatus } from "./pipeline-gaps.ts";
+import { FINDING_CATALOGUE, type FindingId } from "./finding-catalogue.ts";
+import { catchRequirement, catchStatus } from "./pipeline-gaps.ts";
 
 // 時間相關的斷言固定在台灣時區，不受跑測試的機器影響。
 // Time assertions are pinned to Taiwan's time zone so they do not depend on the machine running them.
@@ -342,10 +343,11 @@ describe("gaps found by mutation testing", () => {
 
 describe("invariants over every profile", () => {
   it("holds for all combinations", () => {
-    const DEPTH = new Set(["g3-imds", "g3-csp", "g4-rules", "g5-rate", "g6-dow"]);
+    const catalogued = Object.keys(FINDING_CATALOGUE) as FindingId[];
+    const DEPTH = new Set(catalogued.filter((id) => "depth" in FINDING_CATALOGUE[id]));
     let count = 0;
     let passWithModel = 0;
-    const produced = new Set<string>();
+    const produced = new Set<FindingId>();
     for (const p of everyProfile()) {
       count++;
       const plan = buildPlan(p);
@@ -380,8 +382,8 @@ describe("invariants over every profile", () => {
     assert.equal(count, 3 * 3 * 8 * 3 * 1024);
     assert.ok(passWithModel > 0, "a public LLM system must be able to pass");
 
-    // 每個可能出現的發現都有控制項攔得下，對照表也沒有過期的條目。
-    // Every finding that can appear has a catching control, and the map carries no stale entries.
+    // 每個可能出現的發現都有控制項攔得下；目錄裡也沒有永遠不會出現的條目。
+    // Every finding that can appear has a catching control, and the catalogue has no entry that never appears.
     const controlIds = new Set(GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)));
     for (const id of produced) {
       const { controls } = catchRequirement(id);
@@ -389,14 +391,12 @@ describe("invariants over every profile", () => {
       for (const item of controls)
         assert.ok(item && controlIds.has(item.id), `${id} maps to an unknown control`);
     }
-    assert.deepEqual(Object.keys(CATCH_REQUIREMENTS).sort(), [...produced].sort());
+    assert.deepEqual(catalogued.sort(), [...produced].sort());
 
     // 每個控制項不是攔得下某個發現，就是明確標成流程性控制項；兩者不重疊。
     // Every control either catches some finding or is explicitly a process control, never both.
     const referenced = new Set(
-      Object.keys(CATCH_REQUIREMENTS).flatMap((id) =>
-        catchRequirement(id).controls.map((item) => item.id),
-      ),
+      catalogued.flatMap((id) => catchRequirement(id).controls.map((item) => item.id)),
     );
     for (const doc of GATE_DOCS) {
       for (const item of doc.controls) {
