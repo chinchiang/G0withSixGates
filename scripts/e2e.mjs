@@ -214,7 +214,7 @@ try {
   });
 
   await test("harness: runs, stops back to the previous verdict, and stops to idle on the first run", async () => {
-    // 要保留逐道亮起的動畫，才來得及在執行中按下停止。
+    // 要保留逐道揭示，才來得及在揭示中按下停止。
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop, "no-preference");
     await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
     const verdict = page.getByText("不准放行。");

@@ -1,6 +1,7 @@
 import { joinAlt, joinList, pick, quote, type Bi, type Locale } from "../i18n/locale.ts";
 import { GATE_DOCS, type GateId } from "./model.ts";
-import type { Finding, RunPlan } from "./engine.ts";
+import type { Finding, FindingId } from "./finding-catalogue.ts";
+import type { RunPlan } from "./engine.ts";
 
 /**
  * 管線缺口：用閘門頁的勾選（你們真實的管線）對照 Harness 的發現。
@@ -15,15 +16,13 @@ type CatchRule = { readonly all: readonly string[] } | { readonly any: readonly 
 
 /**
  * 每個發現的攔截條件：`any` 任一勾選即攔下，`all` 須全部勾選。威脅模型須同時具備資料流與風險盤點。
- * 跨閘門的配對（例如 G5 雙帳號測試也攔得下 G4 的越權）照對照表列入。
- * 匯出只為了讓測試比對 id 清單；其他模組請用下方的函式。
+ * 跨閘門的配對（例如 G5 雙帳號測試也攔得下 G4 的越權）照對照表列入。型別保證每個發現都有一條。
  *
  * Each finding's catch requirement: `any` is caught by one checked control, `all` needs every one.
  * Threat modeling requires both data-flow and risk analysis. Cross-gate pairs (G5's two-account
- * test also catches G4's authorization gap) follow the map. Exported only so tests can compare id
- * lists; other modules use the functions below.
+ * test also catches G4's authorization gap) follow the map. The type guarantees one per finding.
  */
-export const CATCH_REQUIREMENTS: Record<string, CatchRule> = {
+const CATCH_REQUIREMENTS: Record<FindingId, CatchRule> = {
   "g0-tri": { any: ["g0-tri"] },
   "g0-model": { all: ["g0-dfd", "g0-stride"] },
   "g1-slop": { any: ["g1-exist"] },
@@ -68,13 +67,9 @@ export interface CatchRequirement {
   controls: ControlRef[];
 }
 
-/**
- * 一個發現的攔截條件。未登錄的發現沒有控制項，永遠不算攔下。
- * A finding's catch requirement. An unregistered finding has no controls and is never caught.
- */
-export function catchRequirement(findingId: string): CatchRequirement {
+/** 一個發現的攔截條件。 A finding's catch requirement. */
+export function catchRequirement(findingId: FindingId): CatchRequirement {
   const rule = CATCH_REQUIREMENTS[findingId];
-  if (!rule) return { mode: "any", controls: [] };
   return "all" in rule
     ? { mode: "all", controls: rule.all.map((id) => CONTROLS[id]) }
     : { mode: "any", controls: rule.any.map((id) => CONTROLS[id]) };

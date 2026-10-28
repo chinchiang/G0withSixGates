@@ -81,6 +81,7 @@ flowchart TB
         BI["src/i18n/locale.ts<br/>Bi＝{ zh, en }<br/>bi()・pick()・joinList()"]
         MODEL["src/data/model.ts<br/>閘門・控制項・ASVS・預設情境<br/>gates・controls・presets<br/>全部 Bi all bilingual"]
         ENGINE["src/data/engine.ts<br/>示範模擬 demo simulation<br/>recommendLevel → buildPlan<br/>→ 裁決 verdict"]
+        CATALOGUE["src/data/finding-catalogue.ts<br/>發現目錄 finding catalogue<br/>FindingId・文案 text・縱深項 depth items"]
         GAPS["src/data/pipeline-gaps.ts<br/>攔截條件 catch requirements<br/>catchStatus → 管線缺口 pipeline gaps"]
     end
 
@@ -109,8 +110,8 @@ flowchart TB
    `AppStateProvider` reads and writes the URL params, persists to localStorage (including the `vibegate-*` migration) through `storage.ts`, and hands the locale to `LocaleProvider`. The Harness run, its reveal, Stop, staleness and the sessionStorage record live in `harness-run.ts`; views read them through `useApp().harness`.
 4. **介面 UI**：`AppShell` 提供導覽、中文／EN 切換與淺色／深色主題切換；在「管線」畫面按下執行 Harness，`ProfileForm` 的設定交回狀態層。
    `AppShell` provides navigation, the 中文 / EN switch and the light / dark theme toggle; pressing Run on the Pipeline view sends the `ProfileForm` settings back to state.
-5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決；`pipeline-gaps.ts` 的 `catchStatus` 依各發現的攔截條件對照閘門頁勾選，算出管線缺口；內容全部來自 `model.ts` 的雙語 `Bi`。
-   `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict; `catchStatus` in `pipeline-gaps.ts` checks each finding's catch requirement against the gates-page checks to find pipeline gaps; all content is bilingual `Bi` from `model.ts`.
+5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決，只決定出現哪些發現與嚴重度，發現的文案、影響與重新驗證條件都在發現目錄 `finding-catalogue.ts`；`pipeline-gaps.ts` 的 `catchStatus` 依各發現的攔截條件對照閘門頁勾選，算出管線缺口；內容全部來自 `model.ts` 的雙語 `Bi`。
+   `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict, deciding only which findings appear and how severe; each finding's text, impact and retest criteria live in the finding catalogue `finding-catalogue.ts`; `catchStatus` in `pipeline-gaps.ts` checks each finding's catch requirement against the gates-page checks to find pipeline gaps; all content is bilingual `Bi` from `model.ts`.
 6. **輸出 Output**：`reportMarkdown(…, locale)` 依目前語系產生 `six-gate-release-YYYY-MM-DD.md` 供下載；日期與時間用使用者所在時區，設定在執行後改過時會加註。
    `reportMarkdown(…, locale)` writes `six-gate-release-YYYY-MM-DD.md` in the current locale for download; the date and time are in the viewer's time zone, and a note is added when the settings changed after the run.
 
@@ -135,13 +136,13 @@ View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`
 
 ## 雙語怎麼做 / How the bilingual UI works
 
-所有顯示文字都是 `Bi = { zh, en }`（`src/i18n/locale.ts`）。內容（`model.ts`）、規則引擎輸出（`engine.ts` 的發現、日誌、裁決、放行紀錄）與各畫面頂端的 `T` 字典全部成對儲存，型別會強制兩種語言都有。畫面用 `useT()` 取字；`reportMarkdown` 多一個 `locale` 參數。語系來源依序是網址 `?lang=`、localStorage、預設中文，切換時同步 `<html lang>`。
+所有顯示文字都是 `Bi = { zh, en }`（`src/i18n/locale.ts`）。內容（`model.ts`）、發現目錄（`finding-catalogue.ts`）、規則引擎輸出（`engine.ts` 的日誌、裁決、放行紀錄）與各畫面頂端的 `T` 字典全部成對儲存，型別會強制兩種語言都有。畫面用 `useT()` 取字；`reportMarkdown` 多一個 `locale` 參數。語系來源依序是網址 `?lang=`、localStorage、預設中文，切換時同步 `<html lang>`。
 
-Every display string is a `Bi = { zh, en }` (`src/i18n/locale.ts`). Content (`model.ts`), rule-engine output (findings, logs, verdicts and the release record in `engine.ts`) and the per-view `T` dictionaries are all stored as pairs, and the type forces both languages. Views call `useT()`; `reportMarkdown` takes an extra `locale` argument. The locale comes from `?lang=` in the URL, then localStorage, then the Chinese default, and `<html lang>` follows it.
+Every display string is a `Bi = { zh, en }` (`src/i18n/locale.ts`). Content (`model.ts`), the finding catalogue (`finding-catalogue.ts`), rule-engine output (logs, verdicts and the release record in `engine.ts`) and the per-view `T` dictionaries are all stored as pairs, and the type forces both languages. Views call `useT()`; `reportMarkdown` takes an extra `locale` argument. The locale comes from `?lang=` in the URL, then localStorage, then the Chinese default, and `<html lang>` follows it.
 
 ## Harness 的規則 / Harness rules
 
-規則都在 `src/data/engine.ts`（管線缺口在 `src/data/pipeline-gaps.ts`），重點如下：
+規則都在 `src/data/engine.ts`（發現的文字在 `src/data/finding-catalogue.ts`，管線缺口在 `src/data/pipeline-gaps.ts`），重點如下：
 
 - **分級**：高衝擊領域（金流、醫療核心、關鍵基礎設施）、對外且有個資、致命三要素未切斷、破壞性工具沒有人工核可，任一項成立就是 L3；有個資或業務資料、有 LLM、超出內部使用或有 Agent 則是 L2；其餘 L1。
 - **致命三要素**（私有資料、不受信任內容、對外通訊）只在有 LLM 或 Agent 時成立。沙箱或出向允許清單不保證切斷一腳；應驗證限制後調整對應能力，人工核可不算。未切斷時 G0 與 G6 都阻擋。表單會停用目前沒有作用的能力（例如沒有 LLM 或 Agent 時的三要素開關），判斷由規則引擎的 `settingsThatApply` 提供；沙箱與出向允許清單仍可切換，讓使用者親手確認它們不改變裁決。
@@ -150,11 +151,11 @@ Every display string is a `Bi = { zh, en }` (`src/i18n/locale.ts`). Content (`mo
 - **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，有 Web 表面的專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
 - **SSRF 升級**：程式仍有缺陷、有 Web 表面、有 LLM 或 Agent 且能對外通訊，時，G5 的抓取工具會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
 - **越權與 `alg:none` 是兩個發現**：只做 JWT 測試攔不下雙帳號越權。
-- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額）一律升為阻擋；L1／L2 只警示。公開端點完全沒有配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
+- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額；目錄以 `depth: true` 標記）一律升為阻擋；L1／L2 只警示。公開端點完全沒有配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
 - **未文件化的威脅模型**在 L3 阻擋，其他等級警示。
-- **管線缺口**：每個發現都有一條攔截條件（`CATCH_REQUIREMENTS`），標明任一（`any`）或全部（`all`）控制項勾選才算攔下；多數項目任一即可，威脅模型須同時勾選資料流與風險盤點。管線頁、閘門頁與放行紀錄都從同一個模組取用，閘門頁會標出需要搭配的控制項，缺少的控制項各自加上「」，「全部」時以「、」列出、「任一」時以「／」表示擇一；控制項文字本身就含有這兩個符號，引號才分得出一項在哪裡結束。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
+- **管線缺口**：每個發現都有一條攔截條件（`CATCH_REQUIREMENTS`，型別保證不會漏列），標明任一（`any`）或全部（`all`）控制項勾選才算攔下；多數項目任一即可，威脅模型須同時勾選資料流與風險盤點。管線頁、閘門頁與放行紀錄都從同一個模組取用，閘門頁會標出需要搭配的控制項，缺少的控制項各自加上「」，「全部」時以「、」列出、「任一」時以「／」表示擇一；控制項文字本身就含有這兩個符號，引號才分得出一項在哪裡結束。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
-The rules live in `src/data/engine.ts` (pipeline gaps in `src/data/pipeline-gaps.ts`):
+The rules live in `src/data/engine.ts` (finding text in `src/data/finding-catalogue.ts`, pipeline gaps in `src/data/pipeline-gaps.ts`):
 
 - **Level**: a high-impact domain (payments, core healthcare, critical infrastructure), public with personal data, an uncut lethal trifecta, or destructive tools without human approval each force L3; personal or business data, an LLM, exposure beyond internal use or an agent give L2; everything else is L1.
 - **Lethal trifecta** (private data, untrusted content, egress) only counts with an LLM or agent. A sandbox or egress allow-list does not by itself cut a leg; verify restrictions and update the corresponding capability; human approval does not. While uncut, G0 and G6 both block. The form disables capabilities that do not apply under the current settings (such as the trifecta toggles without an LLM or agent), as decided by the rule engine's `settingsThatApply`; the sandbox and egress allow-list stay toggleable so users can see for themselves that they never change the verdict.
@@ -163,9 +164,9 @@ The rules live in `src/data/engine.ts` (pipeline gaps in `src/data/pipeline-gaps
 - **G1 / G2 findings follow how the code was written**, not whether the system under test has a model: while defective, a project with a web surface gets hallucinated packages and a malicious postinstall, a batch script gets a look-alike package inside its cooling-off period; both can hard-code secrets.
 - **SSRF escalation**: when the code is still defective, there is a web surface, an LLM or agent, and egress, G5's fetch tool reaches cloud metadata and G3's IMDSv2 blocks at every level.
 - **The IDOR and `alg:none` are separate findings**: a JWT test alone does not catch the two-account authorization bypass.
-- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints) escalate to blocks; L1 / L2 only warn. A public endpoint with no quota at all blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
+- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints; marked `depth: true` in the catalogue) escalate to blocks; L1 / L2 only warn. A public endpoint with no quota at all blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
 - **An undocumented threat model** blocks at L3 and warns elsewhere.
-- **Pipeline gaps**: every finding has a catch requirement (`CATCH_REQUIREMENTS`) saying whether any one (`any`) or all (`all`) of its controls must be checked for it to be caught; most findings need one, the threat model needs both data-flow and risk analysis. The Pipeline view, the Gates view and the release record all read the same module; the Gates view names the controls a control must be paired with, and missing controls are each quoted, then listed with commas for `all` or offered as alternatives with slashes for `any`; control text itself contains commas and slashes, so the quotes show where each one ends. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
+- **Pipeline gaps**: every finding has a catch requirement (`CATCH_REQUIREMENTS`, which the type keeps complete) saying whether any one (`any`) or all (`all`) of its controls must be checked for it to be caught; most findings need one, the threat model needs both data-flow and risk analysis. The Pipeline view, the Gates view and the release record all read the same module; the Gates view names the controls a control must be paired with, and missing controls are each quoted, then listed with commas for `all` or offered as alternatives with slashes for `any`; control text itself contains commas and slashes, so the quotes show where each one ends. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
 
 ## 📦 目錄結構 / Directory layout
 
@@ -180,7 +181,7 @@ flowchart TB
     subgraph SRC["src/ ─ 應用程式 App"]
         ROUTES["routes/<br/>__root.tsx・index.tsx<br/>api/csp-report.ts"]
         COMP["components/<br/>shell・app-state・storage<br/>harness-run<br/>profile-form・ui・tone<br/>getting-started・related-sites<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
-        DATA["data/<br/>model.ts・engine.ts<br/>pipeline-gaps.ts<br/>finding-guidance.ts<br/>＋測試 tests"]
+        DATA["data/<br/>model.ts・engine.ts<br/>pipeline-gaps.ts<br/>finding-catalogue.ts<br/>＋測試 tests"]
         I18N["i18n/<br/>locale.ts・context.tsx"]
         LIBA["lib/（本專案 app）<br/>error-component<br/>not-found-component<br/>og/site.json"]
         LIBP["lib/（平台 platform）<br/>auth/・app-data/<br/>multiplayer/・db.ts<br/>env.server.ts・preview-*.ts"]
@@ -260,7 +261,7 @@ G0withSixGates/
 │   ├── zod-jitless.ts              # 關閉 zod JIT（CSP 不允許 eval）
 │   ├── routes/__root.tsx、index.tsx、api/csp-report.ts
 │   ├── i18n/locale.ts(.test.ts)、context.tsx
-│   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)、pipeline-gaps.ts(.test.ts)、finding-guidance.ts(.test.ts)
+│   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)、pipeline-gaps.ts(.test.ts)、finding-catalogue.ts(.test.ts)
 │   ├── components/
 │   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx、tone.ts
 │   │   ├── getting-started.tsx、related-sites.tsx
@@ -317,7 +318,7 @@ For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks pag
 **預設關閉。** `npm test` 與每次 PR 的 CI 都不跑突變測試；要跑有兩種方式：本機執行 `npm run test:mutation`，或在 GitHub 的 Actions 分頁手動觸發「Mutation testing」工作流程（報告會上傳成 artifact）。
 
 - 工具是 [StrykerJS](https://stryker-mutator.io/)，完全在本機執行，不需要外部服務或金鑰。
-- 只突變純函式邏輯：`src/data/engine.ts`（規則引擎）、`src/data/pipeline-gaps.ts`（管線缺口）、`src/components/storage.ts`（儲存搬移）、`src/components/harness-run.ts`（執行生命週期）、`src/i18n/locale.ts`（雙語工具）。`model.ts` 幾乎全是內容資料，不列入。
+- 只突變純函式邏輯：`src/data/engine.ts`（規則引擎）、`src/data/pipeline-gaps.ts`（管線缺口）、`src/components/storage.ts`（儲存搬移）、`src/components/harness-run.ts`（執行生命週期）、`src/i18n/locale.ts`（雙語工具）。`model.ts` 與發現目錄 `finding-catalogue.ts` 幾乎全是內容資料，不列入。
 - `scripts/stryker-ignore-bi.mjs` 會跳過 `bi("中文", "English")` 裡的顯示文字；測試不該逐句斷言文案，留著只會灌水存活突變體。其他字串（例如 `=== "public"`）照常突變。
 - 每個突變體都要重跑一次邏輯測試（約 2 秒），七百多個突變體以 4 個並行約需十幾分鐘，所以不放進每次 PR 的流程。
 - 設定在 `stryker.config.json`；`thresholds.break` 為 `null`，分數低不會讓指令失敗，報告在 `reports/mutation/index.html`（不進版控）。存活的突變體就是測試沒有鎖住的行為，依此補測試或接受它。
@@ -325,7 +326,7 @@ For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks pag
 **Off by default.** Neither `npm test` nor the per-PR CI runs mutation testing. Run it locally with `npm run test:mutation`, or trigger the "Mutation testing" workflow by hand from the Actions tab on GitHub (the report is uploaded as an artifact).
 
 - The tool is [StrykerJS](https://stryker-mutator.io/); it runs entirely locally with no external service or key.
-- Only pure logic is mutated: `src/data/engine.ts` (rule engine), `src/data/pipeline-gaps.ts` (pipeline gaps), `src/components/storage.ts` (storage migration), `src/components/harness-run.ts` (run lifecycle), `src/i18n/locale.ts` (locale helpers). `model.ts` is almost all content data and is left out.
+- Only pure logic is mutated: `src/data/engine.ts` (rule engine), `src/data/pipeline-gaps.ts` (pipeline gaps), `src/components/storage.ts` (storage migration), `src/components/harness-run.ts` (run lifecycle), `src/i18n/locale.ts` (locale helpers). `model.ts` and the finding catalogue `finding-catalogue.ts` are almost all content data and are left out.
 - `scripts/stryker-ignore-bi.mjs` skips the display text inside `bi("中文", "English")`; tests should not assert on every sentence, and keeping those mutants only inflates the survivor count. Other strings (such as `=== "public"`) are still mutated.
 - Every mutant reruns the logic tests (about 2 seconds); seven hundred-odd mutants at 4-way concurrency take ten-plus minutes, so it stays out of the per-PR pipeline.
 - Configuration lives in `stryker.config.json`; `thresholds.break` is `null`, so a low score never fails the command, and the report lands in `reports/mutation/index.html` (not tracked). Surviving mutants are behaviour the tests do not pin down: add a test or accept them.
