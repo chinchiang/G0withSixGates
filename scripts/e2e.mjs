@@ -398,6 +398,9 @@ try {
     await detail.getByText("可能影響", { exact: true }).waitFor();
     await detail.getByText("重新驗證條件", { exact: true }).waitFor();
     assert.match(await detail.innerText(), /撤銷並輪替/);
+    const gap = await page.locator(".gap-item").first().innerText();
+    assert.match(gap, /缺「/);
+    assert.doesNotMatch(gap, /缺: /);
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: "下載紀錄" }).click(),

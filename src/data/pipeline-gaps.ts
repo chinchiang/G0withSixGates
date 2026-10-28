@@ -1,4 +1,4 @@
-import { joinAlt, joinList, pick, quote, type Bi, type Locale } from "../i18n/locale.ts";
+import { bi, joinAlt, joinList, pick, quote, type Bi, type Locale } from "../i18n/locale.ts";
 import { GATE_DOCS, type GateId } from "./model.ts";
 import type { Finding, FindingId } from "./finding-catalogue.ts";
 import type { RunPlan } from "./engine.ts";
@@ -144,5 +144,25 @@ export function describeMissing(status: CatchStatus, locale: Locale): string {
   return join(
     locale,
     status.missing.map((item) => quote(locale, pick(locale, item.text))),
+  );
+}
+
+/**
+ * 管線缺口的摘要句，管線頁與放行紀錄共用；不帶結尾標點，由各自依版面補上。
+ * The pipeline-gaps summary shared by the Pipeline view and the release record; it carries no
+ * trailing punctuation, which each side adds for its own layout.
+ */
+export function gapSummary(statuses: readonly CatchStatus[]): Bi {
+  const total = statuses.length;
+  const missed = statuses.filter((item) => !item.caught).length;
+  if (total === 0) return bi("本次沒有發現項", "No findings this run");
+  if (missed === 0)
+    return bi(
+      `本次 ${total} 個發現，你們的管線都攔得下`,
+      `All ${total} findings this run would be caught by your pipeline`,
+    );
+  return bi(
+    `本次 ${total} 個發現中，有 ${missed} 個可能會漏掉`,
+    `${missed} of the ${total} findings this run may slip through`,
   );
 }

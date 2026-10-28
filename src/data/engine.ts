@@ -1,5 +1,11 @@
-import { finding, type DepthFindingId, type Finding } from "./finding-catalogue.ts";
-import { catchStatus, describeMissing } from "./pipeline-gaps.ts";
+import {
+  finding,
+  findingRefs,
+  findingRows,
+  type DepthFindingId,
+  type Finding,
+} from "./finding-catalogue.ts";
+import { catchStatus, describeMissing, gapSummary } from "./pipeline-gaps.ts";
 import { bi, biList, joinAlt, pick, yesNo, type Bi, type Locale } from "../i18n/locale.ts";
 import {
   RUN_RULE_VERSION,
@@ -119,18 +125,15 @@ export function agencyOpen(p: Profile): boolean {
 }
 
 /**
- * 兩份設定重新執行，是否得到完全相同的結果（裁決、發現與日誌）。系統名稱與預設情境標記只寫進日誌、
- * 不影響規則，所以先對齊再比較。直接比較輸出，規則改了也不必另外維護一份「規則會讀哪些欄位」。
+ * 兩份設定重新執行，是否得到完全相同的結果（裁決、發現與日誌）。系統名稱與預設情境標記不會出現在輸出裡，
+ * 所以直接比較；規則改了也不必另外維護一份「規則會讀哪些欄位」。
  *
  * Whether two profiles give exactly the same result (verdict, findings and logs). The system name and
- * preset tag only appear in logs and do not affect the rules, so they are aligned first. Comparing the
- * output means no separate list of "fields the rules read" has to follow rule changes.
+ * preset tag never reach the output, so the outputs are compared as they are; no separate list of
+ * "fields the rules read" has to follow rule changes.
  */
 export function sameResult(a: Profile, b: Profile): boolean {
-  return (
-    JSON.stringify(buildPlan(a)) ===
-    JSON.stringify(buildPlan({ ...b, name: a.name, preset: a.preset }))
-  );
+  return JSON.stringify(buildPlan(a)) === JSON.stringify(buildPlan(b));
 }
 
 export function recommendLevel(p: Profile): { level: Level; reasons: Bi[] } {
@@ -279,8 +282,8 @@ export function buildPlan(p: Profile): RunPlan {
   const g0: Finding[] = [];
   const g0logs: Bi[] = [
     bi(
-      `Harness 載入「${displayName(p, "zh")}」，工具鏈對應 ${level}：${toolchain.zh}。`,
-      `Harness loaded "${displayName(p, "en")}"; toolchain for ${level}: ${toolchain.en}.`,
+      `Harness 載入受測系統，工具鏈對應 ${level}：${toolchain.zh}。`,
+      `Harness loaded the system under test; toolchain for ${level}: ${toolchain.en}.`,
     ),
     ...reasons.map((r) => bi(`分級：${r.zh}`, `Level: ${r.en}`)),
   ];
@@ -649,11 +652,6 @@ const R = {
   diffOnly: bi("PR 只掃差異", "Diff-only PR scan"),
   defects: bi("程式狀態", "Code state"),
   reasons: bi("## 分級理由", "## Why this level"),
-  evidence: bi("示範證據", "Demo evidence"),
-  cause: bi("問題原因", "Cause"),
-  impact: bi("可能影響", "Potential impact"),
-  retest: bi("重新驗證條件", "Retest criteria"),
-  fix: bi("修正方式", "Remediation"),
   yours: bi("你們的管線", "Your pipeline"),
   caught: bi("攔得下", "caught"),
   missed: bi("會漏掉", "would miss"),
@@ -662,7 +660,6 @@ const R = {
     "依閘門頁勾選估算；威脅模型須同時具備資料流與風險盤點。",
     "Estimated from gates-page checks; a threat model needs both data-flow and risk analysis.",
   ),
-  noFindings: bi("- 本次沒有發現項。", "- No findings this run."),
   footer: bi(
     "ASVS 對照到章節。CWE／LLM Top 10 是營運交叉引用，不是 ASVS 5.0 的正式對應表。",
     "ASVS references point to chapters. CWE / LLM Top 10 are operational cross-references, not an official ASVS 5.0 mapping.",
@@ -700,24 +697,14 @@ export function reportMarkdown(
   const yn = (value: boolean) => yesNo(locale, value);
   const colon = locale === "zh" ? "：" : ": ";
   const semi = locale === "zh" ? "；" : "; ";
-  const rawName = displayName(p, locale);
-  const safeName = escapeMarkdown(rawName);
-  // 理由與日誌會引用系統名稱，換成跳脫後的版本。 Reasons and logs quote the system name; swap in the escaped form.
-  const named = (text: string) => text.split(rawName).join(safeName);
-  const ai = p.llm || p.agent;
-  const tri = (value: boolean) => (ai ? yn(value) : t(NOT_APPLICABLE));
+  const safeName = escapeMarkdown(displayName(p, locale));
+  const applies = settingsThatApply(p);
+  const tri = (key: "privateData" | "untrusted" | "egress") =>
+    applies[key] ? yn(p[key]) : t(NOT_APPLICABLE);
   const statuses = new Map(catchStatus(plan, checks).map((item) => [item.finding.id, item]));
   const missed = [...statuses.values()].filter((item) => !item.caught);
-  const gapSummary =
-    statuses.size === 0
-      ? t(R.noFindings)
-      : missed.length === 0
-        ? locale === "zh"
-          ? `- 本次 ${statuses.size} 個發現，你們的管線都攔得下。`
-          : `- All ${statuses.size} findings this run would be caught by your pipeline.`
-        : locale === "zh"
-          ? `- 本次 ${statuses.size} 個發現中，有 ${missed.length} 個可能會漏掉：`
-          : `- ${missed.length} of the ${statuses.size} findings this run may slip through:`;
+  // 摘要句後面接漏掉的清單就補冒號，否則補句號。 A colon when the misses follow, otherwise a full stop.
+  const summaryEnd = locale === "zh" ? (missed.length ? "：" : "。") : missed.length ? ":" : ".";
 
   const lines: string[] = [
     t(R.title),
@@ -738,13 +725,12 @@ export function reportMarkdown(
     t(R.settings),
     `- ${t(R.exposure)}${colon}${t(EXPOSURE_LABEL[p.exposure])}${semi}${t(R.sensitivity)}${colon}${t(SENSITIVITY_LABEL[p.sensitivity])}${semi}${t(R.critical)}${colon}${yn(p.critical)}`,
     `- ${t(R.web)}${colon}${yn(webSurface(p))}${semi}${t(R.llm)}${colon}${yn(p.llm)}${semi}${t(R.agent)}${colon}${yn(p.agent)}${semi}${t(R.destructive)}${colon}${yn(p.agent && p.destructive)}`,
-    `- ${t(R.privateData)}${colon}${tri(p.privateData)}${semi}${t(R.untrusted)}${colon}${tri(p.untrusted)}${semi}${t(R.egress)}${colon}${tri(p.egress)}`,
+    `- ${t(R.privateData)}${colon}${tri("privateData")}${semi}${t(R.untrusted)}${colon}${tri("untrusted")}${semi}${t(R.egress)}${colon}${tri("egress")}`,
     `- ${t(R.mitigations)}${colon}${p.mitigations.length ? t(biList(p.mitigations.map((item) => MITIGATION_LABEL[item]))) : t(R.none)}`,
     `- ${t(R.threatModel)}${colon}${p.threatModel ? t(R.done) : t(R.notDone)}${semi}${t(R.diffOnly)}${colon}${yn(p.diffOnly)}${semi}${t(R.defects)}${colon}${t(DEFECT_LABEL[p.defects])}`,
     ``,
     t(R.reasons),
-    // 其中一條理由會帶入系統名稱，同樣要跳脫。 One reason quotes the system name, so it is escaped as well.
-    ...plan.reasons.map((r) => `- ${named(t(r))}`),
+    ...plan.reasons.map((r) => `- ${t(r)}`),
     ``,
   ];
   for (const s of plan.steps) {
@@ -754,15 +740,11 @@ export function reportMarkdown(
         ? `## ${s.gate} ${t(GATE_NAME[s.gate])}（${meta}）`
         : `## ${s.gate} ${t(GATE_NAME[s.gate])} (${meta})`,
     );
-    for (const log of s.logs) lines.push(`- ${named(t(log))}`);
+    for (const log of s.logs) lines.push(`- ${t(log)}`);
     for (const item of s.findings) {
       lines.push(`- **${t(STATUS_LABEL[item.severity])}** ${t(item.title)}`);
-      lines.push(`  - ${t(R.cause)}${colon}${t(item.detail)}`);
-      lines.push(`  - ${t(R.impact)}${colon}${t(item.impact)}`);
-      lines.push(`  - ${t(R.evidence)}${colon}${t(item.evidence)}`);
-      lines.push(`  - ${t(R.fix)}${colon}${t(item.fix)}`);
-      lines.push(`  - ${t(R.retest)}${colon}${t(item.retest)}`);
-      lines.push(`  - ${t(item.tool)}｜${t(item.asvs)}｜${t(item.cwe)}`);
+      for (const row of findingRows(item)) lines.push(`  - ${t(row.label)}${colon}${t(row.value)}`);
+      lines.push(`  - ${findingRefs(item).map(t).join("｜")}`);
       const status = statuses.get(item.id);
       if (status) {
         const marks = status.controls
@@ -780,7 +762,7 @@ export function reportMarkdown(
   lines.push(t(R.gaps));
   lines.push(t(R.gapsNote));
   lines.push("");
-  lines.push(gapSummary);
+  lines.push(`- ${t(gapSummary([...statuses.values()]))}${summaryEnd}`);
   if (missed.length > 0) {
     for (const item of missed) {
       const controls = describeMissing(item, locale);

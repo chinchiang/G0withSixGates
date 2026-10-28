@@ -568,6 +568,12 @@ describe("the IDOR and alg:none are separate findings", () => {
 });
 
 describe("same result", () => {
+  it("keeps the system name out of the plan", () => {
+    for (const [name, base] of Object.entries(PRESETS)) {
+      const profile: Profile = { ...base, preset: "custom", name: "Zq9-獨特名稱" };
+      assert.ok(!JSON.stringify(buildPlan(profile)).includes("Zq9"), name);
+    }
+  });
   it("ignores the name, the preset tag, the sandbox and the egress allow-list", () => {
     const renamed: Profile = { ...PRESETS.kb, preset: "custom", name: "改過名字" };
     assert.equal(sameResult(PRESETS.kb, renamed), true);
@@ -668,6 +674,18 @@ describe("report escaping and sources", () => {
     const md = reportMarkdown(profile, buildPlan(profile), at, {}, "en");
     assert.ok(!/^# heading/m.test(md));
     assert.equal(escapeMarkdown("x\r\n# heading"), "x \\# heading");
+  });
+
+  it("leaves the log text alone when the system name is a single hyphen", () => {
+    for (const [name, base] of Object.entries(PRESETS)) {
+      const profile: Profile = { ...base, preset: "custom", name: "-" };
+      const plan = buildPlan(profile);
+      for (const locale of ["zh", "en"] as const) {
+        const record = reportMarkdown(profile, plan, at, {}, locale).split("\n");
+        for (const log of plan.steps.flatMap((step) => step.logs))
+          assert.ok(record.includes(`- ${log[locale]}`), `${name} / ${locale}: ${log[locale]}`);
+      }
+    }
   });
 
   it("lists every source in both locales", () => {
