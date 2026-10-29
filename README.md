@@ -226,6 +226,7 @@ G0withSixGates/
 ├── AGENTS.md                       # 代理指標；沙箱契約在 .grok/references/ / agent pointers
 ├── LICENSE                         # MIT（attachments/、第三方與平台檔案除外，見「授權」/ see "License"）
 ├── GLOSSARY.md                     # 領域用語：發現、控制項、攔截條件、管線缺口 / domain terms
+├── CODING_STANDARDS.md             # 審查用的判斷型規則：註解中英對照、文字走 bi()、獨立的預期值 / review rules
 ├── README.md
 ├── attachments/                    # ASVS 5.0.0 原文 docx、心智圖 JSON（PDF、GIF 不進版控）
 ├── migrations/auth/0001_auth.sql   # 平台 platform：Better Auth 資料表；migrate.mjs 不讀子目錄，不會套用 / never applied
@@ -237,6 +238,7 @@ G0withSixGates/
 ├── screenshots/.gitkeep            # browser-smoke 與 e2e 的截圖輸出，只保留目錄
 ├── scripts/
 │   ├── run-tests.mjs               # 本專案 app：npm test
+│   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()）/ the lint rules apply
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── regress.mjs、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors

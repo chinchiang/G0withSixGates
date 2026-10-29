@@ -14,5 +14,7 @@ This file loads into every session, so it holds pointers only; the detail lives 
   **Regression suite**: after every change run `npm run regress`, the CI-equivalent suite including the tenfold-throttled e2e; the steps live in `.github/workflows/ci.yml`.
 - **e2e 測試**：載入頁面用 `scripts/e2e.mjs` 的 `load`／`reload`，它們等 `<html data-hydrated>` 出現才讓測試操作。
   **e2e tests**: load pages with `load` / `reload` in `scripts/e2e.mjs`, which wait for `<html data-hydrated>` before the test acts.
+- **審查程式碼**：對照 `CODING_STANDARDS.md` 的判斷型規則；寫法固定的規則在 `eslint.config.mjs`。
+  **Reviewing code**: check against the judgement rules in `CODING_STANDARDS.md`; fixed-shape rules live in `eslint.config.mjs`.
 - **架構、規則與指令**：README 的「系統架構與流程」「Harness 的規則」「開發」各節。
   **Architecture, rules and commands**: the README sections "Architecture Overview", "Harness rules" and "Development".
