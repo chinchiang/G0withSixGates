@@ -56,6 +56,10 @@ jobs:
       - run: npm run build
       - run: npm run preview:restart
       - run: npm run test:e2e
+      # CPU 降速 10 倍再跑一次：在水合完成前就操作的測試，在這裡每次都會失敗，不會只是偶爾失敗。
+      # Again with the CPU slowed tenfold: a test that acts before hydration finishes fails here
+      # every time instead of now and then.
+      - run: npm run test:e2e:throttled
       - run: npm run build:pages
       - run: npm run test:pages
       - if: failure()

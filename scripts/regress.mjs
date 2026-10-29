@@ -91,8 +91,9 @@ await Promise.all([
 if (await step("build", ["npm", "run", "build"])) {
   if (await step("preview", ["npm", "run", "preview:restart"])) {
     await step("e2e", ["npm", "run", "test:e2e"]);
-  } else skip("e2e");
-} else skip("preview", "e2e");
+    await step("e2e-throttled", ["npm", "run", "test:e2e:throttled"]);
+  } else skip("e2e", "e2e-throttled");
+} else skip("preview", "e2e", "e2e-throttled");
 
 if (await step("build-pages", ["npm", "run", "build:pages"])) {
   await step("test-pages", ["npm", "run", "test:pages"]);

@@ -165,6 +165,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [theme, hydrated]);
 
+  // 水合標記：副作用照宣告順序執行，這一個放最後，出現時上面的存檔、語系與主題都已跑完。
+  // 伺服器端渲染不帶它，所以每次載入都重新等得到；瀏覽器測試以它判斷可以開始操作。
+  // Hydration marker: effects run in declaration order and this one is last, so when it appears the
+  // saves, locale and theme above have run. Server rendering never sets it, so every page load waits
+  // afresh; the browser tests use it to know when to start interacting.
+  useEffect(() => {
+    if (hydrated) document.documentElement.dataset.hydrated = "";
+  }, [hydrated]);
+
   const value = useMemo<AppState>(() => {
     const total = GATE_DOCS.reduce((sum, doc) => sum + doc.controls.length, 0);
     const done = GATE_DOCS.reduce(

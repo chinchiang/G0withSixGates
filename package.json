@@ -26,6 +26,7 @@
     "check:auth": "node scripts/check-auth-invariant.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:e2e": "node scripts/e2e.mjs",
+    "test:e2e:throttled": "E2E_CPU_THROTTLE=10 node scripts/e2e.mjs",
     "regress": "node scripts/regress.mjs",
     "test:mutation": "stryker run",
     "lint": "eslint .",

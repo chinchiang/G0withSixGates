@@ -297,6 +297,7 @@ npm run lint
 npm run build            # 產出 .vercel/output（不進版控），接著跑 db:migrate（沒有 DATABASE_URL 會略過）
 npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the production build
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
+npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
 npm run regress          # 與 CI 相同的整套檢查，含建置、e2e 與 Pages / the full CI-equivalent suite
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
 node scripts/og-card.mjs         # 重製分享卡片 public/og.jpg / regenerate the share card
@@ -307,7 +308,7 @@ npm run test:mutation            # 突變測試，預設不跑，見下節 / mut
 
 `npm run test:e2e`（`scripts/e2e.mjs`）測要真的瀏覽器才看得到的事：兩種語系的每個畫面在桌機與手機都有內容、沒有橫向捲動與 console 錯誤、預設情境不被截掉、對照頁的點擊範圍、Harness 執行與停止、重新整理後結果還在、閘門頁標出過期的裁決、勾選存檔與復原、網址狀態、404 畫面，以及 CSP 回報端點的大小上限。CI 另開一個 job 對正式建置跑，失敗時上傳截圖。
 
-`E2E_CPU_THROTTLE=10 npm run test:e2e` 會把 CPU 降速 10 倍再跑。降速讓水合變慢，在水合後的副作用跑完前就讀寫的測試會穩定失敗，用來重現只在機器忙時才出現的偶發失敗。
+CI 還會用 `npm run test:e2e:throttled`（`E2E_CPU_THROTTLE=10`）把 CPU 降速 10 倍再跑一次。降速讓水合變慢，在水合完成前就操作的測試會每次都失敗，不會只在機器忙的時候偶爾失敗。app 水合完成後會在 `<html>` 加上 `data-hydrated`，測試用 `load`／`reload` 載入頁面，等到這個標記才開始操作。
 
 `npm run regress` 照 CI 的順序跑完所有檢查，每一步的輸出寫在暫存目錄的 `six-gate-regress/`。它會先確認 Chromium 能啟動；缺系統函式庫時會列出缺了哪些，以及有無 sudo 時各怎麼補，不必等到建置完才在 e2e 失敗。
 
@@ -315,7 +316,7 @@ Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth
 
 `npm run test:e2e` (`scripts/e2e.mjs`) covers what only a real browser shows: every view in both locales has content on desktop and mobile with no horizontal overflow or console errors, the presets are not clipped, the map's hit areas, a Harness run and stop, the run surviving a reload, the Gates view marking a stale verdict, stored checks with undo, URL state, the 404 screen, and the CSP report endpoint's size limit. CI runs it against the production build in its own job and uploads screenshots on failure.
 
-`E2E_CPU_THROTTLE=10 npm run test:e2e` runs the suite with the CPU slowed tenfold. Hydration slows with it, so a test that reads or writes before the post-hydration effects have run fails every time; use it to reproduce a failure that only shows up on a busy machine.
+CI also runs `npm run test:e2e:throttled` (`E2E_CPU_THROTTLE=10`), the suite with the CPU slowed tenfold. Hydration slows with it, so a test that acts before hydration finishes fails every time instead of only on a busy machine. Once hydrated, the app sets `data-hydrated` on `<html>`; the tests load pages with `load` / `reload`, which wait for that marker before interacting.
 
 `npm run regress` runs every check in CI order and writes each step's output to `six-gate-regress/` in the temp directory. It first checks that Chromium can start; if system libraries are missing it lists them and how to install them with or without sudo, instead of failing in e2e after the build.
 
