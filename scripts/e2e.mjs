@@ -85,17 +85,29 @@ async function openPage(browser, viewport, reducedMotion = "reduce") {
 }
 
 /**
- * 等水合後的副作用跑完。設定只在水合後才存進 localStorage，而且和 `saveRun` 屬於同一批副作用，
- * 所以在全新的瀏覽器環境裡，這個鍵一出現就代表副作用都跑過了；之後重新載入時鍵已存在，不能再拿來等。
- * 在這之前寫進 storage 的資料，會被讀走或被 `saveRun(null)` 刪掉。
+ * 等水合後的副作用跑完：`app-state.tsx` 在最後一個副作用設定 `<html data-hydrated>`。伺服器端渲染不帶它，
+ * 所以每次載入與重新載入都要重新等。在這之前，點擊會被吃掉、`<html lang>` 與 theme-color 還沒更新，
+ * 寫進 storage 的資料也會被讀走或被 `saveRun(null)` 刪掉。
  *
- * Wait for the post-hydration effects. The profile is saved to localStorage only after hydration, in
- * the same batch of effects as `saveRun`, so in a fresh browser context the key appearing means they
- * have all run; after a reload the key already exists and cannot be waited on. Storage written before
- * this point is read or removed by `saveRun(null)`.
+ * Wait for the post-hydration effects: `app-state.tsx` sets `<html data-hydrated>` in its last effect.
+ * Server rendering never sets it, so every load and reload waits afresh. Before it appears, clicks are
+ * lost, `<html lang>` and theme-color are not updated yet, and storage written now is read or removed
+ * by `saveRun(null)`.
  */
 async function waitForHydration(page) {
-  await page.waitForFunction(() => localStorage.getItem("six-gate-profile-v1") !== null);
+  await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
+}
+
+/** 載入並等水合完成。 Load a page and wait for hydration. */
+async function load(page, search = "") {
+  await page.goto(url(search), { waitUntil: "networkidle" });
+  await waitForHydration(page);
+}
+
+/** 重新載入並等水合完成。 Reload and wait for hydration. */
+async function reload(page) {
+  await page.reload({ waitUntil: "networkidle" });
+  await waitForHydration(page);
 }
 
 /** 用原始 HTTP 送請求，才能送出沒有 content-length 的 chunked 本文。 */
@@ -135,10 +147,7 @@ try {
     await test(`${name}: every view renders in English too`, async () => {
       const { page, errors, close } = await openPage(browser, viewport);
       for (const view of VIEWS) {
-        await page.goto(url(`?view=${view}&lang=en`), { waitUntil: "networkidle" });
-        // 伺服器端一律渲染 zh-Hant-TW，`<html lang>` 由水合後的副作用改；等它改了再斷言。
-        // The server always renders zh-Hant-TW and a post-hydration effect sets `<html lang>`; wait for it.
-        await page.waitForFunction(() => document.documentElement.lang !== "zh-Hant-TW");
+        await load(page, `?view=${view}&lang=en`);
         assert.equal(await page.getAttribute("html", "lang"), "en", view);
         const main = await page.locator("main").innerText();
         assert.ok(/[A-Za-z]{4,}/.test(main), `${view} has no English text`);
@@ -223,8 +232,7 @@ try {
 
   await test("language, radio keyboard and obsolete runs", async () => {
     const { page, close } = await openPage(browser, VIEWPORTS.desktop);
-    await page.goto(url(), { waitUntil: "networkidle" });
-    await waitForHydration(page);
+    await load(page);
     await page.evaluate(() => {
       localStorage.setItem("six-gate-locale", "en");
       sessionStorage.setItem(
@@ -232,7 +240,7 @@ try {
         JSON.stringify({ version: 1, profile: {}, at: new Date().toISOString() }),
       );
     });
-    await page.goto(url("?view=harness&lang=zh"), { waitUntil: "networkidle" });
+    await load(page, "?view=harness&lang=zh");
     await page.getByText("先前結果的規則版本不符或資料損壞，請重新執行。").waitFor();
     assert.equal(await page.locator("html").getAttribute("lang"), "zh-Hant-TW");
     const group = page.getByRole("radiogroup", { name: "預設情境" });
@@ -248,7 +256,7 @@ try {
   await test("harness: runs, stops back to the previous verdict, and stops to idle on the first run", async () => {
     // 要保留逐道揭示，才來得及在揭示中按下停止。
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop, "no-preference");
-    await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
+    await load(page, "?view=harness");
     const verdict = page.getByText("不准放行。");
 
     // 第一次執行就停止：回到尚未執行。
@@ -272,7 +280,7 @@ try {
     await sandbox.click();
 
     // 結果存在 sessionStorage：重新整理還在。 The run lives in sessionStorage and survives a reload.
-    await page.reload({ waitUntil: "networkidle" });
+    await reload(page);
     await verdict.waitFor();
     // 重新整理後不能還有「等待」，第一道閘門仍顯示狀態徽章。 After a reload no gate says 「等待」 and the first step still shows its status badge.
     const results = page.locator("#harness-results");
@@ -314,14 +322,14 @@ try {
       assert.equal(new Set(all).size, 1, `theme-color tags disagree: ${all}`);
       return all[0];
     };
-    await page.goto(url(), { waitUntil: "networkidle" });
+    await load(page);
     const dark = await color();
     await page.getByRole("button", { name: "切換為淺色主題" }).click();
     await page.locator('html[data-theme="light"]').waitFor();
     const light = await color();
     assert.notEqual(light, dark);
     assert.equal(light, "#ffffff");
-    await page.reload({ waitUntil: "networkidle" });
+    await reload(page);
     await page.locator('html[data-theme="light"]').waitFor();
     assert.equal(await color(), light);
     await page.getByRole("button", { name: "切換為深色主題" }).click();
@@ -333,11 +341,11 @@ try {
 
   await test("gates: checks survive a reload, clear-all can be undone", async () => {
     const { page, close } = await openPage(browser, VIEWPORTS.mobile);
-    await page.goto(url("?view=gates&gate=G2"), { waitUntil: "networkidle" });
+    await load(page, "?view=gates&gate=G2");
     const control = page.locator("main li button[aria-pressed]").first();
     await control.click();
     assert.equal(await control.getAttribute("aria-pressed"), "true");
-    await page.reload({ waitUntil: "networkidle" });
+    await reload(page);
     assert.equal(
       await page.locator("main li button[aria-pressed]").first().getAttribute("aria-pressed"),
       "true",
@@ -358,19 +366,19 @@ try {
   await test("gates: a stale verdict says so after the settings change", async () => {
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
     const notice = "設定已改，這份裁決對不上目前的系統。";
-    await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
+    await load(page, "?view=harness");
     await page.getByRole("button", { name: "執行 Harness" }).click();
     await page.getByText("不准放行。").waitFor();
 
-    await page.goto(url("?view=gates&gate=G0"), { waitUntil: "networkidle" });
+    await load(page, "?view=gates&gate=G0");
     await page.getByText("對照的是最近一次 Harness").waitFor();
     assert.equal(await page.getByText(notice).count(), 0, "a fresh verdict is not stale");
 
     // 改設定後，閘門頁的對照要標出過期。 After a settings change the gates page marks the comparison as stale.
-    await page.goto(url("?view=harness"), { waitUntil: "networkidle" });
+    await load(page, "?view=harness");
     await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
     await page.getByText(`${notice}請再跑一次。`).waitFor();
-    await page.goto(url("?view=gates&gate=G0"), { waitUntil: "networkidle" });
+    await load(page, "?view=gates&gate=G0");
     await page.getByText(notice).waitFor();
     assert.deepEqual(errors, []);
     await close();
@@ -378,7 +386,7 @@ try {
 
   await test("map: tab, gate filter and search live in the URL", async () => {
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
-    await page.goto(url("?view=map"), { waitUntil: "networkidle" });
+    await load(page, "?view=map");
     await page.getByRole("button", { name: "十七章" }).click();
     await page
       .getByRole("group", { name: "依閘門篩選" })
@@ -390,7 +398,7 @@ try {
     assert.equal(shared.searchParams.get("tab"), "chapters");
     assert.equal(shared.searchParams.get("filter"), "G5");
 
-    await page.goto(shared.href, { waitUntil: "networkidle" });
+    await load(page, shared.href);
     assert.equal(
       await page.getByRole("button", { name: "十七章" }).getAttribute("aria-pressed"),
       "true",
@@ -407,7 +415,7 @@ try {
 
   await test("guided review: keyboard focus, anchors, findings, report and related links", async () => {
     const { page, errors, close } = await openPage(browser, { width: 320, height: 740 });
-    await page.goto(url(), { waitUntil: "networkidle" });
+    await load(page);
     await page.keyboard.press("Tab");
     assert.equal(await page.evaluate(() => document.activeElement?.className), "skip-link");
     await page.keyboard.press("Enter");
