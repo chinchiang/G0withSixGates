@@ -14,12 +14,11 @@ screenshots/
 reports/
 .stryker-tmp/
 package-lock.json
-AGENTS.md
 tsconfig.json
 eslint.config.mjs
 
-# 其他平台檔案（AGENTS.md 規定不改）。
-# Other platform files (AGENTS.md says not to edit them).
+# 其他平台檔案（.grok/references/sandbox-contract.md 規定不改）。
+# Other platform files (.grok/references/sandbox-contract.md says not to edit them).
 scripts/brand-check.mjs
 scripts/brand-check.test.mjs
 scripts/browser-smoke-verdict.test.mjs

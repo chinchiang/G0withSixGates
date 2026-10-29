@@ -200,8 +200,8 @@ flowchart TB
     subgraph META["設定與專案檔 Config and project files"]
         CFG["根目錄設定 Root config<br/>package.json・vite.config.ts<br/>tsconfig.json・vercel.json<br/>eslint.config.mjs・.prettierrc<br/>stryker.config.json"]
         CI[".github/workflows/<br/>ci.yml（每次 PR per PR）<br/>mutation.yml（手動 manual）"]
-        DOCS["README.md・GLOSSARY.md・LICENSE<br/>attachments/<br/>screenshots/"]
-        GROK["平台 Platform<br/>AGENTS.md・.grok/<br/>startup.sh・migrations/"]
+        DOCS["README.md・GLOSSARY.md・LICENSE<br/>AGENTS.md・attachments/<br/>screenshots/"]
+        GROK["平台 Platform<br/>.grok/<br/>startup.sh・migrations/"]
         CFG ~~~ CI ~~~ DOCS ~~~ GROK
     end
 
@@ -222,8 +222,8 @@ flowchart TB
 G0withSixGates/
 ├── .github/workflows/ci.yml        # CI：typecheck → lint → test → build；另一個 job 對正式建置跑 e2e / plus an e2e job
 ├── .github/workflows/mutation.yml  # 突變測試，只在手動觸發時執行 / mutation testing, manual trigger only
-├── .grok/                          # 平台 platform：app-env.json、references/、skills/
-├── AGENTS.md                       # 平台 platform：Grok App Builder 工作合約
+├── .grok/                          # 平台 platform：app-env.json、references/（含沙箱契約 sandbox-contract.md）、skills/
+├── AGENTS.md                       # 代理指標；沙箱契約在 .grok/references/ / agent pointers
 ├── LICENSE                         # MIT（attachments/、第三方與平台檔案除外，見「授權」/ see "License"）
 ├── GLOSSARY.md                     # 領域用語：發現、控制項、攔截條件、管線缺口 / domain terms
 ├── README.md
@@ -368,7 +368,7 @@ Production builds do not load the Grok branding script; CSP has no Grok-specific
 
 這個專案用 Grok App Builder 建立，部署時由平台在 Vercel 上執行 `npm run build`。以下檔案屬於平台，不要刪除或改寫（本次雙語化也不動它們）：
 
-- `AGENTS.md` 與 `.grok/`：給 Grok 代理的工作合約、技能與 `app-env.json`
+- `.grok/`：給 Grok 代理的工作合約（`references/sandbox-contract.md`，原本是根目錄的 `AGENTS.md`）、技能與 `app-env.json`。根目錄的 `AGENTS.md` 現在是本專案自己的代理指標，不在此列；契約的規則 2、4 已改成符合本專案停用品牌腳本的現況。
 - `public/__grok/`、`server/`、`scripts/grok-pwa-*`：PWA 與分享卡片
 - `src/lib/` 下的 auth、app-data、db、multiplayer 助手與 `migrations/`：本 app 未啟用 auth 與 db；`.grok/app-env.json` 把 `VITE_AUTH_ENABLED` 設為 `"false"`，但部署端的旗標由平台決定（見 `scripts/with-app-env.mjs`），上線後請確認
 - `startup.sh`：Grok 沙箱重啟時用的啟動腳本（平台固定從 `/workspace/startup.sh` 執行；腳本以自己所在的目錄為準，本機也能用）
@@ -376,7 +376,7 @@ Production builds do not load the Grok branding script; CSP has no Grok-specific
 
 This project was created with Grok App Builder; the platform runs `npm run build` on Vercel at deploy time. The following files belong to the platform and must not be deleted or rewritten (the bilingual pass leaves them untouched):
 
-- `AGENTS.md` and `.grok/`: the Grok agent's contract, skills and `app-env.json`
+- `.grok/`: the Grok agent's contract (`references/sandbox-contract.md`, formerly the root `AGENTS.md`), skills and `app-env.json`. The root `AGENTS.md` is now this project's own agent pointers and is not on this list; the contract's rules 2 and 4 were edited to match this project's disabled branding script.
 - `public/__grok/`, `server/`, `scripts/grok-pwa-*`: PWA and sharing cards
 - The auth, app-data, db and multiplayer helpers under `src/lib/` and `migrations/`: auth and db are off in this app; `.grok/app-env.json` sets `VITE_AUTH_ENABLED` to `"false"`, but the deployed flag is the platform's (see `scripts/with-app-env.mjs`), so check it after deploy
 - `startup.sh`: the restart script for the Grok sandbox (the platform always runs `/workspace/startup.sh`; the script resolves its own directory, so it works locally too)
@@ -394,12 +394,12 @@ Content follows OWASP ASVS 5.0.0 (345 requirements: 70 at L1, 183 more at L2, 92
 
 - `attachments/` 下的參考資料：維持原作者的授權。其中 `OWASP_Application_Security_Verification_Standard_5.0.0_en.docx` 是 OWASP ASVS 5.0.0 原文，採 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)，著作權屬 OWASP Foundation。
 - `.grok/skills/generate2dmap/`、`.grok/skills/generate2dsprite/`、`.grok/skills/video2dsprite/`：各自目錄下的 `LICENSE`（MIT，0x0funky）。
-- Grok App Builder 平台檔案（`AGENTS.md`、`.grok/` 其餘內容、`public/__grok/`、`server/`、`scripts/grok-pwa-*` 與「平台檔案」一節列出的其他檔案）：屬於平台，依平台條款使用。
+- Grok App Builder 平台檔案（`.grok/` 其餘內容（含沙箱契約）、`public/__grok/`、`server/`、`scripts/grok-pwa-*` 與「平台檔案」一節列出的其他檔案）：屬於平台，依平台條款使用。
 - `public/fonts/` 的 IBM Plex：[SIL Open Font License 1.1](https://github.com/IBM/plex/blob/master/LICENSE.txt)。
 
 This project's own code and teaching content are under the [MIT License](LICENSE). Passages quoted directly from OWASP ASVS remain under its CC BY-SA 4.0. The following are outside the MIT license and keep their own:
 
 - The reference material under `attachments/`: its authors' licenses. `OWASP_Application_Security_Verification_Standard_5.0.0_en.docx` is the OWASP ASVS 5.0.0 text under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), copyright the OWASP Foundation.
 - `.grok/skills/generate2dmap/`, `.grok/skills/generate2dsprite/`, `.grok/skills/video2dsprite/`: the `LICENSE` in each directory (MIT, 0x0funky).
-- Grok App Builder platform files (`AGENTS.md`, the rest of `.grok/`, `public/__grok/`, `server/`, `scripts/grok-pwa-*` and the others listed under "Platform files"): they belong to the platform and are used under its terms.
+- Grok App Builder platform files (the rest of `.grok/`, including the sandbox contract, `public/__grok/`, `server/`, `scripts/grok-pwa-*` and the others listed under "Platform files"): they belong to the platform and are used under its terms.
 - IBM Plex in `public/fonts/`: [SIL Open Font License 1.1](https://github.com/IBM/plex/blob/master/LICENSE.txt).
