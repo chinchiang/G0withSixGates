@@ -5,6 +5,9 @@
  *
  *   npm run build && npm run preview:restart && npm run test:e2e
  *   npm run test:e2e -- http://127.0.0.1:8080/   # 對開發伺服器
+ *   E2E_CPU_THROTTLE=10 npm run test:e2e         # CPU 降速 10 倍
+ *
+ * 降速會讓水合變慢，在水合後的副作用跑完之前就讀寫的測試會穩定失敗，不再只是偶爾失敗。
  *
  * 規則引擎與資料由 `npm test` 測；這裡只測要真的瀏覽器才看得到的事：兩種語系的畫面渲染、
  * console、版面、儲存、網址狀態與 CSP 回報端點。
@@ -19,6 +22,9 @@
  * report endpoint. Outside Grok the "Created with Grok" badge script is blocked by
  * grok.com or fail proxy certificate trust. Only known load failures from that exact
  * URL are recorded separately as external warnings; other errors still fail.
+ *
+ * `E2E_CPU_THROTTLE=10` slows the CPU tenfold. Hydration slows with it, so a test that reads or
+ * writes before the post-hydration effects have run fails every time instead of now and then.
  */
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
@@ -36,6 +42,10 @@ const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
 };
 const VIEWS = ["overview", "harness", "gates", "levels", "map", "tools"];
+
+const THROTTLE = Number(process.env.E2E_CPU_THROTTLE ?? 1);
+if (!(THROTTLE >= 1))
+  throw new Error(`E2E_CPU_THROTTLE must be a number ≥ 1, got "${process.env.E2E_CPU_THROTTLE}"`);
 
 const url = (search = "") => new URL(search, BASE).href;
 const results = [];
@@ -59,6 +69,10 @@ async function test(name, fn) {
 async function openPage(browser, viewport, reducedMotion = "reduce") {
   const context = await browser.newContext({ viewport, reducedMotion });
   const page = await context.newPage();
+  if (THROTTLE > 1) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
+  }
   const errors = [];
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
