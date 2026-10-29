@@ -48,6 +48,23 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
+  // 畫面文字一律放進 bi()（T 文案表或就地 t(bi(…))），不在畫面裡依語系分支；中英各一份才看得出缺哪一邊。
+  // On-screen text goes through bi() (the T table or an inline t(bi(…))), never a branch on the locale
+  // inside a view; keeping both languages side by side shows when one is missing.
+  {
+    files: ["src/components/views/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "ConditionalExpression > BinaryExpression.test[operator=/^[!=]==?$/]:matches([left.name='locale'], [left.property.name='locale'], [right.name='locale'], [right.property.name='locale']):matches([left.value=/^(zh|en)$/], [right.value=/^(zh|en)$/])",
+          message:
+            '畫面文字放進 bi()，例如 T 文案表的 bi("缺", "Missing: ")，再用 t() 取出，不要依 locale 分支。 Put on-screen text in bi(), e.g. bi("缺", "Missing: ") in the T table, and read it with t() instead of branching on locale.',
+        },
+      ],
+    },
+  },
   // Disable rules that conflict with Prettier formatting.
   prettier,
 );
