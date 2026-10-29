@@ -239,6 +239,7 @@ G0withSixGates/
 │   ├── run-tests.mjs               # 本專案 app：npm test
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── regress.mjs、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
+│   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── og-card.mjs                 # 本專案 app：重製 public/og.jpg
 │   ├── stryker-ignore-bi.mjs       # 本專案 app：突變測試忽略 bi() 內的內容字串 / mutation ignore plugin
@@ -299,6 +300,7 @@ npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the p
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
 npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
 npm run regress          # 與 CI 相同的整套檢查，含建置、e2e 與 Pages / the full CI-equivalent suite
+npm run compare:main     # 跟 main 比規則引擎的輸出與放行紀錄 / compare behaviour with main
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
 node scripts/og-card.mjs         # 重製分享卡片 public/og.jpg / regenerate the share card
 npm run test:mutation            # 突變測試，預設不跑，見下節 / mutation testing, off by default, see below
@@ -323,6 +325,22 @@ CI also runs `npm run test:e2e:throttled` (`E2E_CPU_THROTTLE=10`), the suite wit
 正式 HTTPS 部署可使用 `npm run test:e2e -- https://example.com/` 驗證頁面與靜態資源安全標頭，並執行瀏覽器互動測試；此測試也會向 CSP 回報端點送出測試資料。
 
 For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks page and static-asset security headers and runs browser interactions; it also sends test data to the CSP report endpoint.
+
+### 行為比對 / Behaviour comparison
+
+重構要證明行為沒變時，用 `npm run compare:main`（`scripts/compare-with-main.mjs`）。它建一份 `main` 的 `git worktree`、借用 `node_modules`，兩邊各用 `scripts/behaviour-snapshot.mjs` 拍一次快照：全部 221,184 種設定組合的 `buildPlan` 雜湊，以及預設情境 × 中英 × 三種勾選的放行紀錄。接著比對雜湊，彙整紀錄差了哪些行；結束時一定刪掉工作樹。兩邊相同時以 0 結束。
+
+- `--base <ref>`／`--head <ref>`：比對的兩端，預設是 `main` 與目前的工作目錄（含還沒提交的修改）。
+- `--normalise <模組>`：排除預期會變的部分。模組可匯出 `plan(plan, profile)` 與 `record(markdown, info)`，格式見 `scripts/behaviour-snapshot.mjs` 開頭的說明。
+- `--out <目錄>`：輸出位置，預設在暫存目錄；要附在 PR 的證據，請指到會留下來的地方。
+- `--e2e`：另外建置基準版，用目前的 `scripts/e2e.mjs` 去測它，證明新加的斷言在修改前確實會失敗；跑完會恢復目前的預覽。
+
+When a refactor must preserve behaviour, run `npm run compare:main` (`scripts/compare-with-main.mjs`). It adds a `git worktree` of `main`, borrows `node_modules`, and snapshots both sides with `scripts/behaviour-snapshot.mjs`: digests of `buildPlan` for all 221,184 profiles, plus the release records for each preset × zh/en × three check sets. It then compares the digests and summarises the changed record lines, always removing the worktree; it exits 0 when both sides match.
+
+- `--base <ref>` / `--head <ref>`: the two sides, by default `main` and the current working tree (uncommitted changes included).
+- `--normalise <module>`: removes the expected changes. The module may export `plan(plan, profile)` and `record(markdown, info)`; see the header of `scripts/behaviour-snapshot.mjs`.
+- `--out <dir>`: where the output goes, a temp directory by default; point it somewhere that persists for PR evidence.
+- `--e2e`: also builds the base and runs the current `scripts/e2e.mjs` against it, to show a new assertion failed before the change; the current preview is restored afterwards.
 
 ### 突變測試 / Mutation testing
 

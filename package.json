@@ -28,6 +28,7 @@
     "test:e2e": "node scripts/e2e.mjs",
     "test:e2e:throttled": "E2E_CPU_THROTTLE=10 node scripts/e2e.mjs",
     "regress": "node scripts/regress.mjs",
+    "compare:main": "node scripts/compare-with-main.mjs",
     "test:mutation": "stryker run",
     "lint": "eslint .",
     "format": "prettier --write .",
