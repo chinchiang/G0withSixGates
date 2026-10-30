@@ -6,6 +6,7 @@
  * 先確認 Chromium 能啟動，缺系統函式庫就列出缺了哪些、怎麼補，再開始跑，不用等建置完才在 e2e 失敗。
  * 快速檢查平行跑；建置失敗時略過依賴它的步驟。每一步的輸出寫進暫存目錄的 `six-gate-regress/`。
  * 要指定解開的函式庫，照常在指令前加 `LD_LIBRARY_PATH=…`，子程序會繼承。
+ * 時間同時用單調時鐘與實際時間量：主機睡眠時 WSL 整台暫停，單調時鐘不前進，兩者的差就是暫停多久（`regress-timing.mjs`）。
  *
  * The full CI-equivalent regression suite: `npm run regress`.
  *
@@ -13,7 +14,9 @@
  * install them before running anything, instead of failing in e2e after the build. The quick checks
  * run in parallel; a failed build skips the steps that need it. Each step's output goes to
  * `six-gate-regress/` in the temp directory. To use extracted libraries, prefix the command with
- * `LD_LIBRARY_PATH=…` as usual; child processes inherit it.
+ * `LD_LIBRARY_PATH=…` as usual; child processes inherit it. Each time is taken on both the monotonic
+ * and the wall clock: when the host sleeps WSL pauses and the monotonic clock stops, so the
+ * difference is how long it paused (`regress-timing.mjs`).
  */
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
@@ -22,10 +25,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { missingFromLdd, missingLibrariesAdvice, missingLibraryError } from "./browser-libs.mjs";
+import { allPassed, skipLine, stepLine, summaryLine } from "./regress-timing.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOGS = join(tmpdir(), "six-gate-regress");
 mkdirSync(LOGS, { recursive: true });
+
+/** 兩個時鐘的現在時間。 Now, on both clocks. */
+const now = () => ({ monotonic: performance.now(), wall: Date.now() });
+/**
+ * 從 `started` 到現在，兩個時鐘各經過多久。 How long each clock ran since `started`.
+ * @param {{ monotonic: number; wall: number }} started
+ */
+const since = (started) => {
+  const ended = now();
+  return { monotonic: ended.monotonic - started.monotonic, wall: ended.wall - started.wall };
+};
+const suiteStarted = now();
 
 async function checkBrowser() {
   try {
@@ -45,7 +61,7 @@ async function checkBrowser() {
   }
 }
 
-/** @type {{ name: string; status: "PASS" | "FAIL" | "SKIP"; seconds: number }[]} */
+/** @type {import("./regress-timing.mjs").StepResult[]} */
 const results = [];
 
 /**
@@ -55,16 +71,15 @@ const results = [];
  */
 function step(name, command) {
   const log = join(LOGS, `${name}.log`);
-  const started = Date.now();
+  const started = now();
   return new Promise((resolve) => {
     const out = openSync(log, "w");
     const child = spawn(command[0], command.slice(1), { cwd: ROOT, stdio: ["ignore", out, out] });
     child.on("close", (code) => {
       closeSync(out);
-      const seconds = Math.round((Date.now() - started) / 1000);
       const status = code === 0 ? "PASS" : "FAIL";
-      results.push({ name, status, seconds });
-      console.log(`${status} ${name} ${seconds}s${status === "FAIL" ? ` (log: ${log})` : ""}`);
+      results.push({ name, status });
+      console.log(stepLine(name, status, since(started), log));
       resolve(code === 0);
     });
   });
@@ -73,8 +88,8 @@ function step(name, command) {
 /** @param {string[]} names */
 function skip(...names) {
   for (const name of names) {
-    results.push({ name, status: "SKIP", seconds: 0 });
-    console.log(`SKIP ${name}`);
+    results.push({ name, status: "SKIP" });
+    console.log(skipLine(name));
   }
 }
 
@@ -100,10 +115,5 @@ if (await step("build-pages", ["npm", "run", "build:pages"])) {
   await step("test-pages-throttled", ["npm", "run", "test:pages:throttled"]);
 } else skip("test-pages", "test-pages-throttled");
 
-const failed = results.filter((item) => item.status !== "PASS");
-console.log(
-  failed.length
-    ? `\n${failed.length} of ${results.length} steps did not pass: ${failed.map((item) => item.name).join(", ")}`
-    : `\nAll ${results.length} steps passed.`,
-);
-process.exit(failed.length ? 1 : 0);
+console.log(`\n${summaryLine(results, since(suiteStarted))}`);
+process.exit(allPassed(results) ? 0 : 1);

@@ -246,7 +246,7 @@ G0withSixGates/
 │   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()）/ the lint rules apply
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速與等水合 / throttling and hydration waits shared by both browser suites
-│   ├── regress.mjs、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
+│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── check-built-headers.mjs、check-built-bundles.mjs(.test.mjs)   # 本專案 app：建置後檢查安全標頭與程式包切分 / post-build checks of the headers and code splitting
@@ -324,7 +324,7 @@ npm run test:mutation            # 突變測試，預設不跑，見下節 / mut
 
 CI 還會用 `npm run test:e2e:throttled`（`E2E_CPU_THROTTLE=10`）把 CPU 降速 10 倍再跑一次。降速讓水合變慢，在水合完成前就操作的測試會每次都失敗，不會只在機器忙的時候偶爾失敗。app 水合完成後會在 `<html>` 加上 `data-hydrated`，測試用 `load`／`reload` 載入頁面，等到這個標記才開始操作。
 
-`npm run regress` 照 CI 的順序跑完所有檢查，每一步的輸出寫在暫存目錄的 `six-gate-regress/`。它會先確認 Chromium 能啟動；缺系統函式庫時會列出缺了哪些，以及有無 sudo 時各怎麼補，不必等到建置完才在 e2e 失敗。
+`npm run regress` 照 CI 的順序跑完所有檢查，每一步的輸出寫在暫存目錄的 `six-gate-regress/`。它會先確認 Chromium 能啟動；缺系統函式庫時會列出缺了哪些，以及有無 sudo 時各怎麼補，不必等到建置完才在 e2e 失敗。每一步的時間不含主機睡眠，最後印出總計；主機睡眠讓 WSL 暫停 30 秒以上時，該行會附註暫停了多久。
 
 Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth`, `format`.
 
@@ -332,7 +332,7 @@ Other scripts: `build:dev`, `preview`, `preview:stop`, `db:migrate`, `check:auth
 
 CI also runs `npm run test:e2e:throttled` (`E2E_CPU_THROTTLE=10`), the suite with the CPU slowed tenfold. Hydration slows with it, so a test that acts before hydration finishes fails every time instead of only on a busy machine. Once hydrated, the app sets `data-hydrated` on `<html>`; the tests load pages with `load` / `reload`, which wait for that marker before interacting.
 
-`npm run regress` runs every check in CI order and writes each step's output to `six-gate-regress/` in the temp directory. It first checks that Chromium can start; if system libraries are missing it lists them and how to install them with or without sudo, instead of failing in e2e after the build.
+`npm run regress` runs every check in CI order and writes each step's output to `six-gate-regress/` in the temp directory. It first checks that Chromium can start; if system libraries are missing it lists them and how to install them with or without sudo, instead of failing in e2e after the build. Step times leave out host sleep, and a total is printed at the end; when host sleep pauses WSL for 30 seconds or more, the line notes how long it paused.
 
 正式 HTTPS 部署可使用 `npm run test:e2e -- https://example.com/` 驗證頁面與靜態資源安全標頭，並執行瀏覽器互動測試；此測試也會向 CSP 回報端點送出測試資料。
 
