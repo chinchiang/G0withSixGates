@@ -97,7 +97,8 @@ if (await step("build", ["npm", "run", "build"])) {
 
 if (await step("build-pages", ["npm", "run", "build:pages"])) {
   await step("test-pages", ["npm", "run", "test:pages"]);
-} else skip("test-pages");
+  await step("test-pages-throttled", ["npm", "run", "test:pages:throttled"]);
+} else skip("test-pages", "test-pages-throttled");
 
 const failed = results.filter((item) => item.status !== "PASS");
 console.log(

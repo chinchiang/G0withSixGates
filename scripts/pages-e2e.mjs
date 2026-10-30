@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { preview } from "vite";
+import { cpuThrottleFromEnv, load, reload, throttle } from "./e2e-shared.mjs";
+
+// E2E_CPU_THROTTLE=10 npm run test:pages 會把 CPU 降速 10 倍（npm run test:pages:throttled）。
+// E2E_CPU_THROTTLE=10 npm run test:pages slows the CPU tenfold (npm run test:pages:throttled).
+const THROTTLE = cpuThrottleFromEnv(process.env);
 
 const server = await preview({
   configFile: "vite.pages.config.ts",
@@ -15,6 +20,7 @@ try {
   ]) {
     const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
     const page = await context.newPage();
+    await throttle(page, THROTTLE);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
@@ -26,7 +32,7 @@ try {
     for (const view of ["overview", "harness", "gates", "levels", "map", "tools"]) {
       const url = new URL(base);
       url.search = `?view=${view}&lang=zh`;
-      await page.goto(url.href, { waitUntil: "networkidle" });
+      await load(page, url.href);
       assert.ok((await page.locator("main").innerText()).trim().length > 50, `${view}: blank`);
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
@@ -34,7 +40,7 @@ try {
         `${view}: overflow`,
       );
     }
-    await page.goto(new URL("?view=harness&lang=zh", base).href, { waitUntil: "networkidle" });
+    await load(page, new URL("?view=harness&lang=zh", base).href);
     const dock = page.locator("nav.dock");
     assert.equal(await dock.isVisible(), viewport.width < 768, "responsive navigation visibility");
     if (viewport.width < 768) {
@@ -46,11 +52,11 @@ try {
 
     await page.getByRole("button", { name: "執行 Harness" }).click();
     await page.getByText("不准放行。", { exact: false }).first().waitFor();
-    await page.reload({ waitUntil: "networkidle" });
+    await reload(page);
     assert.ok(await page.getByText("不准放行。", { exact: false }).first().isVisible());
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.waitForFunction(() => document.documentElement.lang === "en");
-    await page.reload({ waitUntil: "networkidle" });
+    await reload(page);
     assert.equal(await page.locator("html").getAttribute("lang"), "en");
     assert.deepEqual(errors, []);
     await context.close();

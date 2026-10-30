@@ -34,7 +34,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build:pages": "vite build --config vite.pages.config.ts",
-    "test:pages": "node scripts/pages-e2e.mjs"
+    "test:pages": "node scripts/pages-e2e.mjs",
+    "test:pages:throttled": "E2E_CPU_THROTTLE=10 node scripts/pages-e2e.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

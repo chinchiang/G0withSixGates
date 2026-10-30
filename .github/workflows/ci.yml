@@ -62,6 +62,8 @@ jobs:
       - run: npm run test:e2e:throttled
       - run: npm run build:pages
       - run: npm run test:pages
+      # GitHub Pages 版也降速 10 倍再測一次。 Test the GitHub Pages build again with the CPU slowed tenfold.
+      - run: npm run test:pages:throttled
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
