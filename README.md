@@ -25,9 +25,9 @@ Scenarios, checklists, language, results and downloads run in the browser on the
 
 The static site's head (title, description, theme-color, theme bootstrap) shares `src/document-head.ts` with the server build and is injected at build time by a plugin in `vite.pages.config.ts`; the index route's options come from `src/routes/index.tsx`, and the router defaults are shared through `src/app-route.ts`.
 
-本機可用 `npm run build:pages` 建置，以及 `npm run test:pages` 測試已建置的靜態網站。測試需要 Playwright Chromium。若需模擬專案子路徑，建置和測試時將 `GITHUB_REPOSITORY` 設為 `owner/repository`。
+本機可用 `npm run build:pages` 建置，以及 `npm run test:pages` 測試已建置的靜態網站；`npm run test:pages:throttled` 會把 CPU 降速 10 倍再測一次，CI 兩種都會跑。測試需要 Playwright Chromium。若需模擬專案子路徑，建置和測試時將 `GITHUB_REPOSITORY` 設為 `owner/repository`。
 
-Run `npm run build:pages` and `npm run test:pages` locally to build and test the static site; the test requires Playwright Chromium. Set `GITHUB_REPOSITORY` to `owner/repository` for both commands to simulate a project subpath.
+Run `npm run build:pages` and `npm run test:pages` locally to build and test the static site; `npm run test:pages:throttled` tests it again with the CPU slowed tenfold, and CI runs both. The tests require Playwright Chromium. Set `GITHUB_REPOSITORY` to `owner/repository` for both commands to simulate a project subpath.
 
 ## 使用方式 / Getting started
 
@@ -245,6 +245,7 @@ G0withSixGates/
 │   ├── run-tests.mjs               # 本專案 app：npm test
 │   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()）/ the lint rules apply
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
+│   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速與等水合 / throttling and hydration waits shared by both browser suites
 │   ├── regress.mjs、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
@@ -308,6 +309,7 @@ npm run build            # 產出 .vercel/output（不進版控），接著跑 d
 npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the production build
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
 npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
+npm run test:pages:throttled  # 對已建置的 Pages 跑測試，CPU 降速 10 倍 / the Pages tests with the CPU slowed tenfold
 npm run regress          # 與 CI 相同的整套檢查，含建置、e2e 與 Pages / the full CI-equivalent suite
 npm run compare:main     # 跟 main 比規則引擎的輸出與放行紀錄 / compare behaviour with main
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
