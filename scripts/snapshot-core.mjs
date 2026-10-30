@@ -125,6 +125,24 @@ export function compareDigests(a, b, limit = 5) {
 }
 
 /**
+ * 取出 HTML 的 `<head>`，把資源網址裡的雜湊值換成 `HASH`，每個標籤一行；程式包內容一變雜湊值就會變，比對時要排除。
+ * Extract an HTML document's `<head>` with the hashes in asset URLs replaced by `HASH`, one tag per line;
+ * the hashes change whenever a bundle does, so comparisons leave them out.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+export function comparableHead(html) {
+  const head = /<head>([\s\S]*?)<\/head>/.exec(html)?.[1] ?? "";
+  return head
+    .replace(/(\/assets\/[\w.-]+?)-[\w-]{8}\.(js|css)\b/g, "$1-HASH.$2")
+    .trim()
+    .split(/>\s*(?=<)/)
+    .map((tag, i, tags) => (i < tags.length - 1 ? `${tag}>` : tag))
+    .join("\n");
+}
+
+/**
  * 把多份紀錄的差異行彙整成「哪一行、在幾份紀錄裡變了」，依次數由多到少。
  * Summarise changed lines across records as "which line, in how many records", most frequent first.
  *

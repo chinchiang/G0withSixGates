@@ -12,14 +12,19 @@
  * - `--out`：輸出目錄，預設是暫存目錄的 `six-gate-compare/`。要附在 PR 的證據，指到 `scratch/` 之類會留下來的地方。
  * - `--e2e`：另外建置基準版，用 head 的 `scripts/e2e.mjs` 去測它（`E2E_CPU_THROTTLE` 等環境變數照常傳下去），
  *   輸出在 `e2e-base.txt`；跑完會恢復 head 的預覽。用來證明新加的 e2e 斷言在修改前確實會失敗。
+ * - `--pages`：兩邊各建置 GitHub Pages 版，比對 `dist/pages/index.html` 的 `<head>`（資源雜湊值排除在外），
+ *   差異存成 `pages-head.diff`；再從基準版的目錄執行 head 的 `scripts/pages-e2e.mjs`，它會用基準版的
+ *   `vite.pages.config.ts` 與建置結果，輸出在 `pages-e2e-base.txt`。
  *
  * 計畫雜湊與放行紀錄都相同時以 0 結束，有任何不同就以 1 結束。
  *
  * Compare behaviour with `main` (or another ref): add a `git worktree`, borrow `node_modules`,
  * snapshot both sides with `behaviour-snapshot.mjs`, compare the plan digests and summarise which
  * record lines changed. The worktrees are always removed. `--e2e` also builds the base and runs the
- * head's `scripts/e2e.mjs` against it, then restores the head's preview. Exits 0 when the digests and
- * records match, 1 otherwise.
+ * head's `scripts/e2e.mjs` against it, then restores the head's preview. `--pages` builds GitHub Pages
+ * on both sides, diffs the `<head>` of `dist/pages/index.html` without asset hashes, and runs the head's
+ * `scripts/pages-e2e.mjs` from the base's directory, so it tests the base's Pages build. Exits 0 when the
+ * digests, records and (with `--pages`) Pages heads match, 1 otherwise.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -34,7 +39,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compareDigests, summariseChanges } from "./snapshot-core.mjs";
+import { comparableHead, compareDigests, summariseChanges } from "./snapshot-core.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -48,6 +53,7 @@ const head = option("--head");
 const normalise = option("--normalise");
 const out = resolve(option("--out") ?? join(tmpdir(), "six-gate-compare"));
 const withE2e = process.argv.includes("--e2e");
+const withPages = process.argv.includes("--pages");
 
 /**
  * 執行指令；失敗時丟出含輸出的錯誤。 Run a command; throw with its output on failure.
@@ -167,7 +173,52 @@ try {
     for (const line of failing) console.log(`  ${line}`);
   }
 
-  exitCode = plans.equal && differingRecords === 0 ? 0 : 1;
+  let pagesHeadsMatch = true;
+  if (withPages) {
+    /** @param {string} root */
+    const buildPages = (root) =>
+      run("vite", ["build", "--config", "vite.pages.config.ts"], {
+        cwd: root,
+        env: { ...process.env, PATH: `${join(root, "node_modules/.bin")}:${process.env.PATH}` },
+      });
+    const heads = ["base", "head"].map((side) => {
+      const root = side === "base" ? baseRoot : headRoot;
+      buildPages(root);
+      const file = join(out, `pages-head-${side}.txt`);
+      writeFileSync(
+        file,
+        comparableHead(readFileSync(join(root, "dist/pages/index.html"), "utf8")) + "\n",
+      );
+      return file;
+    });
+    const diff = run("git", ["diff", "--no-index", "--no-color", "-U0", ...heads], {
+      allowFailure: true,
+    }).stdout;
+    writeFileSync(join(out, "pages-head.diff"), diff);
+    pagesHeadsMatch = diff === "";
+    console.log(
+      pagesHeadsMatch
+        ? "\npages <head>: identical (asset hashes excluded)"
+        : `\npages <head> (asset hashes excluded), full diff in ${join(out, "pages-head.diff")}:`,
+    );
+    for (const line of diff.split("\n").filter((l) => /^[-+](?![-+]{2} )/.test(l)))
+      console.log(`  ${line}`);
+    // pages-e2e.mjs 讀執行目錄的 vite.pages.config.ts 與 dist/pages/，所以從基準版目錄執行就是測基準版。
+    // pages-e2e.mjs reads vite.pages.config.ts and dist/pages/ from its working directory, so running it from the base tests the base.
+    const pagesE2e = run(process.execPath, [join(headRoot, "scripts/pages-e2e.mjs")], {
+      cwd: baseRoot,
+      allowFailure: true,
+    });
+    writeFileSync(join(out, "pages-e2e-base.txt"), pagesE2e.stdout + pagesE2e.stderr);
+    const verdict =
+      pagesE2e.status === 0
+        ? "passed"
+        : ((pagesE2e.stdout + pagesE2e.stderr).match(/AssertionError[^\n]*\n?[^\n]*/)?.[0] ??
+          "failed");
+    console.log(`\npages e2e (head's tests on base's Pages build): ${verdict.trim()}`);
+  }
+
+  exitCode = plans.equal && differingRecords === 0 && pagesHeadsMatch ? 0 : 1;
   console.log(`\noutput: ${out}`);
 } catch (error) {
   console.error(String(/** @type {Error} */ (error)?.message ?? error));

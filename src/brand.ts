@@ -1,4 +1,4 @@
-import { bi } from "@/i18n/locale";
+import { bi } from "./i18n/locale.ts";
 
 /**
  * 專案名稱與一句話說明，供標頭、分頁標題、meta 與放行紀錄共用。

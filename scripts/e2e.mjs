@@ -312,6 +312,22 @@ try {
     await close();
   });
 
+  // 跟 pages-e2e.mjs 的同一項檢查：兩個版本共用 src/document-head.ts 的開機腳本。
+  // The same check as in pages-e2e.mjs: both builds share the bootstrap in src/document-head.ts.
+  await test("theme: a light-theme user gets the light theme-color before any JS module loads", async () => {
+    const context = await browser.newContext();
+    await context.addInitScript(() => localStorage.setItem("six-gate-theme", "light"));
+    await context.route(/\.js(\?|$)/, (route) => route.abort());
+    const page = await context.newPage();
+    await page.goto(url(), { waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+    assert.equal(
+      await page.locator('meta[name="theme-color"]').first().getAttribute("content"),
+      "#ffffff",
+    );
+    await context.close();
+  });
+
   await test("theme: toggle switches light and dark, updates theme-color and survives a reload", async () => {
     const { page, errors, close } = await openPage(browser, VIEWPORTS.desktop);
     // 水合後可能有兩個 theme-color 標籤，全部都要一致。 Hydration may leave two theme-color tags; they must all agree.

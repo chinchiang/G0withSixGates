@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as model from "../src/data/model.ts";
 import {
+  comparableHead,
   compareDigests,
   digestLines,
   everyProfile,
@@ -63,6 +64,28 @@ describe("behaviour snapshot core", () => {
     assert.equal(result.differingCount, 2);
     assert.deepEqual(result.differing, [1, 3]);
     assert.deepEqual(result.sizes, [4, 3]);
+  });
+
+  it("compares two heads without the asset hashes, one tag per line", () => {
+    const html = (hash) =>
+      [
+        "<html><head>",
+        '  <meta charset="UTF-8" />',
+        `  <script type="module" crossorigin src="/assets/index-${hash}.js"></script>`,
+        `  <link rel="stylesheet" href="/assets/styles-${hash}.css">`,
+        "  <title>六扇門</title>",
+        "</head><body><p>not in the head</p></body></html>",
+      ].join("\n");
+    const expected = [
+      '<meta charset="UTF-8" />',
+      '<script type="module" crossorigin src="/assets/index-HASH.js">',
+      "</script>",
+      '<link rel="stylesheet" href="/assets/styles-HASH.css">',
+      "<title>六扇門</title>",
+    ].join("\n");
+    assert.equal(comparableHead(html("Dl7GFrBu")), expected);
+    assert.equal(comparableHead(html("C0b3mg5L")), comparableHead(html("Dl7GFrBu")));
+    assert.equal(comparableHead("<p>no head</p>"), "");
   });
 
   it("counts each changed line across records, most frequent first", () => {

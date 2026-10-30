@@ -55,6 +55,21 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
+  // JS 模組還沒載入前，淺色使用者就要拿到淺色主題與淺色 theme-color：只讓 <head> 的行內開機腳本執行。
+  // Before any JS module loads, a light-theme user already gets the light theme and theme-color: only the inline bootstrap in <head> runs.
+  const context = await browser.newContext();
+  await context.addInitScript(() => localStorage.setItem("six-gate-theme", "light"));
+  await context.route(/\.js(\?|$)/, (route) => route.abort());
+  const page = await context.newPage();
+  await page.goto(base.href, { waitUntil: "domcontentloaded" });
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "light", "bootstrap theme");
+  assert.equal(
+    await page.locator('meta[name="theme-color"]').getAttribute("content"),
+    "#ffffff",
+    "bootstrap theme-color",
+  );
+  await context.close();
+
   console.log("GitHub Pages desktop and mobile regression checks passed.");
 } finally {
   await browser.close();

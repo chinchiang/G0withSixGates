@@ -3,16 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="G0 威脅建模與六道資安閘門的互動教學工具。" />
-    <meta name="theme-color" content="#070b12" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
-    <title>六扇門 | Six-Gate for Vibe Code</title>
-    <script>
-      try {
-        if (localStorage.getItem("six-gate-theme") === "light")
-          document.documentElement.dataset.theme = "light";
-      } catch (e) {}
-    </script>
+    <!-- 標題、描述、theme-color 與主題開機腳本由 vite.pages.config.ts 從 src/document-head.ts 注入。 -->
+    <!-- The title, description, theme-color and theme bootstrap are injected from src/document-head.ts by vite.pages.config.ts. -->
   </head>
   <body>
     <div id="root"></div>

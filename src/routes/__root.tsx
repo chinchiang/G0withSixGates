@@ -1,8 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
-import { APP_DESCRIPTION, APP_TITLE } from "@/brand";
-import { THEME_BOOTSTRAP, THEME_COLOR } from "@/theme";
+import { DOCUMENT_HEAD } from "@/document-head";
 import appCss from "../styles.css?url";
 
 /**
@@ -17,9 +16,9 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: APP_TITLE },
-      { name: "description", content: `${APP_DESCRIPTION.zh} ${APP_DESCRIPTION.en}` },
-      { name: "theme-color", content: THEME_COLOR.dark },
+      { title: DOCUMENT_HEAD.title },
+      { name: "description", content: DOCUMENT_HEAD.description },
+      { name: "theme-color", content: DOCUMENT_HEAD.themeColor },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -32,7 +31,7 @@ export const Route = createRootRoute({
     <html lang="zh-Hant-TW" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: DOCUMENT_HEAD.bootstrap }} />
       </head>
       <body>
         <PreviewHostBridge />
