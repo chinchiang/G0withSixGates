@@ -1,7 +1,6 @@
 import "./zod-jitless";
 import { createRouter } from "@tanstack/react-router";
-import { AppErrorComponent } from "@/lib/error-component";
-import { AppNotFoundComponent } from "@/lib/not-found-component";
+import { ROUTER_DEFAULTS } from "@/app-route";
 import { routeTree } from "./routeTree.gen";
 
 /**
@@ -11,7 +10,6 @@ import { routeTree } from "./routeTree.gen";
 export function getRouter() {
   return createRouter({
     routeTree,
-    defaultErrorComponent: AppErrorComponent,
-    defaultNotFoundComponent: AppNotFoundComponent,
+    ...ROUTER_DEFAULTS,
   });
 }

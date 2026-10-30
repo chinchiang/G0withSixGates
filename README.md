@@ -21,6 +21,10 @@ GitHub Pages is the recommended deployment. On pushes to `main`, **Deploy GitHub
 
 Scenarios, checklists, language, results and downloads run in the browser on the static site. GitHub Pages does not provide the server-side CSP reporting endpoint, Vercel custom HTTP security headers or the server-generated PWA installation tutorial. The server build remains available if those features are needed; the architecture diagram and security-header section below describe that build, not GitHub Pages.
 
+靜態版的頁首（標題、描述、theme-color、主題開機腳本）與伺服器版共用 `src/document-head.ts`，由 `vite.pages.config.ts` 的外掛在建置時注入；首頁的路由選項讀 `src/routes/index.tsx`，路由器預設值跟伺服器版共用 `src/app-route.ts`。
+
+The static site's head (title, description, theme-color, theme bootstrap) shares `src/document-head.ts` with the server build and is injected at build time by a plugin in `vite.pages.config.ts`; the index route's options come from `src/routes/index.tsx`, and the router defaults are shared through `src/app-route.ts`.
+
 本機可用 `npm run build:pages` 建置，以及 `npm run test:pages` 測試已建置的靜態網站。測試需要 Playwright Chromium。若需模擬專案子路徑，建置和測試時將 `GITHUB_REPOSITORY` 設為 `owner/repository`。
 
 Run `npm run build:pages` and `npm run test:pages` locally to build and test the static site; the test requires Playwright Chromium. Set `GITHUB_REPOSITORY` to `owner/repository` for both commands to simulate a project subpath.
@@ -230,6 +234,7 @@ G0withSixGates/
 ├── README.md
 ├── attachments/                    # ASVS 5.0.0 原文 docx、心智圖 JSON（PDF、GIF 不進版控）
 ├── migrations/auth/0001_auth.sql   # 平台 platform：Better Auth 資料表；migrate.mjs 不讀子目錄，不會套用 / never applied
+├── pages/                          # GitHub Pages 版入口：index.html 只剩殼，頁首由 vite.pages.config.ts 注入 / the Pages entry; the head is injected
 ├── public/
 │   ├── favicon.svg
 │   ├── og.jpg                      # 分享卡片，由 scripts/og-card.mjs 產生 / share card
@@ -259,6 +264,8 @@ G0withSixGates/
 │   ├── brand.ts                    # 專案名稱與說明 / name and description
 │   ├── theme.ts(.test.ts)          # 主題鍵、theme-color 與開機腳本的單一來源 / single source for the theme key, theme-color and bootstrap script
 │   ├── router.tsx                  # getRouter()：錯誤與找不到畫面
+│   ├── app-route.ts                # 伺服器版與 Pages 版共用的路由器預設值 / router defaults shared by both builds
+│   ├── document-head.ts(.test.ts)  # 頁首內容的單一來源：標題、描述、theme-color、開機腳本 / single source for the document head
 │   ├── csp-report.ts(.test.ts)     # CSP 回報摘要與限量讀取 / CSP report summaries and capped reads
 │   ├── routeTree.gen.ts            # TanStack Router 自動產生 / generated
 │   ├── styles.css、styles.test.ts  # Tailwind v4 色彩 tokens、對比度測試
@@ -336,6 +343,7 @@ For a deployed HTTPS site, `npm run test:e2e -- https://example.com/` checks pag
 - `--normalise <模組>`：排除預期會變的部分。模組可匯出 `plan(plan, profile)` 與 `record(markdown, info)`，格式見 `scripts/behaviour-snapshot.mjs` 開頭的說明。
 - `--out <目錄>`：輸出位置，預設在暫存目錄；要附在 PR 的證據，請指到會留下來的地方。
 - `--e2e`：另外建置基準版，用目前的 `scripts/e2e.mjs` 去測它，證明新加的斷言在修改前確實會失敗；跑完會恢復目前的預覽。
+- `--pages`：兩邊各建置 GitHub Pages 版，比對 `dist/pages/index.html` 的 `<head>`（排除資源雜湊值），再用目前的 `scripts/pages-e2e.mjs` 去測基準版的 Pages。
 
 When a refactor must preserve behaviour, run `npm run compare:main` (`scripts/compare-with-main.mjs`). It adds a `git worktree` of `main`, borrows `node_modules`, and snapshots both sides with `scripts/behaviour-snapshot.mjs`: digests of `buildPlan` for all 221,184 profiles, plus the release records for each preset × zh/en × three check sets. It then compares the digests and summarises the changed record lines, always removing the worktree; it exits 0 when both sides match.
 
@@ -343,6 +351,7 @@ When a refactor must preserve behaviour, run `npm run compare:main` (`scripts/co
 - `--normalise <module>`: removes the expected changes. The module may export `plan(plan, profile)` and `record(markdown, info)`; see the header of `scripts/behaviour-snapshot.mjs`.
 - `--out <dir>`: where the output goes, a temp directory by default; point it somewhere that persists for PR evidence.
 - `--e2e`: also builds the base and runs the current `scripts/e2e.mjs` against it, to show a new assertion failed before the change; the current preview is restored afterwards.
+- `--pages`: builds GitHub Pages on both sides, diffs the `<head>` of `dist/pages/index.html` without asset hashes, and runs the current `scripts/pages-e2e.mjs` against the base's Pages build.
 
 ### 突變測試 / Mutation testing
 
