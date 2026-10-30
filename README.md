@@ -249,6 +249,7 @@ G0withSixGates/
 │   ├── regress.mjs、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
+│   ├── check-built-headers.mjs、check-built-bundles.mjs(.test.mjs)   # 本專案 app：建置後檢查安全標頭與程式包切分 / post-build checks of the headers and code splitting
 │   ├── og-card.mjs                 # 本專案 app：重製 public/og.jpg
 │   ├── stryker-ignore-bi.mjs       # 本專案 app：突變測試忽略 bi() 內的內容字串 / mutation ignore plugin
 │   ├── app-env-plugin.mjs、with-app-env.mjs(.test.mjs)          # 平台 platform
@@ -305,7 +306,7 @@ npm run dev              # 開發伺服器 dev server：http://localhost:8080
 npm test                 # 規則引擎、雙語內容、儲存搬移、對比度、腳本與平台測試 / all test suites
 npm run typecheck
 npm run lint
-npm run build            # 產出 .vercel/output（不進版控），接著跑 db:migrate（沒有 DATABASE_URL 會略過）
+npm run build            # 產出 .vercel/output（不進版控），檢查安全標頭與程式包切分，接著跑 db:migrate（沒有 DATABASE_URL 會略過）/ build, check headers and code splitting, then migrate
 npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the production build
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
 npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
