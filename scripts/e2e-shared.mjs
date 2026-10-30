@@ -6,6 +6,17 @@
  */
 
 /**
+ * 兩套瀏覽器測試的畫面尺寸：桌機與手機。手機寬度小於 768px（`shell.tsx` 底部導覽列的 `md:hidden`，
+ * Tailwind 預設的 `md`），所以會出現底部導覽列。
+ * The screen sizes both browser suites test: desktop and mobile. The mobile width sits below 768px (the
+ * `md:hidden` on the bottom dock in `shell.tsx`, Tailwind's default `md`), so the dock shows.
+ */
+export const VIEWPORTS = {
+  desktop: { width: 1280, height: 800 },
+  mobile: { width: 390, height: 844 },
+};
+
+/**
  * 從環境變數讀 `E2E_CPU_THROTTLE`：沒設定時是 1（不降速），不是大於等於 1 的數字就報錯。
  * Read `E2E_CPU_THROTTLE` from the environment: 1 (no throttling) when unset; anything that is not a
  * number ≥ 1 throws.
