@@ -243,7 +243,7 @@ G0withSixGates/
 ├── screenshots/.gitkeep            # browser-smoke 與 e2e 的截圖輸出，只保留目錄
 ├── scripts/
 │   ├── run-tests.mjs               # 本專案 app：npm test
-│   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()）/ the lint rules apply
+│   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()、Vite 設定檔匯入鏈不用 @/）/ the lint rules apply (on-screen text via bi(), no @/ in the Vite config import chain)
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速與等水合 / throttling and hydration waits shared by both browser suites
 │   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite

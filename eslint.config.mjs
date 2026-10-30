@@ -65,6 +65,35 @@ export default tseslint.config(
       ],
     },
   },
+  // Vite 載入設定檔時不認得 @/ 別名，設定檔與它們匯入的模組只能用相對路徑；eslint-config.test.mjs 確認實際匯入鏈上的每個檔案都在清單裡。
+  // 動態 import() 擋不到，那時 npm run build:pages 仍會失敗。
+  // Vite does not resolve the @/ alias while loading its config, so the configs and the modules they import use
+  // relative paths only; eslint-config.test.mjs checks that every file on the real import chain is in this list.
+  // A dynamic import() slips past this rule, but npm run build:pages still fails on it.
+  {
+    files: [
+      "vite.config.ts",
+      "vite.pages.config.ts",
+      "src/document-head.ts",
+      "src/brand.ts",
+      "src/theme.ts",
+      "src/i18n/locale.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*"],
+              message:
+                "Vite 載入設定檔時不認得 @/ 別名；Vite 設定檔與它們匯入的模組請改用相對路徑，例如 src/ 裡寫 ./brand.ts。 Vite does not resolve the @/ alias while loading its config; the Vite configs and the modules they import use relative paths instead, such as ./brand.ts inside src/.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Disable rules that conflict with Prettier formatting.
   prettier,
 );
