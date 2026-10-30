@@ -3,10 +3,11 @@ import { THEME_BOOTSTRAP, THEME_COLOR } from "./theme.ts";
 
 /**
  * 頁首內容的單一來源：伺服器版的 `__root.tsx` 與 GitHub Pages 版的建置外掛都從這裡取。
- * 不用 React、只用相對路徑匯入，Vite 載入設定檔時也讀得到。
+ * 不用 React、只用相對路徑匯入，Vite 載入設定檔時也讀得到；相對路徑由 `eslint.config.mjs` 把關。
  *
  * Single source for the document head: the server's `__root.tsx` and the GitHub Pages build plugin
- * both read it. No React and only relative imports, so Vite can load it while reading its config.
+ * both read it. No React and only relative imports, so Vite can load it while reading its config;
+ * `eslint.config.mjs` enforces the relative imports.
  */
 export interface DocumentHead {
   title: string;
