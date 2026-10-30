@@ -163,10 +163,14 @@ try {
     run(process.execPath, ["scripts/with-app-env.mjs", "vite", "build"], { cwd: baseRoot, env });
     run(process.execPath, ["scripts/preview.mjs", "restart"], { cwd: baseRoot });
     basePreview = true;
-    const e2e = run(process.execPath, [join(headRoot, "scripts/e2e.mjs")], {
-      cwd: headRoot,
-      allowFailure: true,
-    });
+    const e2e = run(
+      process.execPath,
+      ["--experimental-strip-types", join(headRoot, "scripts/e2e.mjs")],
+      {
+        cwd: headRoot,
+        allowFailure: true,
+      },
+    );
     writeFileSync(join(out, "e2e-base.txt"), e2e.stdout + e2e.stderr);
     const failing = e2e.stdout.split("\n").filter((line) => line.startsWith("not ok"));
     console.log(`\ne2e (head's tests on base's build): ${e2e.stdout.trim().split("\n").at(-1)}`);
@@ -205,10 +209,14 @@ try {
       console.log(`  ${line}`);
     // pages-e2e.mjs 讀執行目錄的 vite.pages.config.ts 與 dist/pages/，所以從基準版目錄執行就是測基準版。
     // pages-e2e.mjs reads vite.pages.config.ts and dist/pages/ from its working directory, so running it from the base tests the base.
-    const pagesE2e = run(process.execPath, [join(headRoot, "scripts/pages-e2e.mjs")], {
-      cwd: baseRoot,
-      allowFailure: true,
-    });
+    const pagesE2e = run(
+      process.execPath,
+      ["--experimental-strip-types", join(headRoot, "scripts/pages-e2e.mjs")],
+      {
+        cwd: baseRoot,
+        allowFailure: true,
+      },
+    );
     writeFileSync(join(out, "pages-e2e-base.txt"), pagesE2e.stdout + pagesE2e.stderr);
     const verdict =
       pagesE2e.status === 0

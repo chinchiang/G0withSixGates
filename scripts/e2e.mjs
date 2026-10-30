@@ -33,16 +33,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { isExternalBrandingFailure } from "./browser-diagnostics.mjs";
-import { cpuThrottleFromEnv, load, reload, throttle } from "./e2e-shared.mjs";
+import { VIEWS } from "../src/data/model.ts";
+import { VIEWPORTS, cpuThrottleFromEnv, load, reload, throttle } from "./e2e-shared.mjs";
 
 const BASE = new URL(process.argv[2] ?? "http://127.0.0.1:8081/");
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), "..", "screenshots");
 const externalWarnings = new Set();
-const VIEWPORTS = {
-  desktop: { width: 1280, height: 800 },
-  mobile: { width: 390, height: 844 },
-};
-const VIEWS = ["overview", "harness", "gates", "levels", "map", "tools"];
 
 const THROTTLE = cpuThrottleFromEnv(process.env);
 
