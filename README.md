@@ -163,7 +163,7 @@ HTTP and model capabilities are independent: an internal LLM may have no HTTP in
 - **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，有 Web 表面的專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
 - **SSRF 升級**：程式仍有缺陷、有 Web 表面、有 LLM 或 Agent 且能對外通訊，時，G5 的抓取工具會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
 - **越權與 `alg:none` 是兩個發現**：只做 JWT 測試攔不下雙帳號越權。
-- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額；目錄以 `depth: true` 標記）一律升為阻擋；L1／L2 只警示。公開端點完全沒有配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
+- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額；目錄以 `depth: true` 標記）一律升為阻擋；L1／L2 只警示。公開端點未落實配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
 - **未文件化的威脅模型**在 L3 阻擋，其他等級警示。
 - **管線缺口**：每個發現都有一條攔截條件（`CATCH_REQUIREMENTS`，型別保證不會漏列），標明任一（`any`）或全部（`all`）控制項勾選才算攔下；多數項目任一即可，威脅模型須同時勾選資料流與風險盤點。管線頁、閘門頁與放行紀錄都從同一個模組取用，閘門頁會標出需要搭配的控制項，缺少的控制項各自加上「」，「全部」時以「、」列出、「任一」時以「／」表示擇一；控制項文字本身就含有這兩個符號，引號才分得出一項在哪裡結束。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
@@ -176,7 +176,7 @@ The rules live in `src/data/engine.ts` (finding text in `src/data/finding-catalo
 - **G1 / G2 findings follow how the code was written**, not whether the system under test has a model: while defective, a project with a web surface gets hallucinated packages and a malicious postinstall, a batch script gets a look-alike package inside its cooling-off period; both can hard-code secrets.
 - **SSRF escalation**: when the code is still defective, there is a web surface, an LLM or agent, and egress, G5's fetch tool reaches cloud metadata and G3's IMDSv2 blocks at every level.
 - **The IDOR and `alg:none` are separate findings**: a JWT test alone does not catch the two-account authorization bypass.
-- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints; marked `depth: true` in the catalogue) escalate to blocks; L1 / L2 only warn. A public endpoint with no quota at all blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
+- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints; marked `depth: true` in the catalogue) escalate to blocks; L1 / L2 only warn. A public endpoint failing to enforce its quota blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
 - **An undocumented threat model** blocks at L3 and warns elsewhere.
 - **Pipeline gaps**: every finding has a catch requirement (`CATCH_REQUIREMENTS`, which the type keeps complete) saying whether any one (`any`) or all (`all`) of its controls must be checked for it to be caught; most findings need one, the threat model needs both data-flow and risk analysis. The Pipeline view, the Gates view and the release record all read the same module; the Gates view names the controls a control must be paired with, and missing controls are each quoted, then listed with commas for `all` or offered as alternatives with slashes for `any`; control text itself contains commas and slashes, so the quotes show where each one ends. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
 

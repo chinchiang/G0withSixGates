@@ -727,10 +727,10 @@ export const FINDING_CATALOGUE = {
     ),
     variants: {
       public: {
-        title: bi("沒有權杖配額", "No token quota"),
+        title: bi("公開端點未落實權杖配額", "Public endpoint fails to enforce token quota"),
         detail: bi(
-          "長文與併發沒有熔斷，公開端點會直接轉成帳單。",
-          "Long inputs and concurrency have no circuit breaker; a public endpoint turns straight into a bill.",
+          "公開端點未依宣告配額拒絕超量請求，可能產生非預期費用；須另驗證長文、併發與熔斷。",
+          "The public endpoint fails to reject requests beyond its declared quota and may incur unexpected cost; test long inputs, concurrency and circuit breakers separately.",
         ),
       },
     },
