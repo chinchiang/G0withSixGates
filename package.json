@@ -35,7 +35,8 @@
     "format:check": "prettier --check .",
     "build:pages": "vite build --config vite.pages.config.ts",
     "test:pages": "node --experimental-strip-types scripts/pages-e2e.mjs",
-    "test:pages:throttled": "E2E_CPU_THROTTLE=10 node --experimental-strip-types scripts/pages-e2e.mjs"
+    "test:pages:throttled": "E2E_CPU_THROTTLE=10 node --experimental-strip-types scripts/pages-e2e.mjs",
+    "regress:all": "node scripts/regress.mjs --all-browsers"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

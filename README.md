@@ -255,7 +255,7 @@ G0withSixGates/
 │   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()、Vite 設定檔匯入鏈不用 @/）/ the lint rules apply (on-screen text via bi(), no @/ in the Vite config import chain)
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速、等水合與畫面尺寸 / throttling, hydration waits and screen sizes shared by both browser suites
-│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
+│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all / Chromium regression; use npm run regress:all for full CI coverage
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── check-built-headers.mjs、check-built-bundles.mjs(.test.mjs)   # 本專案 app：建置後檢查安全標頭與程式包切分 / post-build checks of the headers and code splitting
@@ -320,7 +320,7 @@ npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the p
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
 npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
 npm run test:pages:throttled  # 對已建置的 Pages 跑測試，CPU 降速 10 倍 / the Pages tests with the CPU slowed tenfold
-npm run regress          # 與 CI 相同的整套檢查，含建置、e2e 與 Pages / the full CI-equivalent suite
+npm run regress          # Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all，含建置、e2e 與 Pages / the Chromium regression; use npm run regress:all for full CI coverage
 npm run compare:main     # 跟 main 比規則引擎的輸出與放行紀錄 / compare behaviour with main
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
 node scripts/og-card.mjs         # 重製分享卡片 public/og.jpg / regenerate the share card
@@ -448,3 +448,11 @@ This project's own code and teaching content are under the [MIT License](LICENSE
 跨瀏覽器回歸：`E2E_BROWSER=firefox npm run test:pages` 與 `E2E_BROWSER=webkit npm run test:pages` 執行相同的靜態版案例；CI 與 Pages 部署均須通過這兩項。WebKit 是 Safari 引擎相容性檢查，不能取代真實 iOS 裝置測試。
 
 Cross-browser regression: `E2E_BROWSER=firefox npm run test:pages` and `E2E_BROWSER=webkit npm run test:pages` run the same Pages assertions. Both CI and Pages deployment require them. WebKit checks Safari-engine compatibility, not real iOS devices.
+
+完整跨瀏覽器檢查使用 `npm run regress:all`，共 14 步驟；先安裝 `npx playwright install --with-deps chromium firefox webkit`。`npm run regress` 為 12 步驟 Chromium 檢查，不包含 Firefox／WebKit。控制項只有完成驗證並留有核可紀錄才勾選；送交人工審查仍屬未完成。
+
+Full cross-browser coverage uses `npm run regress:all` (14 steps), after `npx playwright install --with-deps chromium firefox webkit`. `npm run regress` is the 12-step Chromium subset. Check controls only after verification and recorded approval; pending review remains incomplete.
+
+控制項與規則第 4 版：資料／間接注入授權、資料庫逐物件授權及冷卻期審查已加強，舊定義的勾選不自動沿用，須重新確認。研究數字附適用範圍，事故卡片可直接開啟來源；無法完整追溯的 Replit 敘述改為合成情境，未核對條件的 14% 指標移除。
+
+Controls and rule version 4 strengthen data/indirect-injection authorization, database object authorization and cooling-off review. Checks using old definitions require reconfirmation. Research numbers carry scope and incident cards link to sources; the untraceable Replit account is now a synthetic scenario and the unverified 14% metric is omitted.

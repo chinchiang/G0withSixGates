@@ -1,3 +1,4 @@
+import { QUOTA_EVIDENCE } from "./quota-example.ts";
 import { bi, type Bi } from "../i18n/locale.ts";
 import type { GateId, Severity } from "./model.ts";
 
@@ -371,8 +372,8 @@ export const FINDING_CATALOGUE = {
       "api/docs.ts: select * from documents where id = $1; RLS disabled.",
     ),
     fix: bi(
-      "加上擁有者條件並開啟 RLS。用兩個帳號的測試鎖住這個行為。",
-      "Add the owner condition and turn on RLS. Lock the behaviour in with a two-account test.",
+      "在可信任的服務層驗證主體與物件權限；PostgreSQL 可加 RLS。Firestore 前端使用 Rules，伺服器程式庫另驗證逐物件授權與最小 IAM。以雙帳號測試讀取、修改與刪除。",
+      "Enforce principal and object permissions in a trusted service layer; PostgreSQL may add RLS. Firestore clients use Rules, while server libraries enforce object authorization and least-privilege IAM separately. Test reads, updates and deletes across two accounts.",
     ),
     tool: bi("架構審查", "Architecture review"),
     cwe: bi("營運對照：CWE-639", "Operational reference: CWE-639"),
@@ -703,12 +704,12 @@ export const FINDING_CATALOGUE = {
   "g6-dow": {
     gate: "G6",
     depth: true,
-    title: bi("配額尚未寫進測試", "Quota not yet covered by tests"),
-    detail: bi("內部端點仍建議有配額。", "Internal endpoints should still have a quota."),
-    evidence: bi(
-      "50 條 100k token 請求皆 200，未見 429。",
-      "50 requests of 100k tokens each returned 200; no 429 observed.",
+    title: bi("配額超量案例未被拒絕", "Over-quota test requests are not rejected"),
+    detail: bi(
+      "示範政策：每主體每分鐘上限 100k token，正常請求仍須可用；本案例的超量拒絕測試失敗。",
+      "Demo policy: each principal is limited to 100k tokens per minute while normal requests remain available; this case fails the over-quota rejection test.",
     ),
+    evidence: QUOTA_EVIDENCE,
     fix: bi(
       "加上每主體配額、超時與熔斷，並把拒絕寫進安全日誌。",
       "Add a per-principal quota, timeouts and a circuit breaker, and write rejections to the security log.",

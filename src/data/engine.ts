@@ -791,6 +791,8 @@ export function reportMarkdown(
   lines.push("");
   lines.push(t(R.sources));
   for (const source of SOURCES)
-    lines.push(`- [${escapeMarkdown(t(source.title))}](${source.href})`);
+    lines.push(
+      `- [${escapeMarkdown(t(source.title))}](${source.href}) — ${source.period} · ${t(source.section)} · ${t(source.scope)}`,
+    );
   return lines.join("\n");
 }

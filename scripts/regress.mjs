@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * 與 CI（`.github/workflows/ci.yml`）相同的整套回歸測試：`npm run regress`。
+ * Chromium 回歸：`npm run regress`；與 CI 同範圍的完整檢查：`npm run regress:all`。
  *
  * 先確認 Chromium 能啟動，缺系統函式庫就列出缺了哪些、怎麼補，再開始跑，不用等建置完才在 e2e 失敗。
  * 快速檢查平行跑；建置失敗時略過依賴它的步驟。每一步的輸出寫進暫存目錄的 `six-gate-regress/`。
  * 要指定解開的函式庫，照常在指令前加 `LD_LIBRARY_PATH=…`，子程序會繼承。
  * 時間同時用單調時鐘與實際時間量：主機睡眠時 WSL 整台暫停，單調時鐘不前進，兩者的差就是暫停多久（`regress-timing.mjs`）。
  *
- * The full CI-equivalent regression suite: `npm run regress`.
+ * Chromium regression: `npm run regress`; full CI-equivalent coverage: `npm run regress:all`.
  *
  * It first checks that Chromium can start; if system libraries are missing it lists them and how to
  * install them before running anything, instead of failing in e2e after the build. The quick checks
@@ -26,6 +26,10 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { missingFromLdd, missingLibrariesAdvice, missingLibraryError } from "./browser-libs.mjs";
 import { allPassed, skipLine, stepLine, summaryLine } from "./regress-timing.mjs";
+
+const args = process.argv.slice(2);
+if (args.some((arg) => arg !== "--all-browsers")) throw new Error("Unknown regression option");
+const allBrowsers = args.includes("--all-browsers");
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOGS = join(tmpdir(), "six-gate-regress");
@@ -113,7 +117,14 @@ if (await step("build", ["npm", "run", "build"])) {
 if (await step("build-pages", ["npm", "run", "build:pages"])) {
   await step("test-pages", ["npm", "run", "test:pages"]);
   await step("test-pages-throttled", ["npm", "run", "test:pages:throttled"]);
-} else skip("test-pages", "test-pages-throttled");
+  if (allBrowsers) {
+    await step("test-pages-firefox", ["env", "E2E_BROWSER=firefox", "npm", "run", "test:pages"]);
+    await step("test-pages-webkit", ["env", "E2E_BROWSER=webkit", "npm", "run", "test:pages"]);
+  }
+} else {
+  skip("test-pages", "test-pages-throttled");
+  if (allBrowsers) skip("test-pages-firefox", "test-pages-webkit");
+}
 
 console.log(`\n${summaryLine(results, since(suiteStarted))}`);
 process.exit(allPassed(results) ? 0 : 1);

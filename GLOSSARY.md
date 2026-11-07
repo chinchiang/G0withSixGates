@@ -49,6 +49,10 @@ _Avoid_：執行中（running）、動畫（animation）
 
 ## 管線缺口 Pipeline gaps
 
+**審查完成（review complete）**：
+審查已有核可結論與驗證紀錄；送審或等待處理仍屬未完成，不能勾選完成。
+Review has an approval decision and verification record; submission or waiting is incomplete and cannot be checked as done.
+
 **發現（finding）**：
 Harness 一次執行中某道閘門指出的一個示範問題，帶有嚴重度與證據。
 A demo problem one gate reports in a Harness run, with a severity and evidence.

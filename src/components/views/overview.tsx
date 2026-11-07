@@ -17,6 +17,7 @@ import {
   LEVEL_META,
   PRINCIPLES,
   SOURCES,
+  sourceFor,
   SYMPTOMS,
   TRACK_LABEL,
   type GateId,
@@ -300,6 +301,14 @@ export function Overview() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-muted">{t(item.text)}</p>
+              <a
+                href={sourceFor(item.sourceId).href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-6 text-sm underline"
+              >
+                {t(sourceFor(item.sourceId).title)}
+              </a>
               <button
                 type="button"
                 onClick={() => openGate(item.gate)}
@@ -382,6 +391,14 @@ export function Overview() {
                 </button>
               </div>
               <p className="mt-2 text-sm leading-6 text-muted">{t(item.text)}</p>
+              <a
+                href={sourceFor(item.sourceId).href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-6 text-sm underline"
+              >
+                {t(sourceFor(item.sourceId).title)}
+              </a>
             </article>
           ))}
         </div>
@@ -405,6 +422,9 @@ export function Overview() {
                 <span>{t(source.title)}</span>
                 <ArrowUpRight className="mt-1 size-3.5 shrink-0" aria-hidden="true" />
               </a>
+              <p>
+                {source.period} · {t(source.section)} — {t(source.scope)}
+              </p>
             </li>
           ))}
         </ul>
