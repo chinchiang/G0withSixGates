@@ -1,0 +1,32 @@
+
+> six-gate-for-vibe-code@1.0.0 test:e2e
+> node --experimental-strip-types scripts/e2e.mjs
+
+ok - CSP: request nonce permits hydration and blocks injected inline scripts
+ok - desktop: every view renders without console errors or horizontal overflow
+ok - desktop: every view renders in English too
+ok - desktop: all four presets are visible without scrolling sideways
+ok - desktop: map links are at least 24px tall
+ok - mobile: every view renders without console errors or horizontal overflow
+ok - mobile: every view renders in English too
+ok - mobile: all four presets are visible without scrolling sideways
+ok - mobile: map links are at least 24px tall
+ok - production HTML does not load the Grok branding script
+ok - language, radio keyboard and obsolete runs
+ok - harness: runs, stops back to the previous verdict, and stops to idle on the first run
+ok - theme: a light-theme user gets the light theme-color before any JS module loads
+ok - theme: toggle switches light and dark, updates theme-color and survives a reload
+ok - gates: checks survive a reload, clear-all can be undone
+ok - gates: a stale verdict says so after the settings change
+ok - map: tab, gate filter and search live in the URL
+ok - guided review: keyboard focus, anchors, findings, report and related links
+ok - narrow screens: every gate is visible without sideways scrolling
+ok - unknown URLs show the bilingual not-found page with a way home
+ok - CSP report endpoint: 204 for reports, 405 for GET, 413 past the limit even when chunked
+
+21/21 passed
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

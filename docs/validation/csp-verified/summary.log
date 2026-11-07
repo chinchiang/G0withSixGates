@@ -1,0 +1,23 @@
+
+> six-gate-for-vibe-code@1.0.0 regress
+> node scripts/regress.mjs
+
+PASS audit 3s
+PASS format 9s
+PASS lint 11s
+PASS typecheck 14s
+PASS test 22s
+PASS build 4s
+PASS preview 2s
+PASS e2e 92s
+PASS e2e-throttled 158s
+PASS build-pages 1s
+PASS test-pages 15s
+PASS test-pages-throttled 33s
+
+All 12 steps passed in 328s.
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

@@ -1,0 +1,54 @@
+{
+  "jobs": [
+    {
+      "conclusion": "success",
+      "html_url": "https://github.com/chinchiang/G0withSixGates/actions/runs/42363744424/job/128377364130",
+      "name": "check",
+      "status": "completed",
+      "steps": [
+        { "conclusion": "success", "name": "Set up job" },
+        { "conclusion": "success", "name": "Run actions/checkout@v4" },
+        { "conclusion": "success", "name": "Run actions/setup-node@v4" },
+        { "conclusion": "success", "name": "Run npm ci" },
+        { "conclusion": "success", "name": "Run npm run typecheck" },
+        { "conclusion": "success", "name": "Run npm run lint" },
+        { "conclusion": "success", "name": "Run npm run format:check" },
+        { "conclusion": "success", "name": "Run node scripts/audit-gate.mjs" },
+        { "conclusion": "success", "name": "Run npm test" },
+        { "conclusion": "success", "name": "Run npm run build" },
+        { "conclusion": "success", "name": "Post Run actions/setup-node@v4" },
+        { "conclusion": "success", "name": "Post Run actions/checkout@v4" },
+        { "conclusion": "success", "name": "Complete job" }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "html_url": "https://github.com/chinchiang/G0withSixGates/actions/runs/42363744424/job/128377364355",
+      "name": "e2e",
+      "status": "completed",
+      "steps": [
+        { "conclusion": "success", "name": "Set up job" },
+        { "conclusion": "success", "name": "Run actions/checkout@v4" },
+        { "conclusion": "success", "name": "Run actions/setup-node@v4" },
+        { "conclusion": "success", "name": "Run npm ci" },
+        {
+          "conclusion": "success",
+          "name": "Run npx playwright install --with-deps chromium firefox webkit"
+        },
+        { "conclusion": "success", "name": "Run npm run build" },
+        { "conclusion": "success", "name": "Run npm run preview:restart" },
+        { "conclusion": "success", "name": "Run npm run test:e2e" },
+        { "conclusion": "success", "name": "Run npm run test:e2e:throttled" },
+        { "conclusion": "success", "name": "Run npm run build:pages" },
+        { "conclusion": "success", "name": "Run npm run test:pages" },
+        { "conclusion": "success", "name": "Run npm run test:pages:throttled" },
+        { "conclusion": "success", "name": "Run E2E_BROWSER=firefox npm run test:pages" },
+        { "conclusion": "success", "name": "Run E2E_BROWSER=webkit npm run test:pages" },
+        { "conclusion": "skipped", "name": "Run actions/upload-artifact@v4" },
+        { "conclusion": "success", "name": "Post Run actions/setup-node@v4" },
+        { "conclusion": "success", "name": "Post Run actions/checkout@v4" },
+        { "conclusion": "success", "name": "Complete job" }
+      ]
+    }
+  ]
+}

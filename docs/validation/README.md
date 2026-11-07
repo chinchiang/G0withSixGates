@@ -1,5 +1,8 @@
 # 修正驗證紀錄 / Fix validation evidence
 
+最新 CSP 與跨瀏覽器證據見 [csp-verified/README.md](csp-verified/README.md)。下方為首輪修正的歷史紀錄；當時的行內腳本與 WebKit 限制已由後續修正處理。
+Latest CSP and cross-browser evidence is in [csp-verified/README.md](csp-verified/README.md). The material below records the initial round; its inline-script and WebKit limitations have since been addressed.
+
 驗證對象為基底提交 `3fbcff6` 上的工作區變更；最終修正差異與 SHA-256 在 `verified/changes.patch`、`verified/changes.sha256`。執行環境版本見 `verified/runtime.txt`。
 The target is the working-tree change on base commit `3fbcff6`. The final patch and its SHA-256 are in `verified/changes.patch` and `verified/changes.sha256`. Runtime version is in `verified/runtime.txt`.
 
