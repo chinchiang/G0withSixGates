@@ -8,7 +8,11 @@ import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
-import { vercelHeaderRoute, vercelInstallHeaderRoute } from "./scripts/security-headers.mjs";
+import {
+  vercelHeaderRoute,
+  vercelInstallHeaderRoute,
+  vercelAssetHeaderRoute,
+} from "./scripts/security-headers.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
@@ -185,6 +189,7 @@ export default defineConfig(({ command, isPreview }) => ({
                   vercelInstallHeaderRoute(
                     readFileSync(new URL("./scripts/install-page.html", import.meta.url), "utf8"),
                   ),
+                  vercelAssetHeaderRoute(),
                 ],
               },
             },

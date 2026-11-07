@@ -71,10 +71,8 @@ test("the Vercel route only adds headers and lets routing continue to SSR", () =
   assert.equal(route.src, "/(.*)");
   assert.equal(route.continue, true);
   assert.equal(route.dest, undefined);
-  assert.deepEqual(route.headers, {
-    ...securityHeaders(),
-    "Content-Security-Policy": `${STRUCTURAL_POLICY}; ${REPORTING}`,
-  });
+  assert.equal(route.headers["Content-Security-Policy"], undefined);
+  assert.equal(route.headers["X-Content-Type-Options"], "nosniff");
 });
 
 test("ships the non-CSP hardening headers", () => {

@@ -39,14 +39,15 @@ export const RESOURCE_POLICY = policy({
 
 /** A header-only route; `continue` lets Vercel go on to the filesystem and SSR routes. */
 export function vercelHeaderRoute() {
-  return {
-    src: "/(.*)",
-    headers: {
-      ...securityHeaders(),
-      "Content-Security-Policy": `${STRUCTURAL_POLICY}; ${REPORTING}`,
-    },
-    continue: true,
-  };
+  const headers = Object.fromEntries(
+    Object.entries(securityHeaders()).filter(([name]) => name !== "Content-Security-Policy"),
+  );
+  return { src: "/(.*)", headers, continue: true };
+}
+
+/** 靜態資源沒有水合腳本，使用固定嚴格政策。 Static assets have no hydration scripts and use a fixed strict policy. */
+export function vercelAssetHeaderRoute() {
+  return { src: "/(?:assets|__grok)/(.*)", headers: securityHeaders(), continue: true };
 }
 
 export function securityHeaders(enforceResources = ENFORCE_RESOURCE_POLICY) {

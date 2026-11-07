@@ -392,13 +392,13 @@ When a refactor must preserve behaviour, run `npm run compare:main` (`scripts/co
 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
 
 - **強制**：`frame-ancestors`（只允許本站嵌入）、`object-src 'none'`、`base-uri 'none'`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許本站），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
-- 伺服器 HTML 的 `script-src` 使用逐請求隨機授權碼；HTML 禁止共用快取。Pages 的主題腳本與平台安裝教學腳本採 SHA-256 雜湊授權。`style-src` 仍允許行內樣式。Vercel 共用路由僅設結構性 CSP，SSR 回應另設完整資源政策；安裝教學由條件路由套用雜湊政策。
+- 伺服器 HTML 的 `script-src` 使用逐請求隨機授權碼；HTML 禁止共用快取。Pages 的主題腳本與平台安裝教學腳本採 SHA-256 雜湊授權。`style-src` 仍允許行內樣式。Vercel 共用路由不設定 CSP，避免覆蓋逐請求政策；SSR 回應設定完整政策，安裝教學使用條件雜湊路由，靜態資源另有固定政策。
 - **回報**：CSP 帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），一個請求只寫一行並限制筆數；本文邊讀邊計數，超過 16KB 回 413，chunked 請求也一樣；GET 回 405。端點本身沒有頻率限制，有需要時在 Vercel 防火牆設定。部署日誌裡 `[csp]` 開頭的就是違規紀錄。
 
 The production build adds security headers to the Vercel output config (`scripts/security-headers.mjs`); the dev server and the Grok live preview are unaffected.
 
 - **Enforced**: `frame-ancestors` (self only), `object-src 'none'`, `base-uri 'none'`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
-- Server HTML uses a per-request script nonce and disallows shared caching. Pages theme scripts and the platform installation tutorial use SHA-256 hashes. Inline styles remain allowed. The common Vercel route sets structural CSP; SSR adds its resource policy and a conditional route applies the tutorial hash policy.
+- Server HTML uses a per-request script nonce and disallows shared caching. Pages theme scripts and the platform installation tutorial use SHA-256 hashes. Inline styles remain allowed. The common Vercel route does not set CSP, avoiding overrides of per-request policies. SSR sets its full policy; a conditional route covers the tutorial hashes and static assets have a separate fixed policy.
 - **Reporting**: the CSP carries `report-uri` and `report-to` (`Reporting-Endpoints`) pointing at `/api/csp-report`. The endpoint is unauthenticated, so it keeps only the directive, the blocked origin and the page (query strings stripped), writes one line per request with a capped count, counts the body while reading so anything past 16KB gets 413 even when chunked, and answers GET with 405. The endpoint has no rate limit of its own; add one in the Vercel firewall if needed. Lines starting with `[csp]` in the deployment logs are violations.
 
 正式建置不再載入 Grok 品牌腳本；CSP 不再為 Grok 網域設特別允許，正式站台僅允許本站嵌入。
