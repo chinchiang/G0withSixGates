@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as model from "./model.ts";
 import {
   GATE_DOCS,
+  INCIDENTS,
+  SYMPTOMS,
+  SOURCES,
+  sourceFor,
   MAX_QUERY,
   NAME_MAX_LENGTH,
   PRESETS,
@@ -141,5 +145,25 @@ describe("parseProfile name", () => {
     assert.equal(Array.from(parsed.name).length, NAME_MAX_LENGTH);
     assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])/.test(parsed.name));
     assert.ok(!/(?<![\ud800-\udbff])[\udc00-\udfff]/.test(parsed.name));
+  });
+});
+
+describe("source traceability", () => {
+  it("every statistic and incident resolves to a source with scope and location", () => {
+    assert.equal(new Set(SOURCES.map((s) => s.id)).size, SOURCES.length);
+    for (const item of [...SYMPTOMS, ...INCIDENTS]) {
+      const source = sourceFor(item.sourceId);
+      assert.ok(source.href.startsWith("https://"));
+      assert.ok(source.period.length > 0);
+      assert.ok(source.section.zh.length > 0 && source.section.en.length > 0);
+      assert.ok(source.scope.zh.length > 0 && source.scope.en.length > 0);
+    }
+    assert.throws(() => sourceFor("unknown-source"));
+  });
+  it("database controls distinguish RLS and backend object authorization", () => {
+    const ids = GATE_DOCS.find((g) => g.id === "G4")?.controls.map((c) => c.id);
+    assert.ok(ids?.includes("g4-rls-object"));
+    assert.ok(ids?.includes("g4-object-authz"));
+    assert.ok(!ids?.includes("g4-rls"));
   });
 });

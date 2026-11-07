@@ -21,9 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox webkit
-      - run: npm run regress
-      - run: E2E_BROWSER=firefox npm run test:pages
-      - run: E2E_BROWSER=webkit npm run test:pages
+      - run: npm run regress:all
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/pages

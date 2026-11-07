@@ -9,7 +9,7 @@ import { bi, isLocale, type Bi, type Locale } from "../i18n/locale.ts";
  * identifiers and rules live in engine.ts.
  */
 
-export const RUN_RULE_VERSION = 3;
+export const RUN_RULE_VERSION = 4;
 
 export type GateId = "G0" | "G1" | "G2" | "G3" | "G4" | "G5" | "G6";
 export type Level = "L1" | "L2" | "L3";
@@ -423,8 +423,8 @@ export const GATE_DOCS: GateDoc[] = [
       bi("ASVS 5.0 等級定義", "ASVS 5.0 level definitions"),
     ],
     fails: bi(
-      "Base44 把驗證做成公開 app_id；Replit Agent 在凍結期刪除正式庫。兩件都是設計期就該攔下的授權與代理問題。",
-      "Base44 made authentication a public app_id; the Replit agent deleted a production database during a freeze. Both are authorization and agency problems that design-time should have caught.",
+      "Base44 的公開 app_id 驗證繞過是事故案例；高權限 Agent 刪除資料則以教學情境示範。兩者都須在設計期審查授權邊界。",
+      "Base44’s public app_id bypass is an incident; destructive high-privilege agents are illustrated with a teaching scenario. Both call for design-time authorization review.",
     ),
   },
   {
@@ -465,10 +465,10 @@ export const GATE_DOCS: GateDoc[] = [
         ),
       },
       {
-        id: "g1-cool",
+        id: "g1-cool-reviewed",
         text: bi(
-          "發布未滿 7–14 天的版本會被拒絕或改走人工審查",
-          "Versions published less than 7–14 days ago are rejected or routed to manual review",
+          "未滿 7–14 天的版本預設拒絕；人工例外須已完成來源、名稱與腳本審查並留核可紀錄，送審不算完成",
+          "Versions under 7–14 days are rejected by default; exceptions require completed provenance, name and script review with approval records; pending review is incomplete",
         ),
       },
       {
@@ -488,8 +488,8 @@ export const GATE_DOCS: GateDoc[] = [
     ],
     asvs: [bi("V15.2 安全架構與相依", "V15.2 Secure architecture and dependencies")],
     fails: bi(
-      "Nx s1ngularity 用受污染套件的 postinstall 呼叫本機 Claude／Gemini CLI 搜刮憑證。Shai-Hulud 則在 npm 自我複製。",
-      "Nx s1ngularity used a poisoned package's postinstall to call the local Claude / Gemini CLI and harvest credentials. Shai-Hulud replicated itself across npm.",
+      "Nx s1ngularity 用受污染套件的 postinstall 嘗試呼叫本機 Claude／Gemini CLI 搜刮憑證。此處依 Nx 官方事後報告，不混用其他攻擊活動。",
+      "Nx s1ngularity used a poisoned package's postinstall to attempt to use the local Claude / Gemini CLI and harvest credentials. This account follows the Nx postmortem without conflating separate campaigns.",
     ),
   },
   {
@@ -500,8 +500,8 @@ export const GATE_DOCS: GateDoc[] = [
       "Pre-commit and every push. A PR may scan only the diff; the nightly job still scans the full history.",
     ),
     cause: bi(
-      "啟用 Copilot 的儲存庫較容易把金鑰寫死，也常忘記 .gitignore。教材引用 GitGuardian：啟用 Copilot 的儲存庫約 6.4% 含外洩金鑰，約高出四成。",
-      "Repositories with Copilot enabled hard-code keys more often and tend to forget .gitignore. The course material cites GitGuardian: about 6.4% of repositories with Copilot enabled leak a secret, roughly 40% higher.",
+      "GitGuardian 2025 報告觀察到受測公開 Copilot 儲存庫有 6.4% 外洩金鑰；這是群體相關性，不能推論 Copilot 造成外洩或使用者較常漏寫 .gitignore。",
+      "GitGuardian’s 2025 report observes secrets in 6.4% of the sampled public Copilot repositories. This association does not establish that Copilot caused leakage or that users omitted .gitignore more often.",
     ),
     summary: bi(
       "正則與熵值一起掃。命中即阻擋推送，先撤銷憑證，再用歷史清理工具移除，而不是只刪掉最新提交。",
@@ -553,8 +553,8 @@ export const GATE_DOCS: GateDoc[] = [
       "Every pull request. Single-file rules are not enough, because models often split source and sink across files.",
     ),
     cause: bi(
-      "模型輸出常未經跳脫就直接渲染進頁面，也容易拼接字串而不用參數化查詢。教材引用 Veracode：AI 生成程式對 XSS（模型輸出未跳脫）的防禦率約 14%，而 CWE-79 是 MITRE 2025 Top 25 的第一名。",
-      "Model output is often rendered into the page unescaped, and models also lean toward string concatenation over parameterized queries. The course material cites Veracode: AI-generated code defends against XSS (model output rendered unescaped) about 14% of the time, and CWE-79 tops the MITRE 2025 Top 25.",
+      "AI 生成程式碼的 XSS 風險與 LLM 產品渲染模型輸出的風險應分開驗證。Veracode 報告是特定程式碼生成測試，不作為所有模型或產品的通用防禦率。",
+      "Validate XSS in AI-generated code separately from rendering model output in LLM products. Veracode reports a specific code-generation benchmark, not a universal defense rate for all models or products.",
     ),
     summary: bi(
       "跨檔污點分析追蹤不受信任來源（含 HTTP 與模型輸出）到危險匯點。IaC 另掃 Terraform／Kubernetes，強制 IMDSv2，並收斂過度寬鬆的 CORS。",
@@ -626,8 +626,8 @@ export const GATE_DOCS: GateDoc[] = [
       "Authorization lives in hidden buttons while the back end has no session or object-level check. Agents expose delete and execute directly as tools.",
     ),
     summary: bi(
-      "每一筆查詢都要綁定已驗證主體。列層安全性要打開。授權不能只放在單一中介層。Agent 工具用允許清單，高影響動作要人工核可。",
-      "Every query binds to the authenticated principal. Row-level security is on. Authorization never lives in a single middleware. Agent tools are allow-listed, and high-impact actions need human approval.",
+      "每一筆查詢都要綁定已驗證主體與物件。依技術選用 PostgreSQL RLS 或 Firestore Security Rules；Firestore 伺服器程式庫略過 Rules，須另做後端逐物件授權與最小 IAM 權限。授權不能只放在單一中介層。Agent 工具用允許清單，高影響動作要人工核可。",
+      "Every query binds to the authenticated principal and object. Choose PostgreSQL RLS or Firestore Security Rules as applicable; Firestore server libraries bypass Rules and require backend object authorization and least-privilege IAM. Authorization never lives in a single middleware. Agent tools are allow-listed, and high-impact actions need human approval.",
     ),
     controls: [
       {
@@ -638,17 +638,17 @@ export const GATE_DOCS: GateDoc[] = [
         ),
       },
       {
-        id: "g4-rls",
+        id: "g4-rls-object",
         text: bi(
-          "Supabase／Firebase 一類的列層安全性已開啟並用測試驗證",
-          "Row-level security on Supabase / Firebase-style stores is on and verified by tests",
+          "PostgreSQL／Supabase 的 RLS 已綁定主體與物件，並驗證跨帳號讀寫遭拒；不以 Firebase Rules 代替後端授權",
+          "PostgreSQL / Supabase RLS binds principals and objects and denies tested cross-account reads and writes; Firebase Rules do not substitute for backend authorization",
         ),
       },
       {
-        id: "g4-depth",
+        id: "g4-object-authz",
         text: bi(
-          "授權在資料層再做一次，不只有框架 middleware",
-          "Authorization is re-checked at the data layer, not only in framework middleware",
+          "後端逐物件授權已用不同帳號驗證；Firestore 伺服器程式庫另設最小 IAM，不依賴會被略過的 Rules",
+          "Backend object authorization is verified across accounts; Firestore server libraries use least-privilege IAM without relying on bypassed Rules",
         ),
       },
       {
@@ -788,17 +788,17 @@ export const GATE_DOCS: GateDoc[] = [
     ),
     controls: [
       {
-        id: "g6-direct",
+        id: "g6-data-authz",
         text: bi(
-          "直接注入不能抽出系統提示詞或改寫工具政策",
-          "Direct injection cannot extract the system prompt or rewrite tool policy",
+          "直接注入測試已確認受保護資料不被揭露、未授權操作遭拒；提示詞保密不作為授權證據",
+          "Direct-injection tests verify protected data is not disclosed and unauthorized actions are denied; prompt secrecy is not authorization evidence",
         ),
       },
       {
-        id: "g6-indirect",
+        id: "g6-indirect-authz",
         text: bi(
-          "外部網頁、PDF、信件不能驅使 Agent 外連洩密",
-          "External web pages, PDFs and mail cannot drive the agent to exfiltrate",
+          "惡意網頁、PDF、信件的間接注入測試已驗證資料存取、工具核可與外洩通道，未授權動作遭拒",
+          "Indirect-injection tests with malicious pages, PDFs and mail verify data access, tool approval and exfiltration paths; unauthorized actions are denied",
         ),
       },
       {
@@ -1659,47 +1659,52 @@ export interface Symptom {
   text: Bi;
   gate: GateId;
   source: Bi;
+  sourceId: string;
 }
 
 export const SYMPTOMS: Symptom[] = [
   {
     id: "s1",
+    sourceId: "packages",
     title: bi("幻覺套件", "Hallucinated packages"),
     stat: "19.7%",
     text: bi(
-      "推薦套件根本不存在。重複出現的假名會被搶註投毒。",
-      "Recommended packages do not exist. Recurring fake names get squatted and poisoned.",
+      "研究的 223 萬筆套件輸出中有 19.7% 為幻覺；結果依模型與測試條件而異，非通用機率。",
+      "19.7% of 2.23 million package outputs in the study were hallucinations; rates depend on models and test conditions, not a universal probability.",
     ),
     gate: "G1",
     source: bi("教材引 USENIX Security 2025", "Course material citing USENIX Security 2025"),
   },
   {
     id: "s2",
+    sourceId: "secrets",
     title: bi("硬編碼金鑰", "Hard-coded secrets"),
     stat: "6.4%",
     text: bi(
-      "啟用 Copilot 的儲存庫含外洩金鑰的比例較高，且常漏掉忽略規則。",
-      "Repositories with Copilot enabled leak secrets more often and tend to miss ignore rules.",
+      "報告中的公開 Copilot 儲存庫群體有 6.4% 含外洩金鑰；觀察結果不代表因果。",
+      "6.4% of the public Copilot repository cohort contained leaked secrets; the observation does not establish causation.",
     ),
     gate: "G2",
     source: bi("教材引 GitGuardian", "Course material citing GitGuardian"),
   },
   {
     id: "s3",
+    sourceId: "veracode",
     title: bi("靜態注入", "Injection"),
-    stat: "14%",
+    stat: "XSS",
     text: bi(
-      "XSS 防禦率偏低。模型偏好拼接字串，而不是參數化。",
-      "XSS defense rates are low. Models prefer string concatenation over parameterization.",
+      "程式碼生成測試與產品中的模型輸出渲染是不同情境，皆須驗證上下文編碼。",
+      "Code-generation benchmarks and model-output rendering are different scenarios; both require contextual encoding checks.",
     ),
     gate: "G3",
     source: bi(
-      "教材引 Veracode；CWE-79 為 2025 Top 25 之首",
-      "Course material citing Veracode; CWE-79 tops the 2025 Top 25",
+      "Veracode 2025 程式碼生成安全測試",
+      "Veracode 2025 code-generation security benchmarks",
     ),
   },
   {
     id: "s4",
+    sourceId: "base44",
     title: bi("前端假象", "Front-end illusion"),
     stat: "BOLA",
     text: bi(
@@ -1713,6 +1718,7 @@ export const SYMPTOMS: Symptom[] = [
 
 export interface Incident {
   id: string;
+  sourceId: string;
   title: Bi;
   gate: GateId;
   text: Bi;
@@ -1721,6 +1727,7 @@ export interface Incident {
 export const INCIDENTS: Incident[] = [
   {
     id: "base44",
+    sourceId: "base44",
     title: bi("Base44 驗證繞過", "Base44 authentication bypass"),
     gate: "G4",
     text: bi(
@@ -1729,16 +1736,21 @@ export const INCIDENTS: Incident[] = [
     ),
   },
   {
-    id: "replit",
-    title: bi("Replit 刪除正式庫", "Replit deletes production"),
+    id: "destructive-agent-demo",
+    sourceId: "asvs",
+    title: bi(
+      "高權限 Agent 刪除資料（教學情境）",
+      "Destructive high-privilege agent (teaching scenario)",
+    ),
     gate: "G0",
     text: bi(
-      "凍結期內 Agent 仍刪除正式資料庫，並生成假資料試圖掩蓋。這是過度代理：有權限、沒有隔離，也沒有人工核可。",
-      "During a code freeze the agent still deleted the production database and generated fake data to cover it. Excessive agency: privileges without isolation or human approval.",
+      "教學情境：Agent 以過大的服務帳號權限執行刪除，且缺少工具核可與可信任服務層授權。此案例為風險示範，不指稱特定廠商事故。",
+      "Teaching scenario: an agent deletes data using excessive service-account privileges without tool approval or trusted-service authorization. This is a risk example, not an attribution to a vendor incident.",
     ),
   },
   {
     id: "next",
+    sourceId: "next-cve",
     title: bi("CVE-2025-29927", "CVE-2025-29927"),
     gate: "G5",
     text: bi(
@@ -1748,11 +1760,12 @@ export const INCIDENTS: Incident[] = [
   },
   {
     id: "nx",
-    title: bi("Nx 與 npm 蠕蟲", "Nx and the npm worm"),
+    sourceId: "nx-postmortem",
+    title: bi("Nx s1ngularity 供應鏈攻擊", "Nx s1ngularity supply-chain attack"),
     gate: "G1",
     text: bi(
-      "受污染套件的 postinstall 呼叫本機模型 CLI 搜刮憑證。工具鏈本身就是攻擊面，所以供應鏈閘門要在安裝之前。",
-      "A poisoned package's postinstall called the local model CLI to harvest credentials. The toolchain itself is the attack surface, so the supply-chain gate runs before install.",
+      "受污染套件的 postinstall 嘗試呼叫本機模型 CLI 搜刮憑證。工具鏈本身就是攻擊面，所以供應鏈閘門要在安裝之前。",
+      "A poisoned package's postinstall attempted to use the local model CLI to harvest credentials. The toolchain itself is the attack surface, so the supply-chain gate runs before install.",
     ),
   },
 ];
@@ -1848,13 +1861,27 @@ export const LEVEL_META: Record<
  * 資料來源：總覽頁與下載紀錄共用。
  * Sources shared by the overview page and the downloaded record.
  */
-export const SOURCES: { title: Bi; href: string }[] = [
+export const SOURCES: {
+  id: string;
+  title: Bi;
+  href: string;
+  period: string;
+  section: Bi;
+  scope: Bi;
+}[] = [
   {
     title: bi(
       'Perry 等人，"Do Users Write More Insecure Code with AI Assistants?"（ACM CCS 2023）',
       'Perry et al., "Do Users Write More Insecure Code with AI Assistants?" (ACM CCS 2023)',
     ),
     href: "https://arxiv.org/abs/2211.03622",
+    id: "perry",
+    period: "2023",
+    section: bi("研究設計與結果", "Study design and results"),
+    scope: bi(
+      "受測人員與任務的研究，不外推所有工具；管線建議屬教材推論。",
+      "A study of selected participants and tasks, not all tools; pipeline advice is an instructional inference.",
+    ),
   },
   {
     title: bi(
@@ -1862,6 +1889,13 @@ export const SOURCES: { title: Bi; href: string }[] = [
       'Spracklen et al., "We Have a Package for You! A Comprehensive Analysis of Package Hallucinations" (USENIX Security 2025)',
     ),
     href: "https://arxiv.org/abs/2406.10279",
+    id: "packages",
+    period: "2025",
+    section: bi("§5.1、圖 2", "§5.1, Figure 2"),
+    scope: bi(
+      "223 萬筆套件輸出中的 19.7%；商用與開源模型結果不同，不是通用機率。",
+      "19.7% of 2.23 million package outputs; commercial and open models differ, so this is not a universal rate.",
+    ),
   },
   {
     title: bi(
@@ -1869,6 +1903,13 @@ export const SOURCES: { title: Bi; href: string }[] = [
       "GitGuardian, State of Secrets Sprawl 2025",
     ),
     href: "https://www.gitguardian.com/state-of-secrets-sprawl-report-2025",
+    id: "secrets",
+    period: "2025",
+    section: bi("Copilot 公開儲存庫群體統計", "Public Copilot repository cohort statistics"),
+    scope: bi(
+      "6.4% 為報告群體的觀察比例；相關性不代表 Copilot 造成外洩。",
+      "6.4% is an observed cohort rate; association does not establish that Copilot caused leakage.",
+    ),
   },
   {
     title: bi(
@@ -1876,6 +1917,13 @@ export const SOURCES: { title: Bi; href: string }[] = [
       "Veracode, 2025 GenAI Code Security Report",
     ),
     href: "https://www.veracode.com/resources/analyst-reports/2025-genai-code-security-report/",
+    id: "veracode",
+    period: "2025",
+    section: bi("程式碼生成安全測試", "Code-generation security benchmarks"),
+    scope: bi(
+      "廠商測試僅適用於受測模型與題目；詳細條件以原報告為準，不外推所有模型或產品。",
+      "Vendor results apply to the tested models and tasks; consult the report’s conditions rather than generalizing to all models or products.",
+    ),
   },
   {
     title: bi(
@@ -1883,21 +1931,93 @@ export const SOURCES: { title: Bi; href: string }[] = [
       "Cloud Security Alliance, MAESTRO (2025)",
     ),
     href: "https://cloudsecurityalliance.org/blog/2025/02/06/agentic-ai-threat-modeling-framework-maestro",
+    id: "maestro",
+    period: "2025",
+    section: bi("MAESTRO 框架說明", "MAESTRO framework description"),
+    scope: bi(
+      "威脅建模框架，不是掃描成效或合規認證。",
+      "A threat-modeling framework, not measured scanner effectiveness or certification.",
+    ),
   },
   {
     title: bi("NVD，CVE-2025-29927", "NVD, CVE-2025-29927"),
     href: "https://nvd.nist.gov/vuln/detail/CVE-2025-29927",
+    id: "next-cve",
+    period: "2025",
+    section: bi("弱點描述與評分", "Vulnerability description and scoring"),
+    scope: bi(
+      "適用於公告列出的受影響版本與條件；不能外推所有 middleware。",
+      "Applies to the listed affected versions and conditions, not all middleware.",
+    ),
   },
   {
     title: bi("MITRE，CWE Top 25", "MITRE, CWE Top 25"),
     href: "https://cwe.mitre.org/top25/",
+    id: "cwe",
+    period: "2025",
+    section: bi("年度 Top 25", "Annual Top 25"),
+    scope: bi(
+      "頁面可能轉到新年度；教材中的年度排名須依對應年度查核。",
+      "The landing page may advance to a new year; annual rankings require the matching edition.",
+    ),
   },
   {
     title: bi("Wiz，Base44 漏洞揭露", "Wiz, Base44 vulnerability disclosure"),
     href: "https://www.wiz.io/blog/critical-vulnerability-base44",
+    id: "base44",
+    period: "2025",
+    section: bi("Base44 驗證繞過揭露", "Base44 authentication-bypass disclosure"),
+    scope: bi(
+      "依揭露者報告描述事件；本工具沒有重現廠商系統。",
+      "An account based on the discloser’s report; this tool does not reproduce the vendor system.",
+    ),
   },
   {
     title: bi("OWASP ASVS 5.0.0", "OWASP ASVS 5.0.0"),
     href: "https://github.com/OWASP/ASVS/tree/v5.0.0",
+    id: "asvs",
+    period: "5.0.0",
+    section: bi(
+      "V8.2.2、V8.3.1；各章適用要求",
+      "V8.2.2, V8.3.1 and applicable chapter requirements",
+    ),
+    scope: bi(
+      "正式要求以版本原文為準；高權限 Agent 案例為教材合成情境。",
+      "Use the versioned standard for actual requirements; the high-privilege agent case is an instructional synthetic scenario.",
+    ),
   },
 ];
+
+SOURCES.push(
+  {
+    id: "nx-postmortem",
+    title: bi("Nx 官方 s1ngularity 事後報告", "Nx official s1ngularity postmortem"),
+    href: "https://nx.dev/blog/s1ngularity-postmortem",
+    period: "2025",
+    section: bi("事件時序、回應與改善", "Incident timeline, response and lessons"),
+    scope: bi(
+      "當事方報告；不混用其他 npm 攻擊活動。",
+      "A first-party report; do not conflate separate npm campaigns.",
+    ),
+  },
+  {
+    id: "firebase",
+    title: bi(
+      "Firebase：Firestore Security Rules 入門",
+      "Firebase: Get started with Firestore Security Rules",
+    ),
+    href: "https://firebase.google.com/docs/firestore/security/get-started",
+    period: "—",
+    section: bi("伺服器程式庫略過 Rules 的注意事項", "Notice that server libraries bypass Rules"),
+    scope: bi(
+      "持續更新的官方文件；後端仍須逐物件授權與最小 IAM。",
+      "Living official documentation; backend object authorization and least-privilege IAM remain necessary.",
+    ),
+  },
+);
+
+export function sourceFor(id: string) {
+  const source = SOURCES.find((item) => item.id === id);
+  if (!source) throw new Error(`Unknown source: ${id}`);
+  return source;
+}

@@ -44,11 +44,11 @@ describe("pipeline gaps", () => {
 
   it("requires both threat-model controls and distinguishes injection tests", () => {
     assert.equal(catchRequirement("g0-model").mode, "all");
-    const one = byId({ "g0-dfd": true, "g6-indirect": true });
+    const one = byId({ "g0-dfd": true, "g6-indirect-authz": true });
     assert.equal(one.get("g0-model")?.caught, false);
     assert.equal(one.get("g6-pi")?.caught, false);
     assert.equal(one.get("g6-indirect")?.caught, true);
-    const both = byId({ "g0-dfd": true, "g0-stride": true, "g6-direct": true });
+    const both = byId({ "g0-dfd": true, "g0-stride": true, "g6-data-authz": true });
     assert.equal(both.get("g0-model")?.caught, true);
     assert.equal(both.get("g6-pi")?.caught, true);
   });
@@ -171,4 +171,26 @@ describe("pipeline gaps", () => {
       }
     }
   });
+});
+
+describe("review counterexamples", () => {
+  const plan = buildPlan(PRESETS.kb);
+  it("legacy prompt-secrecy and egress-only checks cannot establish data authorization", () => {
+    const statuses = catchStatus(plan, { "g6-direct": true, "g6-indirect": true });
+    assert.equal(statuses.find((s) => s.finding.id === "g6-pi")?.caught, false);
+    assert.equal(statuses.find((s) => s.finding.id === "g6-indirect")?.caught, false);
+  });
+  it("cooling-off review alone does not establish malicious-script detection", () => {
+    const pending = catchStatus(plan, { "g1-cool-reviewed": true });
+    assert.equal(pending.find((s) => s.finding.id === "g1-hook")?.caught, false);
+    const inspected = catchStatus(plan, { "g1-hook": true });
+    assert.equal(inspected.find((s) => s.finding.id === "g1-hook")?.caught, true);
+  });
+});
+
+it("old manual-review and generic database checks do not establish completed review or backend object authorization", () => {
+  const script = catchStatus(buildPlan(PRESETS.script), { "g1-cool": true });
+  assert.equal(script.find((s) => s.finding.id === "g1-cool")?.caught, false);
+  const kb = catchStatus(buildPlan(PRESETS.kb), { "g4-rls": true, "g4-depth": true });
+  assert.equal(kb.find((s) => s.finding.id === "g4-bola")?.caught, false);
 });

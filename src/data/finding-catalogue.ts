@@ -1,3 +1,4 @@
+import { QUOTA_EVIDENCE } from "./quota-example.ts";
 import { bi, type Bi } from "../i18n/locale.ts";
 import type { GateId, Severity } from "./model.ts";
 
@@ -371,8 +372,8 @@ export const FINDING_CATALOGUE = {
       "api/docs.ts: select * from documents where id = $1; RLS disabled.",
     ),
     fix: bi(
-      "加上擁有者條件並開啟 RLS。用兩個帳號的測試鎖住這個行為。",
-      "Add the owner condition and turn on RLS. Lock the behaviour in with a two-account test.",
+      "在可信任的服務層驗證主體與物件權限；PostgreSQL 可加 RLS。Firestore 前端使用 Rules，伺服器程式庫另驗證逐物件授權與最小 IAM。以雙帳號測試讀取、修改與刪除。",
+      "Enforce principal and object permissions in a trusted service layer; PostgreSQL may add RLS. Firestore clients use Rules, while server libraries enforce object authorization and least-privilege IAM separately. Test reads, updates and deletes across two accounts.",
     ),
     tool: bi("架構審查", "Architecture review"),
     cwe: bi("營運對照：CWE-639", "Operational reference: CWE-639"),
@@ -652,8 +653,8 @@ export const FINDING_CATALOGUE = {
       "promptfoo: a test account requests restricted test data; the response contains the protected test marker and violates the case’s denial condition (demo).",
     ),
     fix: bi(
-      "工具權限與核可必須由執行端驗證，不依賴提示詞保密；拒絕未授權操作並記錄。",
-      "Enforce tool authorization and approval in the executor independently of prompt secrecy; reject and log unauthorized actions.",
+      "檢索與工具執行前須在可信任層驗證主體與資源權限，不把未授權資料送入模型；工具動作另需核可。拒絕並記錄未授權存取，不依賴提示詞保密。",
+      "Verify principal and resource permissions in a trusted layer before retrieval or tool execution; never supply unauthorized data to the model. Require approval for applicable tool actions, and deny and log unauthorized access independently of prompt secrecy.",
     ),
     tool: bi("promptfoo", "promptfoo"),
     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
@@ -681,12 +682,12 @@ export const FINDING_CATALOGUE = {
       "Instructions in an untrusted document redirect the model.",
     ),
     evidence: bi(
-      "示範文件使模型嘗試執行未授權動作。",
-      "The demo document causes an unauthorized action attempt.",
+      "惡意文件使回覆包含受保護的測試標記；檢索與回覆紀錄顯示，未通過資料授權仍將該資料提供給測試帳號（示範）。",
+      "A malicious document causes the response to contain a protected test marker; retrieval and response logs show the test account received data without authorization (demo).",
     ),
     fix: bi(
-      "限制工具權限與資料流，並測試不受信任內容。",
-      "Restrict tool permissions and data flows and test untrusted content.",
+      "在檢索與工具執行前驗證主體與資源權限，不把文件指令當成授權；依系統能力限制資料流、工具與外連。",
+      "Verify principal and resource permissions before retrieval and tool execution; document instructions do not grant authorization. Restrict data flows, tools and outbound access as applicable.",
     ),
     tool: bi("promptfoo", "promptfoo"),
     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
@@ -696,19 +697,19 @@ export const FINDING_CATALOGUE = {
       "External content may induce unauthorized actions or exfiltration.",
     ),
     retest: bi(
-      "使用惡意文件複測並檢查工具呼叫與外洩通道。",
-      "Retest malicious documents and inspect tool calls and exfiltration paths.",
+      "使用惡意文件與不同權限帳號複測；確認受保護標記不出現在未授權回覆，並檢查檢索、工具核可及適用的外洩通道紀錄。",
+      "Retest malicious documents across differently authorized accounts; protected markers must not appear in unauthorized responses. Inspect retrieval, tool approval and applicable exfiltration logs.",
     ),
   },
   "g6-dow": {
     gate: "G6",
     depth: true,
-    title: bi("配額尚未寫進測試", "Quota not yet covered by tests"),
-    detail: bi("內部端點仍建議有配額。", "Internal endpoints should still have a quota."),
-    evidence: bi(
-      "50 條 100k token 請求皆 200，未見 429。",
-      "50 requests of 100k tokens each returned 200; no 429 observed.",
+    title: bi("配額超量案例未被拒絕", "Over-quota test requests are not rejected"),
+    detail: bi(
+      "示範政策：每主體每分鐘上限 100k token，正常請求仍須可用；本案例的超量拒絕測試失敗。",
+      "Demo policy: each principal is limited to 100k tokens per minute while normal requests remain available; this case fails the over-quota rejection test.",
     ),
+    evidence: QUOTA_EVIDENCE,
     fix: bi(
       "加上每主體配額、超時與熔斷，並把拒絕寫進安全日誌。",
       "Add a per-principal quota, timeouts and a circuit breaker, and write rejections to the security log.",
@@ -726,10 +727,10 @@ export const FINDING_CATALOGUE = {
     ),
     variants: {
       public: {
-        title: bi("沒有權杖配額", "No token quota"),
+        title: bi("公開端點未落實權杖配額", "Public endpoint fails to enforce token quota"),
         detail: bi(
-          "長文與併發沒有熔斷，公開端點會直接轉成帳單。",
-          "Long inputs and concurrency have no circuit breaker; a public endpoint turns straight into a bill.",
+          "公開端點未依宣告配額拒絕超量請求，可能產生非預期費用；須另驗證長文、併發與熔斷。",
+          "The public endpoint fails to reject requests beyond its declared quota and may incur unexpected cost; test long inputs, concurrency and circuit breakers separately.",
         ),
       },
     },

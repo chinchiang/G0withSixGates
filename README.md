@@ -163,7 +163,7 @@ HTTP and model capabilities are independent: an internal LLM may have no HTTP in
 - **G1／G2 的發現跟著「程式怎麼寫」走**，不看受測系統有沒有模型：仍有缺陷時，有 Web 表面的專案出現幻覺套件與惡意 postinstall，批次腳本出現未滿冷卻期的仿冒套件；兩者都可能寫死祕密。
 - **SSRF 升級**：程式仍有缺陷、有 Web 表面、有 LLM 或 Agent 且能對外通訊，時，G5 的抓取工具會打到雲端中繼資料，G3 的 IMDSv2 不分等級直接阻擋。
 - **越權與 `alg:none` 是兩個發現**：只做 JWT 測試攔不下雙帳號越權。
-- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額；目錄以 `depth: true` 標記）一律升為阻擋；L1／L2 只警示。公開端點完全沒有配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
+- **L3 的縱深項**（IMDSv2、CSP、規則檔掃描、速率限制、內部端點的配額；目錄以 `depth: true` 標記）一律升為阻擋；L1／L2 只警示。公開端點未落實配額則不分等級都阻擋；預備環境的 API 文件外洩不是縱深項，各等級都維持警示。
 - **未文件化的威脅模型**在 L3 阻擋，其他等級警示。
 - **管線缺口**：每個發現都有一條攔截條件（`CATCH_REQUIREMENTS`，型別保證不會漏列），標明任一（`any`）或全部（`all`）控制項勾選才算攔下；多數項目任一即可，威脅模型須同時勾選資料流與風險盤點。管線頁、閘門頁與放行紀錄都從同一個模組取用，閘門頁會標出需要搭配的控制項，缺少的控制項各自加上「」，「全部」時以「、」列出、「任一」時以「／」表示擇一；控制項文字本身就含有這兩個符號，引號才分得出一項在哪裡結束。SBOM、金鑰輪替、差異掃描、等級紀錄這類流程性控制項（`process: true`）不對應示範發現；測試會確保每個控制項不是攔得下某個發現，就是明確標成流程性。
 
@@ -176,7 +176,7 @@ The rules live in `src/data/engine.ts` (finding text in `src/data/finding-catalo
 - **G1 / G2 findings follow how the code was written**, not whether the system under test has a model: while defective, a project with a web surface gets hallucinated packages and a malicious postinstall, a batch script gets a look-alike package inside its cooling-off period; both can hard-code secrets.
 - **SSRF escalation**: when the code is still defective, there is a web surface, an LLM or agent, and egress, G5's fetch tool reaches cloud metadata and G3's IMDSv2 blocks at every level.
 - **The IDOR and `alg:none` are separate findings**: a JWT test alone does not catch the two-account authorization bypass.
-- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints; marked `depth: true` in the catalogue) escalate to blocks; L1 / L2 only warn. A public endpoint with no quota at all blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
+- **Depth items at L3** (IMDSv2, CSP, rule-file scanning, rate limits, quotas on internal endpoints; marked `depth: true` in the catalogue) escalate to blocks; L1 / L2 only warn. A public endpoint failing to enforce its quota blocks at every level; API docs exposed in staging are not a depth item and stay an advisory at every level.
 - **An undocumented threat model** blocks at L3 and warns elsewhere.
 - **Pipeline gaps**: every finding has a catch requirement (`CATCH_REQUIREMENTS`, which the type keeps complete) saying whether any one (`any`) or all (`all`) of its controls must be checked for it to be caught; most findings need one, the threat model needs both data-flow and risk analysis. The Pipeline view, the Gates view and the release record all read the same module; the Gates view names the controls a control must be paired with, and missing controls are each quoted, then listed with commas for `all` or offered as alternatives with slashes for `any`; control text itself contains commas and slashes, so the quotes show where each one ends. Process controls such as SBOMs, key rotation, diff scans and the level record (`process: true`) map to no demo finding; a test makes sure every control either catches some finding or is explicitly a process control.
 
@@ -255,7 +255,7 @@ G0withSixGates/
 │   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()、Vite 設定檔匯入鏈不用 @/）/ the lint rules apply (on-screen text via bi(), no @/ in the Vite config import chain)
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速、等水合與畫面尺寸 / throttling, hydration waits and screen sizes shared by both browser suites
-│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，與 CI 相同的整套檢查 / full CI-equivalent suite
+│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all / Chromium regression; use npm run regress:all for full CI coverage
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── check-built-headers.mjs、check-built-bundles.mjs(.test.mjs)   # 本專案 app：建置後檢查安全標頭與程式包切分 / post-build checks of the headers and code splitting
@@ -320,7 +320,7 @@ npm run preview:restart  # 以 127.0.0.1:8081 預覽正式建置 / preview the p
 npm run test:e2e         # 對 127.0.0.1:8081 跑瀏覽器互動測試 / browser e2e against the preview
 npm run test:e2e:throttled  # 同上，CPU 降速 10 倍 / the same with the CPU slowed tenfold
 npm run test:pages:throttled  # 對已建置的 Pages 跑測試，CPU 降速 10 倍 / the Pages tests with the CPU slowed tenfold
-npm run regress          # 與 CI 相同的整套檢查，含建置、e2e 與 Pages / the full CI-equivalent suite
+npm run regress          # Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all，含建置、e2e 與 Pages / the Chromium regression; use npm run regress:all for full CI coverage
 npm run compare:main     # 跟 main 比規則引擎的輸出與放行紀錄 / compare behaviour with main
 node scripts/browser-smoke.mjs   # 桌機與手機渲染檢查 / desktop + mobile render check
 node scripts/og-card.mjs         # 重製分享卡片 public/og.jpg / regenerate the share card
@@ -448,3 +448,11 @@ This project's own code and teaching content are under the [MIT License](LICENSE
 跨瀏覽器回歸：`E2E_BROWSER=firefox npm run test:pages` 與 `E2E_BROWSER=webkit npm run test:pages` 執行相同的靜態版案例；CI 與 Pages 部署均須通過這兩項。WebKit 是 Safari 引擎相容性檢查，不能取代真實 iOS 裝置測試。
 
 Cross-browser regression: `E2E_BROWSER=firefox npm run test:pages` and `E2E_BROWSER=webkit npm run test:pages` run the same Pages assertions. Both CI and Pages deployment require them. WebKit checks Safari-engine compatibility, not real iOS devices.
+
+完整跨瀏覽器檢查使用 `npm run regress:all`，共 14 步驟；先安裝 `npx playwright install --with-deps chromium firefox webkit`。`npm run regress` 為 12 步驟 Chromium 檢查，不包含 Firefox／WebKit。控制項只有完成驗證並留有核可紀錄才勾選；送交人工審查仍屬未完成。
+
+Full cross-browser coverage uses `npm run regress:all` (14 steps), after `npx playwright install --with-deps chromium firefox webkit`. `npm run regress` is the 12-step Chromium subset. Check controls only after verification and recorded approval; pending review remains incomplete.
+
+控制項與規則第 4 版：資料／間接注入授權、資料庫逐物件授權及冷卻期審查已加強，舊定義的勾選不自動沿用，須重新確認。研究數字附適用範圍，事故卡片可直接開啟來源；無法完整追溯的 Replit 敘述改為合成情境，未核對條件的 14% 指標移除。
+
+Controls and rule version 4 strengthen data/indirect-injection authorization, database object authorization and cooling-off review. Checks using old definitions require reconfirmation. Research numbers carry scope and incident cards link to sources; the untraceable Replit account is now a synthetic scenario and the unverified 14% metric is omitted.
