@@ -44,7 +44,7 @@ const T = {
     "Payments, core healthcare, critical infrastructure; goes straight to L3",
   ),
   api: bi("有 HTTP API 或網頁介面", "Has an HTTP API or web UI"),
-  apiImplied: bi("對外或含 LLM 時一定有", "Always true when public or with an LLM"),
+  apiImplied: bi("對外情境視為具有 HTTP 介面", "External scenarios imply an HTTP interface"),
   apiHint: bi("內部 API 也要過 G4 與 G5", "Internal APIs still go through G4 and G5"),
   llm: bi("含 LLM 介面", "Has an LLM interface"),
   agent: bi("含 Agent 工具呼叫", "Has agent tool calls"),

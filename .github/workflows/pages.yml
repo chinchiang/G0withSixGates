@@ -20,13 +20,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
-      - run: npm run build:pages
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:pages
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run regress
+      - run: E2E_BROWSER=firefox npm run test:pages
+      - run: E2E_BROWSER=webkit npm run test:pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/pages

@@ -158,10 +158,17 @@ export function stopOutcome({ signalled, stubborn, after }) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** 殭屍程序已釋放連接埠，不算仍存活。 Zombies have released their sockets and are not live processes. */
+export function isZombie(stat) {
+  const text = String(stat ?? "");
+  const end = text.lastIndexOf(") ");
+  return end !== -1 && text.slice(end + 2).split(/\s+/)[0] === "Z";
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
-    return true;
+    return !isZombie(readFileSync(`/proc/${pid}/stat`, "utf8"));
   } catch (err) {
     return err?.code === "EPERM";
   }

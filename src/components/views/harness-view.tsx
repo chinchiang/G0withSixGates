@@ -170,9 +170,12 @@ export function HarnessView() {
 
   function download() {
     if (!plan || !run) return;
-    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks, locale, stale)], {
-      type: "text/markdown;charset=utf-8",
-    });
+    const blob = new Blob(
+      [reportMarkdown(run.profile, plan, run.at, checks, locale, stale, new Date())],
+      {
+        type: "text/markdown;charset=utf-8",
+      },
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -315,8 +318,8 @@ export function HarnessView() {
                           )
                         : plan.release === "conditional"
                           ? bi(
-                              "為每項警示指定負責人與期限，完成後重新驗證；有條件放行不代表警示已修復。",
-                              "Assign an owner and deadline to every advisory and retest after remediation; conditional release does not mean the advisories are fixed.",
+                              "本工具僅示範裁決，不保存處置紀錄。請在議題追蹤系統為每項警示記錄負責人、期限、處置方式與重新驗證結果；完成前不得視為正式放行。",
+                              "This tool demonstrates verdicts and does not store dispositions. Record an owner, deadline, disposition and retest result for every advisory in your issue tracker before treating it as a real release.",
                             )
                           : bi(
                               "下載紀錄保留設定與依據。正式放行仍需接入實際掃描結果；之後若設定或程式改變，請重新驗證。",

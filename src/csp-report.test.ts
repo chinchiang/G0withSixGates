@@ -44,6 +44,19 @@ describe("summarizeCspReports", () => {
     ]);
   });
 
+  it("removes secrets from relative and opaque URLs", () => {
+    for (const [input, expected] of [
+      ["/callback?token=secret#private", "/callback"],
+      ["data:text/plain,secret", "data:"],
+      ["blob:https://example.test/secret", "blob:"],
+      ["http://[invalid?token=secret", "[invalid-url]"],
+      ["//example.test/a?token=secret", "https://example.test/a"],
+    ]) {
+      const report = JSON.stringify({ "csp-report": { "document-uri": input } });
+      assert.equal(summarizeCspReports(report)[0].document, expected);
+    }
+  });
+
   it("bounds what an unauthenticated sender can make us log", () => {
     assert.deepEqual(summarizeCspReports("not json"), []);
     assert.deepEqual(summarizeCspReports(JSON.stringify({ hello: 1 })), []);

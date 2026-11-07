@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { DOCUMENT_HEAD } from "@/document-head";
@@ -27,11 +27,16 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
-  component: () => (
+  component: RootDocument,
+});
+
+function RootDocument() {
+  const nonce = useRouter().options.ssr?.nonce;
+  return (
     <html lang="zh-Hant-TW" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: DOCUMENT_HEAD.bootstrap }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: DOCUMENT_HEAD.bootstrap }} />
       </head>
       <body>
         <PreviewHostBridge />
@@ -41,5 +46,5 @@ export const Route = createRootRoute({
         <Scripts />
       </body>
     </html>
-  ),
-});
+  );
+}

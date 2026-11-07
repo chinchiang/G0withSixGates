@@ -9,7 +9,7 @@ import { bi, isLocale, type Bi, type Locale } from "../i18n/locale.ts";
  * identifiers and rules live in engine.ts.
  */
 
-export const RUN_RULE_VERSION = 2;
+export const RUN_RULE_VERSION = 3;
 
 export type GateId = "G0" | "G1" | "G2" | "G3" | "G4" | "G5" | "G6";
 export type Level = "L1" | "L2" | "L3";

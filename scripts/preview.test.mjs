@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   looksLikePreviewProcess,
+  isZombie,
   parseListenerInodes,
   parsePgid,
   parsePid,
@@ -254,4 +255,10 @@ test("terminatePids on a free port signals nothing", async () => {
   const result = await terminatePids([], fake);
   assert.deepEqual(result, { signalled: [], killed: [], stubborn: [] });
   assert.deepEqual(fake.signals, []);
+});
+
+test("zombies with parenthesized names are no longer live preview owners", () => {
+  assert.equal(isZombie("123 (npm run preview) Z 1 123 0"), true);
+  assert.equal(isZombie("123 (npm (preview)) S 1 123 0"), false);
+  assert.equal(isZombie("invalid"), false);
 });

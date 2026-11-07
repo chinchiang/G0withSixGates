@@ -169,9 +169,9 @@ describe("surface and level", () => {
     assert.match(idor?.tool.en ?? "", /ZAP/);
   });
 
-  it("an internal batch job with no API skips G4 and G5", () => {
+  it("an internal batch job reviews permissions and skips HTTP testing", () => {
     const plan = buildPlan(PRESETS.script);
-    assert.equal(status(plan, "G4"), "na");
+    assert.equal(status(plan, "G4"), "pass");
     assert.equal(status(plan, "G5"), "na");
   });
 
@@ -208,11 +208,11 @@ describe("gaps found by mutation testing", () => {
     plan.steps.flatMap((s) => s.findings).find((f) => f.id === id);
   const internal: Profile = { ...PRESETS.script, defects: "vibe" };
 
-  it("webSurface needs an API, a non-internal exposure or an LLM", () => {
+  it("webSurface needs an API or a non-internal exposure", () => {
     assert.equal(webSurface(internal), false);
     assert.equal(webSurface({ ...internal, api: true }), true);
     assert.equal(webSurface({ ...internal, exposure: "partner" }), true);
-    assert.equal(webSurface({ ...internal, llm: true }), true);
+    assert.equal(webSurface({ ...internal, llm: true }), false);
   });
 
   it("trifectaPresent needs all three legs and a model or agent", () => {
@@ -285,7 +285,7 @@ describe("gaps found by mutation testing", () => {
     assert.equal(find(pii, "g4-pii")?.severity, "block");
     assert.equal(find(pii, "g5-mfa")?.severity, "block");
     assert.equal(find(buildPlan(PRESETS.kb), "g4-pii"), undefined);
-    assert.equal(find(buildPlan(PRESETS.kb), "g5-mfa"), undefined);
+    assert.equal(find(buildPlan(PRESETS.kb), "g5-mfa")?.severity, "block");
     assert.equal(find(buildPlan({ ...PRESETS.kb, exposure: "partner" }), "g5-debug"), undefined);
     assert.equal(find(buildPlan(PRESETS.kb), "g5-debug")?.severity, "advisory");
   });
@@ -612,7 +612,7 @@ describe("settings that apply", () => {
       destructive: false,
     });
     assert.equal(settingsThatApply({ ...internal, exposure: "public" }).api, false);
-    assert.equal(settingsThatApply({ ...internal, llm: true }).api, false);
+    assert.equal(settingsThatApply({ ...internal, llm: true }).api, true);
     assert.equal(settingsThatApply({ ...internal, llm: true }).egress, true);
     assert.equal(settingsThatApply({ ...internal, llm: true }).destructive, false);
     assert.deepEqual(settingsThatApply({ ...internal, agent: true }), {
@@ -693,5 +693,28 @@ describe("report escaping and sources", () => {
       const md = reportMarkdown(PRESETS.kb, buildPlan(PRESETS.kb), at, {}, locale);
       for (const source of SOURCES) assert.ok(md.includes(source.href), source.href);
     }
+  });
+});
+
+describe("review regression cases", () => {
+  it("keeps an offline model outside HTTP testing", () => {
+    const plan = buildPlan({ ...PRESETS.script, llm: true, defects: "none" });
+    assert.equal(plan.steps.find((step) => step.gate === "G5")?.status, "na");
+    assert.equal(plan.steps.find((step) => step.gate === "G4")?.status, "pass");
+  });
+  it("reports the separate export assessment time", () => {
+    const p = PRESETS.hardened;
+    const md = reportMarkdown(
+      p,
+      buildPlan(p),
+      new Date("2026-01-01T00:00:00Z"),
+      {},
+      "en",
+      false,
+      new Date("2026-06-01T00:00:00Z"),
+    );
+    assert.match(md, /Export and checklist assessment time: 2026-06-/);
+    assert.match(md, /not a snapshot of controls at run time/);
+    assert.match(md, /not evidence of ASVS conformity/);
   });
 });

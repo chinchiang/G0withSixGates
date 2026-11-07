@@ -69,12 +69,12 @@ export const RELEASE_LABEL: Record<RunPlan["release"], Bi> = {
 };
 
 export const DEMO_NOTICE = bi(
-  "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。",
-  "Demo simulation: findings and evidence are teaching examples generated from the scenario, not a scan of a real system.",
+  "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。建議等級表示本課程的驗證深度；示範裁決不構成 ASVS 符合性證明。正式驗證須逐項確認適用要求與實際證據，工具品牌不決定等級。",
+  "Demo simulation: findings and evidence are teaching examples generated from the scenario, not a scan of a real system. The recommended level describes this course’s verification depth; the demo verdict is not evidence of ASVS conformity. Verify each applicable requirement using actual evidence; tool brands do not determine the level.",
 );
 
 export function webSurface(p: Profile): boolean {
-  return p.api || p.exposure !== "internal" || p.llm;
+  return p.api || p.exposure !== "internal";
 }
 
 /**
@@ -87,7 +87,7 @@ export function trifectaPresent(p: Profile): boolean {
 
 /** 有條件才有作用的系統能力。 The system capabilities that only apply under some settings. */
 export interface SettingsThatApply {
-  /** 不對外且沒有 LLM 時才有作用；否則一定有 Web 表面。 Applies only when internal without an LLM; otherwise there is always a web surface. */
+  /** 內部情境可選擇 HTTP 介面，與模型能力獨立。 Internal scenarios can choose an HTTP interface independently of model capabilities. */
   api: boolean;
   privateData: boolean;
   untrusted: boolean;
@@ -108,7 +108,7 @@ export interface SettingsThatApply {
 export function settingsThatApply(p: Profile): SettingsThatApply {
   const ai = p.llm || p.agent;
   return {
-    api: p.exposure === "internal" && !p.llm,
+    api: p.exposure === "internal",
     privateData: ai,
     untrusted: ai,
     egress: ai,
@@ -402,9 +402,13 @@ export function buildPlan(p: Profile): RunPlan {
   if (!web && !p.agent) {
     g4 = step(
       GATES[4],
-      [bi("沒有 HTTP API，也沒有 Agent 工具。", "No HTTP API and no agent tools.")],
+      [
+        bi(
+          "非 HTTP 情境：仍須審查檔案、資料庫與服務帳號權限；本次未模擬發現。",
+          "Non-HTTP scenario: review file, database and service-account permissions; no finding is simulated this run.",
+        ),
+      ],
       [],
-      bi("不適用：沒有授權邊界需要審查。", "N/A: no authorization boundary to review."),
     );
   } else {
     const findings: Finding[] = [];
@@ -470,7 +474,7 @@ export function buildPlan(p: Profile): RunPlan {
     if (ssrf) {
       findings.push(finding("g5-ssrf", "block"));
     }
-    if (pii) {
+    if (level !== "L1") {
       findings.push(finding("g5-mfa", "block"));
     }
     if (p.exposure === "public") {
@@ -538,8 +542,8 @@ export function buildPlan(p: Profile): RunPlan {
     } else {
       logs.push(
         bi(
-          "promptfoo 案例通過：未抽出系統提示，上傳文件未觸發外連。",
-          "promptfoo cases pass: no system prompt extracted, uploaded documents triggered no outbound call.",
+          "promptfoo 案例通過：受保護測試資料未被揭露，未發生未授權操作或文件觸發的外連。",
+          "promptfoo cases pass: protected test data was not disclosed; no unauthorized action or document-triggered outbound call occurred.",
         ),
       );
       logs.push(
@@ -578,8 +582,8 @@ export function buildPlan(p: Profile): RunPlan {
         )
       : release === "conditional"
         ? bi(
-            "可以合併，但警示要有期限與負責人。",
-            "Merge allowed, but every advisory needs a deadline and an owner.",
+            "示範為有條件放行：正式合併前，須另行建立每項警示的負責人、期限與處置紀錄。",
+            "Demo conditional release: before a real merge, record an owner, deadline and disposition for every advisory in your issue tracker.",
           )
         : bi(
             "放行。G0 與六道閘門都有紀錄，沒有靜默略過。",
@@ -625,6 +629,11 @@ const R = {
   title: bi("# 六扇門放行紀錄", "# Six-Gate release record"),
   system: bi("系統", "System"),
   time: bi("執行時間", "Run time"),
+  exported: bi("匯出與控制項評估時間", "Export and checklist assessment time"),
+  checksTime: bi(
+    "管線缺口依匯出時的勾選估算，並非執行當下的控制項快照。",
+    "Pipeline gaps use the checks at export, not a snapshot of controls at run time.",
+  ),
   level: bi("建議等級", "Recommended level"),
   verdict: bi("裁決", "Verdict"),
   blocks: bi("阻擋", "Blocks"),
@@ -692,6 +701,7 @@ export function reportMarkdown(
   locale: Locale = "zh",
   /** 下載時的設定已經和這次執行不同（畫面上會顯示「設定已改」）。 The settings changed after the run. */
   stale = false,
+  exportedAt: Date = at,
 ): string {
   const t = (value: Bi) => pick(locale, value);
   const yn = (value: boolean) => yesNo(locale, value);
@@ -721,6 +731,9 @@ export function reportMarkdown(
     `- ${t(R.blocks)} ${plan.blockCount}${locale === "zh" ? "、" : ", "}${t(R.advisories)} ${plan.advisoryCount}`,
     ``,
     t(plan.headline),
+    ``,
+    `- ${t(R.exported)}${colon}${localStamp(exportedAt)}`,
+    `> ${t(R.checksTime)}`,
     ``,
     t(R.settings),
     `- ${t(R.exposure)}${colon}${t(EXPOSURE_LABEL[p.exposure])}${semi}${t(R.sensitivity)}${colon}${t(SENSITIVITY_LABEL[p.sensitivity])}${semi}${t(R.critical)}${colon}${yn(p.critical)}`,

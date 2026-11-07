@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -8,7 +8,11 @@ import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
-import { vercelHeaderRoute } from "./scripts/security-headers.mjs";
+import {
+  vercelHeaderRoute,
+  vercelInstallHeaderRoute,
+  vercelAssetHeaderRoute,
+} from "./scripts/security-headers.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
@@ -178,7 +182,17 @@ export default defineConfig(({ command, isPreview }) => ({
             serverDir: "./server",
             // Production-only security headers; see scripts/security-headers.mjs
             // for why this is a Vercel route rather than a Nitro routeRule.
-            vercel: { config: { routes: [vercelHeaderRoute()] } },
+            vercel: {
+              config: {
+                routes: [
+                  vercelHeaderRoute(),
+                  vercelInstallHeaderRoute(
+                    readFileSync(new URL("./scripts/install-page.html", import.meta.url), "utf8"),
+                  ),
+                  vercelAssetHeaderRoute(),
+                ],
+              },
+            },
           }),
         ]
       : []),

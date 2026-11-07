@@ -34,12 +34,18 @@ function text(value: unknown): string {
 
 /** 只留來源與路徑；`inline`、`eval` 這類關鍵字原樣保留。 Keep origin and path only; keywords such as `inline` stay as they are. */
 function location(value: unknown): string {
-  const raw = text(value);
+  const raw = text(value).trim();
+  if (!raw || ["inline", "eval", "self", "none"].includes(raw)) return raw;
   try {
-    const url = new URL(raw);
-    return `${url.origin}${url.pathname}`.slice(0, MAX_FIELD);
+    const relative = !/^[a-z][a-z0-9+.-]*:/i.test(raw);
+    const url = new URL(raw, "https://csp.invalid");
+    if (!["http:", "https:"].includes(url.protocol)) return url.protocol;
+    return `${relative && !raw.startsWith("//") ? "" : url.origin}${url.pathname}`.slice(
+      0,
+      MAX_FIELD,
+    );
   } catch {
-    return raw;
+    return "[invalid-url]";
   }
 }
 
