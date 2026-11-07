@@ -560,7 +560,7 @@ export const FINDING_CATALOGUE = {
   },
   "g5-mfa": {
     gate: "G5",
-    title: bi("只憑帳密就能進個資頁", "A password alone reaches personal data"),
+    title: bi("L2／L3 登入缺少多重要素", "L2 / L3 login lacks multiple factors"),
     detail: bi(
       "登入流程沒有第二要素。ASVS 從 L2 起要求多重要素，L3 其中一個要素必須是硬體式驗證器。",
       "The login flow has no second factor. ASVS requires multi-factor from L2, and at L3 one factor must be a hardware authenticator.",
@@ -570,8 +570,8 @@ export const FINDING_CATALOGUE = {
       "POST /login (username + password) → 302 /customers; no OTP or WebAuthn requested.",
     ),
     fix: bi(
-      "為存取個資的角色開啟多重要素，並在 G4 確認沒有繞過的第二條登入路徑。",
-      "Turn on multi-factor for roles that reach personal data, and confirm in G4 there is no second login path around it.",
+      "為 L2／L3 的登入開啟多重要素；L3 驗證硬體式抗網路釣魚要素，並在 G4 確認沒有繞過的第二條登入路徑。",
+      "Require multiple factors for L2 / L3 login, verify a hardware phishing-resistant factor at L3, and confirm in G4 there is no second login path around it.",
     ),
     tool: bi("Burp 登入流程", "Burp login flow"),
     cwe: bi("營運對照：CWE-308", "Operational reference: CWE-308"),
@@ -642,18 +642,18 @@ export const FINDING_CATALOGUE = {
   },
   "g6-pi": {
     gate: "G6",
-    title: bi("提示詞注入抽出系統政策", "Prompt injection extracts the system policy"),
+    title: bi("提示詞注入突破應用程式政策", "Prompt injection violates application policy"),
     detail: bi(
-      "直接越獄成功，系統提示詞被複述到回覆。",
-      "The direct jailbreak succeeded; the system prompt was echoed.",
+      "不受信任指令使模型違反測試中明定的資料存取政策。單純複述提示詞不足以判定越權。",
+      "Untrusted instructions cause a violation of the data-access policy defined in the test. Prompt disclosure alone does not establish an authorization bypass.",
     ),
     evidence: bi(
-      "promptfoo：jailbreak 案例失敗。回應含「系統政策：你必須…」。",
-      'promptfoo: the jailbreak case failed. The reply contains "System policy: you must…".',
+      "promptfoo：測試帳號要求讀取禁止提供的測試資料；回應含受保護的測試標記，違反案例的拒絕條件（示範）。",
+      "promptfoo: a test account requests restricted test data; the response contains the protected test marker and violates the case’s denial condition (demo).",
     ),
     fix: bi(
-      "工具權限不要寫在可被複述的提示詞裡。間接注入要配合 G0 切斷對外通訊。",
-      "Keep tool permissions out of a prompt that can be echoed. Pair indirect injection with G0 cutting egress.",
+      "工具權限與核可必須由執行端驗證，不依賴提示詞保密；拒絕未授權操作並記錄。",
+      "Enforce tool authorization and approval in the executor independently of prompt secrecy; reject and log unauthorized actions.",
     ),
     tool: bi("promptfoo", "promptfoo"),
     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),

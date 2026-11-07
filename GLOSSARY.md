@@ -82,3 +82,15 @@ _Avoid_：涵蓋（covered）、已覆蓋
 一次執行中，攔截條件未被目前勾選滿足的發現。
 The findings in a run whose catch requirement the current checks do not meet.
 _Avoid_：涵蓋率（coverage rate）、覆蓋缺口
+
+**示範裁決（demo verdict）**：
+依課程政策產生的裁決，不構成 ASVS 符合性證明。
+A verdict produced by course policy, not evidence of ASVS conformity.
+
+**控制項評估時間（checklist assessment time）**：
+匯出時讀取目前勾選的時間，與執行時間分列。
+The export time at which current checks are read, listed separately from run time.
+
+**隨機授權碼（nonce）**：
+每次 HTML 請求獨立產生，僅授權該回應的可信腳本，禁止共用快取。
+Generated independently for each HTML request to authorize trusted scripts in that response; shared caching is prohibited.

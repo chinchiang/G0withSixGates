@@ -1,0 +1,522 @@
+diff --git a/.github/workflows/pages.yml b/.github/workflows/pages.yml
+index dd7525f..e2179ef 100644
+--- a/.github/workflows/pages.yml
++++ b/.github/workflows/pages.yml
+@@ -20,13 +20,8 @@ jobs:
+           node-version: 22
+           cache: npm
+       - run: npm ci
+-      - run: npm run typecheck
+-      - run: npm run lint
+-      - run: npm run format:check
+-      - run: npm test
+-      - run: npm run build:pages
+       - run: npx playwright install --with-deps chromium
+-      - run: npm run test:pages
++      - run: npm run regress
+       - uses: actions/upload-pages-artifact@v3
+         with:
+           path: dist/pages
+diff --git a/GLOSSARY.md b/GLOSSARY.md
+index 5b50fe0..e1e181c 100644
+--- a/GLOSSARY.md
++++ b/GLOSSARY.md
+@@ -82,3 +82,11 @@ _Avoid_：涵蓋（covered）、已覆蓋
+ 一次執行中，攔截條件未被目前勾選滿足的發現。
+ The findings in a run whose catch requirement the current checks do not meet.
+ _Avoid_：涵蓋率（coverage rate）、覆蓋缺口
++
++**示範裁決（demo verdict）**：
++依課程政策產生的裁決，不構成 ASVS 符合性證明。
++A verdict produced by course policy, not evidence of ASVS conformity.
++
++**控制項評估時間（checklist assessment time）**：
++匯出時讀取目前勾選的時間，與執行時間分列。
++The export time at which current checks are read, listed separately from run time.
+diff --git a/README.md b/README.md
+index 89a7daf..852848c 100644
+--- a/README.md
++++ b/README.md
+@@ -144,6 +144,14 @@ View, gate and locale live in the URL (for example `?view=gates&gate=G3&lang=en`
+ 
+ Every display string is a `Bi = { zh, en }` (`src/i18n/locale.ts`). Content (`model.ts`), the finding catalogue (`finding-catalogue.ts`), rule-engine output (logs, verdicts and the release record in `engine.ts`) and the per-view `T` dictionaries are all stored as pairs, and the type forces both languages. Views call `useT()`; `reportMarkdown` takes an extra `locale` argument. The locale comes from `?lang=` in the URL, then localStorage, then the Chinese default, and `<html lang>` follows it.
+ 
++教學裁決與正式驗證：本工具的分級及放行規則是課程政策，不構成 ASVS 符合性證明；工具品牌不決定等級。正式驗證須逐項確認適用要求與證據。有條件放行的負責人、期限、處置及重新驗證結果須另存於議題追蹤系統，本工具不保存處置紀錄。下載紀錄分列執行與匯出時間，管線缺口採匯出時勾選。
++
++Demo verdicts and actual verification: levels and release rules are course policies, not proof of ASVS conformity; tool brands do not determine a level. Verify applicable requirements with actual evidence. Record conditional-release owners, deadlines, dispositions and retest results in your issue tracker; this tool does not store dispositions. Reports distinguish run and export times; pipeline gaps use checks at export.
++
++HTTP 介面與模型能力分開判斷：內部 LLM 可以沒有 HTTP 介面。沒有 HTTP 時 G5 不適用，但 G4 仍提醒審查檔案、資料庫及服務帳號權限。仍有缺陷的 L2／L3 HTTP 情境均示範多重要素驗證缺失，不限個資情境。
++
++HTTP and model capabilities are independent: an internal LLM may have no HTTP interface. G5 is then not applicable, while G4 still calls for file, database and service-account permission review. Defective L2 / L3 HTTP scenarios demonstrate missing multiple factors regardless of personal-data handling.
++
+ ## Harness 的規則 / Harness rules
+ 
+ 規則都在 `src/data/engine.ts`（發現的文字在 `src/data/finding-catalogue.ts`，管線缺口在 `src/data/pipeline-gaps.ts`），重點如下：
+@@ -384,13 +392,13 @@ When a refactor must preserve behaviour, run `npm run compare:main` (`scripts/co
+ 正式建置會在 Vercel 的輸出設定裡加上安全標頭（`scripts/security-headers.mjs`）；開發伺服器與 Grok 即時預覽不受影響。
+ 
+ - **強制**：`frame-ancestors`（只允許本站嵌入）、`object-src 'none'`、`base-uri 'none'`、`form-action`，加上 `default-src`、`script-src`、`style-src`、`img-src`、`font-src`、`connect-src`、`frame-src`、`manifest-src`、`worker-src` 等資源來源限制（只允許本站），以及 `X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`、`Strict-Transport-Security`。
+-- `script-src` 保留 `'unsafe-inline'`：TanStack Start 的 hydration 腳本每頁內容不同，無法用雜湊放行。
++- `script-src` 保留 `'unsafe-inline'`：目前尚未實作逐請求隨機授權碼或動態腳本雜湊；這是現有部署的限制，不能視為完整的 XSS 防護。
+ - **回報**：CSP 帶 `report-uri` 與 `report-to`（`Reporting-Endpoints`），送到 `/api/csp-report`。端點不需登入，所以只記指令、被擋的來源與頁面（網址去掉查詢字串），一個請求只寫一行並限制筆數；本文邊讀邊計數，超過 16KB 回 413，chunked 請求也一樣；GET 回 405。端點本身沒有頻率限制，有需要時在 Vercel 防火牆設定。部署日誌裡 `[csp]` 開頭的就是違規紀錄。
+ 
+ The production build adds security headers to the Vercel output config (`scripts/security-headers.mjs`); the dev server and the Grok live preview are unaffected.
+ 
+ - **Enforced**: `frame-ancestors` (self only), `object-src 'none'`, `base-uri 'none'`, `form-action`, plus the resource limits `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-src`, `manifest-src` and `worker-src` (self only), and `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security`.
+-- `script-src` keeps `'unsafe-inline'`: TanStack Start's hydration script differs on every page, so hashes cannot cover it.
++- `script-src` keeps `'unsafe-inline'`: Per-request nonces or dynamic script hashes are not implemented; this deployment limitation must not be treated as complete XSS protection.
+ - **Reporting**: the CSP carries `report-uri` and `report-to` (`Reporting-Endpoints`) pointing at `/api/csp-report`. The endpoint is unauthenticated, so it keeps only the directive, the blocked origin and the page (query strings stripped), writes one line per request with a capped count, counts the body while reading so anything past 16KB gets 413 even when chunked, and answers GET with 405. The endpoint has no rate limit of its own; add one in the Vercel firewall if needed. Lines starting with `[csp]` in the deployment logs are violations.
+ 
+ 正式建置不再載入 Grok 品牌腳本；CSP 不再為 Grok 網域設特別允許，正式站台僅允許本站嵌入。
+diff --git a/scripts/e2e.mjs b/scripts/e2e.mjs
+index aba461b..05db4b3 100644
+--- a/scripts/e2e.mjs
++++ b/scripts/e2e.mjs
+@@ -433,7 +433,10 @@ try {
+     assert.match(report, /撤銷並輪替/);
+     await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
+     await page.getByRole("button", { name: "重新執行" }).click();
+-    await page.getByText("可以合併，但警示要有期限與負責人。").waitFor();
++    await page
++      .getByText("示範為有條件放行：正式合併前，須另行建立每項警示的負責人、期限與處置紀錄。")
++      .waitFor();
++    await page.getByText(/本工具僅示範裁決，不保存處置紀錄/).waitFor();
+     await page.getByRole("radio", { name: "已整治", exact: true }).click();
+     await page.getByRole("button", { name: "重新執行" }).click();
+     await page.getByText("放行。G0 與六道閘門都有紀錄，沒有靜默略過。").waitFor();
+diff --git a/scripts/pages-e2e.mjs b/scripts/pages-e2e.mjs
+index e25ee33..f85c84f 100644
+--- a/scripts/pages-e2e.mjs
++++ b/scripts/pages-e2e.mjs
+@@ -62,6 +62,17 @@ try {
+       await page.getByText("不准放行。", { exact: false }).first().isVisible(),
+       `${name}: the verdict survives a reload`,
+     );
++    await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
++    await page.getByText("設定已改，這份裁決對不上目前的系統。請再跑一次。").waitFor();
++    const [download] = await Promise.all([
++      page.waitForEvent("download"),
++      page.getByRole("button", { name: "下載紀錄" }).click(),
++    ]);
++    let record = "";
++    for await (const chunk of await download.createReadStream()) record += chunk;
++    assert.match(record, /設定已經改過/);
++    assert.match(record, /匯出與控制項評估時間/);
++    assert.match(record, /不構成 ASVS 符合性證明/);
+     await page.getByRole("button", { name: "EN", exact: true }).click();
+     await page.waitForFunction(() => document.documentElement.lang === "en");
+     await reload(page);
+diff --git a/scripts/preview.mjs b/scripts/preview.mjs
+index cab7a4d..3d0c044 100644
+--- a/scripts/preview.mjs
++++ b/scripts/preview.mjs
+@@ -158,10 +158,17 @@ export function stopOutcome({ signalled, stubborn, after }) {
+ 
+ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+ 
++/** 殭屍程序已釋放連接埠，不算仍存活。 Zombies have released their sockets and are not live processes. */
++export function isZombie(stat) {
++  const text = String(stat ?? "");
++  const end = text.lastIndexOf(") ");
++  return end !== -1 && text.slice(end + 2).split(/\s+/)[0] === "Z";
++}
++
+ function isAlive(pid) {
+   try {
+     process.kill(pid, 0);
+-    return true;
++    return !isZombie(readFileSync(`/proc/${pid}/stat`, "utf8"));
+   } catch (err) {
+     return err?.code === "EPERM";
+   }
+diff --git a/scripts/preview.test.mjs b/scripts/preview.test.mjs
+index cf39aec..a44802f 100644
+--- a/scripts/preview.test.mjs
++++ b/scripts/preview.test.mjs
+@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
+ import { test } from "node:test";
+ import {
+   looksLikePreviewProcess,
++  isZombie,
+   parseListenerInodes,
+   parsePgid,
+   parsePid,
+@@ -255,3 +256,9 @@ test("terminatePids on a free port signals nothing", async () => {
+   assert.deepEqual(result, { signalled: [], killed: [], stubborn: [] });
+   assert.deepEqual(fake.signals, []);
+ });
++
++test("zombies with parenthesized names are no longer live preview owners", () => {
++  assert.equal(isZombie("123 (npm run preview) Z 1 123 0"), true);
++  assert.equal(isZombie("123 (npm (preview)) S 1 123 0"), false);
++  assert.equal(isZombie("invalid"), false);
++});
+diff --git a/src/components/profile-form.tsx b/src/components/profile-form.tsx
+index aba0fc8..c0d5d09 100644
+--- a/src/components/profile-form.tsx
++++ b/src/components/profile-form.tsx
+@@ -44,7 +44,7 @@ const T = {
+     "Payments, core healthcare, critical infrastructure; goes straight to L3",
+   ),
+   api: bi("有 HTTP API 或網頁介面", "Has an HTTP API or web UI"),
+-  apiImplied: bi("對外或含 LLM 時一定有", "Always true when public or with an LLM"),
++  apiImplied: bi("對外情境視為具有 HTTP 介面", "External scenarios imply an HTTP interface"),
+   apiHint: bi("內部 API 也要過 G4 與 G5", "Internal APIs still go through G4 and G5"),
+   llm: bi("含 LLM 介面", "Has an LLM interface"),
+   agent: bi("含 Agent 工具呼叫", "Has agent tool calls"),
+diff --git a/src/components/views/harness-view.tsx b/src/components/views/harness-view.tsx
+index c7cbd18..d50f091 100644
+--- a/src/components/views/harness-view.tsx
++++ b/src/components/views/harness-view.tsx
+@@ -170,9 +170,12 @@ export function HarnessView() {
+ 
+   function download() {
+     if (!plan || !run) return;
+-    const blob = new Blob([reportMarkdown(run.profile, plan, run.at, checks, locale, stale)], {
+-      type: "text/markdown;charset=utf-8",
+-    });
++    const blob = new Blob(
++      [reportMarkdown(run.profile, plan, run.at, checks, locale, stale, new Date())],
++      {
++        type: "text/markdown;charset=utf-8",
++      },
++    );
+     const url = URL.createObjectURL(blob);
+     const link = document.createElement("a");
+     link.href = url;
+@@ -315,8 +318,8 @@ export function HarnessView() {
+                           )
+                         : plan.release === "conditional"
+                           ? bi(
+-                              "為每項警示指定負責人與期限，完成後重新驗證；有條件放行不代表警示已修復。",
+-                              "Assign an owner and deadline to every advisory and retest after remediation; conditional release does not mean the advisories are fixed.",
++                              "本工具僅示範裁決，不保存處置紀錄。請在議題追蹤系統為每項警示記錄負責人、期限、處置方式與重新驗證結果；完成前不得視為正式放行。",
++                              "This tool demonstrates verdicts and does not store dispositions. Record an owner, deadline, disposition and retest result for every advisory in your issue tracker before treating it as a real release.",
+                             )
+                           : bi(
+                               "下載紀錄保留設定與依據。正式放行仍需接入實際掃描結果；之後若設定或程式改變，請重新驗證。",
+diff --git a/src/csp-report.test.ts b/src/csp-report.test.ts
+index fe71cca..74fe20d 100644
+--- a/src/csp-report.test.ts
++++ b/src/csp-report.test.ts
+@@ -44,6 +44,19 @@ describe("summarizeCspReports", () => {
+     ]);
+   });
+ 
++  it("removes secrets from relative and opaque URLs", () => {
++    for (const [input, expected] of [
++      ["/callback?token=secret#private", "/callback"],
++      ["data:text/plain,secret", "data:"],
++      ["blob:https://example.test/secret", "blob:"],
++      ["http://[invalid?token=secret", "[invalid-url]"],
++      ["//example.test/a?token=secret", "https://example.test/a"],
++    ]) {
++      const report = JSON.stringify({ "csp-report": { "document-uri": input } });
++      assert.equal(summarizeCspReports(report)[0].document, expected);
++    }
++  });
++
+   it("bounds what an unauthenticated sender can make us log", () => {
+     assert.deepEqual(summarizeCspReports("not json"), []);
+     assert.deepEqual(summarizeCspReports(JSON.stringify({ hello: 1 })), []);
+diff --git a/src/csp-report.ts b/src/csp-report.ts
+index 04c6058..b5721a2 100644
+--- a/src/csp-report.ts
++++ b/src/csp-report.ts
+@@ -34,12 +34,18 @@ function text(value: unknown): string {
+ 
+ /** 只留來源與路徑；`inline`、`eval` 這類關鍵字原樣保留。 Keep origin and path only; keywords such as `inline` stay as they are. */
+ function location(value: unknown): string {
+-  const raw = text(value);
++  const raw = text(value).trim();
++  if (!raw || ["inline", "eval", "self", "none"].includes(raw)) return raw;
+   try {
+-    const url = new URL(raw);
+-    return `${url.origin}${url.pathname}`.slice(0, MAX_FIELD);
++    const relative = !/^[a-z][a-z0-9+.-]*:/i.test(raw);
++    const url = new URL(raw, "https://csp.invalid");
++    if (!["http:", "https:"].includes(url.protocol)) return url.protocol;
++    return `${relative && !raw.startsWith("//") ? "" : url.origin}${url.pathname}`.slice(
++      0,
++      MAX_FIELD,
++    );
+   } catch {
+-    return raw;
++    return "[invalid-url]";
+   }
+ }
+ 
+diff --git a/src/data/engine.test.ts b/src/data/engine.test.ts
+index 16ea5ce..b485564 100644
+--- a/src/data/engine.test.ts
++++ b/src/data/engine.test.ts
+@@ -169,9 +169,9 @@ describe("surface and level", () => {
+     assert.match(idor?.tool.en ?? "", /ZAP/);
+   });
+ 
+-  it("an internal batch job with no API skips G4 and G5", () => {
++  it("an internal batch job reviews permissions and skips HTTP testing", () => {
+     const plan = buildPlan(PRESETS.script);
+-    assert.equal(status(plan, "G4"), "na");
++    assert.equal(status(plan, "G4"), "pass");
+     assert.equal(status(plan, "G5"), "na");
+   });
+ 
+@@ -208,11 +208,11 @@ describe("gaps found by mutation testing", () => {
+     plan.steps.flatMap((s) => s.findings).find((f) => f.id === id);
+   const internal: Profile = { ...PRESETS.script, defects: "vibe" };
+ 
+-  it("webSurface needs an API, a non-internal exposure or an LLM", () => {
++  it("webSurface needs an API or a non-internal exposure", () => {
+     assert.equal(webSurface(internal), false);
+     assert.equal(webSurface({ ...internal, api: true }), true);
+     assert.equal(webSurface({ ...internal, exposure: "partner" }), true);
+-    assert.equal(webSurface({ ...internal, llm: true }), true);
++    assert.equal(webSurface({ ...internal, llm: true }), false);
+   });
+ 
+   it("trifectaPresent needs all three legs and a model or agent", () => {
+@@ -285,7 +285,7 @@ describe("gaps found by mutation testing", () => {
+     assert.equal(find(pii, "g4-pii")?.severity, "block");
+     assert.equal(find(pii, "g5-mfa")?.severity, "block");
+     assert.equal(find(buildPlan(PRESETS.kb), "g4-pii"), undefined);
+-    assert.equal(find(buildPlan(PRESETS.kb), "g5-mfa"), undefined);
++    assert.equal(find(buildPlan(PRESETS.kb), "g5-mfa")?.severity, "block");
+     assert.equal(find(buildPlan({ ...PRESETS.kb, exposure: "partner" }), "g5-debug"), undefined);
+     assert.equal(find(buildPlan(PRESETS.kb), "g5-debug")?.severity, "advisory");
+   });
+@@ -612,7 +612,7 @@ describe("settings that apply", () => {
+       destructive: false,
+     });
+     assert.equal(settingsThatApply({ ...internal, exposure: "public" }).api, false);
+-    assert.equal(settingsThatApply({ ...internal, llm: true }).api, false);
++    assert.equal(settingsThatApply({ ...internal, llm: true }).api, true);
+     assert.equal(settingsThatApply({ ...internal, llm: true }).egress, true);
+     assert.equal(settingsThatApply({ ...internal, llm: true }).destructive, false);
+     assert.deepEqual(settingsThatApply({ ...internal, agent: true }), {
+@@ -695,3 +695,26 @@ describe("report escaping and sources", () => {
+     }
+   });
+ });
++
++describe("review regression cases", () => {
++  it("keeps an offline model outside HTTP testing", () => {
++    const plan = buildPlan({ ...PRESETS.script, llm: true, defects: "none" });
++    assert.equal(plan.steps.find((step) => step.gate === "G5")?.status, "na");
++    assert.equal(plan.steps.find((step) => step.gate === "G4")?.status, "pass");
++  });
++  it("reports the separate export assessment time", () => {
++    const p = PRESETS.hardened;
++    const md = reportMarkdown(
++      p,
++      buildPlan(p),
++      new Date("2026-01-01T00:00:00Z"),
++      {},
++      "en",
++      false,
++      new Date("2026-06-01T00:00:00Z"),
++    );
++    assert.match(md, /Export and checklist assessment time: 2026-06-/);
++    assert.match(md, /not a snapshot of controls at run time/);
++    assert.match(md, /not evidence of ASVS conformity/);
++  });
++});
+diff --git a/src/data/engine.ts b/src/data/engine.ts
+index 68b2dcd..25186a2 100644
+--- a/src/data/engine.ts
++++ b/src/data/engine.ts
+@@ -69,12 +69,12 @@ export const RELEASE_LABEL: Record<RunPlan["release"], Bi> = {
+ };
+ 
+ export const DEMO_NOTICE = bi(
+-  "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。",
+-  "Demo simulation: findings and evidence are teaching examples generated from the scenario, not a scan of a real system.",
++  "示範模擬：發現項與證據是依情境產生的教學範例，不是對實際系統的掃描結果。建議等級表示本課程的驗證深度；示範裁決不構成 ASVS 符合性證明。正式驗證須逐項確認適用要求與實際證據，工具品牌不決定等級。",
++  "Demo simulation: findings and evidence are teaching examples generated from the scenario, not a scan of a real system. The recommended level describes this course’s verification depth; the demo verdict is not evidence of ASVS conformity. Verify each applicable requirement using actual evidence; tool brands do not determine the level.",
+ );
+ 
+ export function webSurface(p: Profile): boolean {
+-  return p.api || p.exposure !== "internal" || p.llm;
++  return p.api || p.exposure !== "internal";
+ }
+ 
+ /**
+@@ -87,7 +87,7 @@ export function trifectaPresent(p: Profile): boolean {
+ 
+ /** 有條件才有作用的系統能力。 The system capabilities that only apply under some settings. */
+ export interface SettingsThatApply {
+-  /** 不對外且沒有 LLM 時才有作用；否則一定有 Web 表面。 Applies only when internal without an LLM; otherwise there is always a web surface. */
++  /** 內部情境可選擇 HTTP 介面，與模型能力獨立。 Internal scenarios can choose an HTTP interface independently of model capabilities. */
+   api: boolean;
+   privateData: boolean;
+   untrusted: boolean;
+@@ -108,7 +108,7 @@ export interface SettingsThatApply {
+ export function settingsThatApply(p: Profile): SettingsThatApply {
+   const ai = p.llm || p.agent;
+   return {
+-    api: p.exposure === "internal" && !p.llm,
++    api: p.exposure === "internal",
+     privateData: ai,
+     untrusted: ai,
+     egress: ai,
+@@ -402,9 +402,13 @@ export function buildPlan(p: Profile): RunPlan {
+   if (!web && !p.agent) {
+     g4 = step(
+       GATES[4],
+-      [bi("沒有 HTTP API，也沒有 Agent 工具。", "No HTTP API and no agent tools.")],
++      [
++        bi(
++          "非 HTTP 情境：仍須審查檔案、資料庫與服務帳號權限；本次未模擬發現。",
++          "Non-HTTP scenario: review file, database and service-account permissions; no finding is simulated this run.",
++        ),
++      ],
+       [],
+-      bi("不適用：沒有授權邊界需要審查。", "N/A: no authorization boundary to review."),
+     );
+   } else {
+     const findings: Finding[] = [];
+@@ -470,7 +474,7 @@ export function buildPlan(p: Profile): RunPlan {
+     if (ssrf) {
+       findings.push(finding("g5-ssrf", "block"));
+     }
+-    if (pii) {
++    if (level !== "L1") {
+       findings.push(finding("g5-mfa", "block"));
+     }
+     if (p.exposure === "public") {
+@@ -538,8 +542,8 @@ export function buildPlan(p: Profile): RunPlan {
+     } else {
+       logs.push(
+         bi(
+-          "promptfoo 案例通過：未抽出系統提示，上傳文件未觸發外連。",
+-          "promptfoo cases pass: no system prompt extracted, uploaded documents triggered no outbound call.",
++          "promptfoo 案例通過：受保護測試資料未被揭露，未發生未授權操作或文件觸發的外連。",
++          "promptfoo cases pass: protected test data was not disclosed; no unauthorized action or document-triggered outbound call occurred.",
+         ),
+       );
+       logs.push(
+@@ -578,8 +582,8 @@ export function buildPlan(p: Profile): RunPlan {
+         )
+       : release === "conditional"
+         ? bi(
+-            "可以合併，但警示要有期限與負責人。",
+-            "Merge allowed, but every advisory needs a deadline and an owner.",
++            "示範為有條件放行：正式合併前，須另行建立每項警示的負責人、期限與處置紀錄。",
++            "Demo conditional release: before a real merge, record an owner, deadline and disposition for every advisory in your issue tracker.",
+           )
+         : bi(
+             "放行。G0 與六道閘門都有紀錄，沒有靜默略過。",
+@@ -625,6 +629,11 @@ const R = {
+   title: bi("# 六扇門放行紀錄", "# Six-Gate release record"),
+   system: bi("系統", "System"),
+   time: bi("執行時間", "Run time"),
++  exported: bi("匯出與控制項評估時間", "Export and checklist assessment time"),
++  checksTime: bi(
++    "管線缺口依匯出時的勾選估算，並非執行當下的控制項快照。",
++    "Pipeline gaps use the checks at export, not a snapshot of controls at run time.",
++  ),
+   level: bi("建議等級", "Recommended level"),
+   verdict: bi("裁決", "Verdict"),
+   blocks: bi("阻擋", "Blocks"),
+@@ -692,6 +701,7 @@ export function reportMarkdown(
+   locale: Locale = "zh",
+   /** 下載時的設定已經和這次執行不同（畫面上會顯示「設定已改」）。 The settings changed after the run. */
+   stale = false,
++  exportedAt: Date = at,
+ ): string {
+   const t = (value: Bi) => pick(locale, value);
+   const yn = (value: boolean) => yesNo(locale, value);
+@@ -722,6 +732,9 @@ export function reportMarkdown(
+     ``,
+     t(plan.headline),
+     ``,
++    `- ${t(R.exported)}${colon}${localStamp(exportedAt)}`,
++    `> ${t(R.checksTime)}`,
++    ``,
+     t(R.settings),
+     `- ${t(R.exposure)}${colon}${t(EXPOSURE_LABEL[p.exposure])}${semi}${t(R.sensitivity)}${colon}${t(SENSITIVITY_LABEL[p.sensitivity])}${semi}${t(R.critical)}${colon}${yn(p.critical)}`,
+     `- ${t(R.web)}${colon}${yn(webSurface(p))}${semi}${t(R.llm)}${colon}${yn(p.llm)}${semi}${t(R.agent)}${colon}${yn(p.agent)}${semi}${t(R.destructive)}${colon}${yn(p.agent && p.destructive)}`,
+diff --git a/src/data/finding-catalogue.ts b/src/data/finding-catalogue.ts
+index a3980f7..01f4cc1 100644
+--- a/src/data/finding-catalogue.ts
++++ b/src/data/finding-catalogue.ts
+@@ -560,7 +560,7 @@ export const FINDING_CATALOGUE = {
+   },
+   "g5-mfa": {
+     gate: "G5",
+-    title: bi("只憑帳密就能進個資頁", "A password alone reaches personal data"),
++    title: bi("L2／L3 登入缺少多重要素", "L2 / L3 login lacks multiple factors"),
+     detail: bi(
+       "登入流程沒有第二要素。ASVS 從 L2 起要求多重要素，L3 其中一個要素必須是硬體式驗證器。",
+       "The login flow has no second factor. ASVS requires multi-factor from L2, and at L3 one factor must be a hardware authenticator.",
+@@ -570,8 +570,8 @@ export const FINDING_CATALOGUE = {
+       "POST /login (username + password) → 302 /customers; no OTP or WebAuthn requested.",
+     ),
+     fix: bi(
+-      "為存取個資的角色開啟多重要素，並在 G4 確認沒有繞過的第二條登入路徑。",
+-      "Turn on multi-factor for roles that reach personal data, and confirm in G4 there is no second login path around it.",
++      "為 L2／L3 的登入開啟多重要素；L3 驗證硬體式抗網路釣魚要素，並在 G4 確認沒有繞過的第二條登入路徑。",
++      "Require multiple factors for L2 / L3 login, verify a hardware phishing-resistant factor at L3, and confirm in G4 there is no second login path around it.",
+     ),
+     tool: bi("Burp 登入流程", "Burp login flow"),
+     cwe: bi("營運對照：CWE-308", "Operational reference: CWE-308"),
+@@ -642,18 +642,18 @@ export const FINDING_CATALOGUE = {
+   },
+   "g6-pi": {
+     gate: "G6",
+-    title: bi("提示詞注入抽出系統政策", "Prompt injection extracts the system policy"),
++    title: bi("提示詞注入突破應用程式政策", "Prompt injection violates application policy"),
+     detail: bi(
+-      "直接越獄成功，系統提示詞被複述到回覆。",
+-      "The direct jailbreak succeeded; the system prompt was echoed.",
++      "不受信任指令使模型違反測試中明定的資料存取政策。單純複述提示詞不足以判定越權。",
++      "Untrusted instructions cause a violation of the data-access policy defined in the test. Prompt disclosure alone does not establish an authorization bypass.",
+     ),
+     evidence: bi(
+-      "promptfoo：jailbreak 案例失敗。回應含「系統政策：你必須…」。",
+-      'promptfoo: the jailbreak case failed. The reply contains "System policy: you must…".',
++      "promptfoo：測試帳號要求讀取禁止提供的測試資料；回應含受保護的測試標記，違反案例的拒絕條件（示範）。",
++      "promptfoo: a test account requests restricted test data; the response contains the protected test marker and violates the case’s denial condition (demo).",
+     ),
+     fix: bi(
+-      "工具權限不要寫在可被複述的提示詞裡。間接注入要配合 G0 切斷對外通訊。",
+-      "Keep tool permissions out of a prompt that can be echoed. Pair indirect injection with G0 cutting egress.",
++      "工具權限與核可必須由執行端驗證，不依賴提示詞保密；拒絕未授權操作並記錄。",
++      "Enforce tool authorization and approval in the executor independently of prompt secrecy; reject and log unauthorized actions.",
+     ),
+     tool: bi("promptfoo", "promptfoo"),
+     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
+diff --git a/src/data/model.ts b/src/data/model.ts
+index 52c1940..0dedb6c 100644
+--- a/src/data/model.ts
++++ b/src/data/model.ts
+@@ -9,7 +9,7 @@ import { bi, isLocale, type Bi, type Locale } from "../i18n/locale.ts";
+  * identifiers and rules live in engine.ts.
+  */
+ 
+-export const RUN_RULE_VERSION = 2;
++export const RUN_RULE_VERSION = 3;
+ 
+ export type GateId = "G0" | "G1" | "G2" | "G3" | "G4" | "G5" | "G6";
+ export type Level = "L1" | "L2" | "L3";
+diff --git a/src/data/pipeline-gaps.test.ts b/src/data/pipeline-gaps.test.ts
+index 8db1e0a..5eac9d7 100644
+--- a/src/data/pipeline-gaps.test.ts
++++ b/src/data/pipeline-gaps.test.ts
+@@ -85,12 +85,12 @@ describe("pipeline gaps", () => {
+       en: "No findings this run",
+     });
+     assert.deepEqual(gapSummary(catchStatus(plan, allChecked)), {
+-      zh: "本次 14 個發現，你們的管線都攔得下",
+-      en: "All 14 findings this run would be caught by your pipeline",
++      zh: "本次 15 個發現，你們的管線都攔得下",
++      en: "All 15 findings this run would be caught by your pipeline",
+     });
+     assert.deepEqual(gapSummary(catchStatus(plan, { "g2-push": true, "g5-bola": true })), {
+-      zh: "本次 14 個發現中，有 11 個可能會漏掉",
+-      en: "11 of the 14 findings this run may slip through",
++      zh: "本次 15 個發現中，有 12 個可能會漏掉",
++      en: "12 of the 15 findings this run may slip through",
+     });
+   });
+ 

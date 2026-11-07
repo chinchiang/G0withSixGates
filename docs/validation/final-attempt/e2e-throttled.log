@@ -1,0 +1,11 @@
+
+> six-gate-for-vibe-code@1.0.0 test:e2e:throttled
+> E2E_CPU_THROTTLE=10 node --experimental-strip-types scripts/e2e.mjs
+
+ok - desktop: every view renders without console errors or horizontal overflow
+ok - desktop: every view renders in English too
+not ok - desktop: all four presets are visible without scrolling sideways
+  page.goto: Target page, context or browser has been closed
+  Call log:
+  [2m  - navigating to "http://127.0.0.1:8081/?view=harness", waiting until "networkidle"[22m
+  

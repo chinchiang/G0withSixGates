@@ -94,6 +94,23 @@ function send(path, { method = "GET", chunks = [], headers = {} } = {}) {
 
 const browser = await chromium.launch();
 try {
+  await test("CSP: request nonce permits hydration and blocks injected inline scripts", async () => {
+    const page = await browser.newPage();
+    await load(page, url());
+    const nonce = await page.locator('meta[property="csp-nonce"]').getAttribute("content");
+    assert.match(nonce, /^[A-Za-z0-9+/]{32}$/);
+    await page.evaluate(() => {
+      const script = document.createElement("script");
+      script.textContent = "window.__sixgateCspProbe = true";
+      document.body.append(script);
+    });
+    assert.equal(await page.evaluate(() => window.__sixgateCspProbe), undefined);
+    const other = await page.request.get(url(), { headers: { "x-sixgate-csp-nonce": nonce } });
+    assert.ok(!other.headers()["content-security-policy"].includes(`nonce-${nonce}`));
+    assert.equal(other.headers()["cache-control"], "private, no-store");
+    assert.ok(!/script-src[^;]*unsafe-inline/.test(other.headers()["content-security-policy"]));
+    await page.close();
+  });
   for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     await test(`${name}: every view renders without console errors or horizontal overflow`, async () => {
       const { page, errors, close } = await openPage(browser, viewport);
@@ -433,7 +450,10 @@ try {
     assert.match(report, /撤銷並輪替/);
     await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
     await page.getByRole("button", { name: "重新執行" }).click();
-    await page.getByText("可以合併，但警示要有期限與負責人。").waitFor();
+    await page
+      .getByText("示範為有條件放行：正式合併前，須另行建立每項警示的負責人、期限與處置紀錄。")
+      .waitFor();
+    await page.getByText(/本工具僅示範裁決，不保存處置紀錄/).waitFor();
     await page.getByRole("radio", { name: "已整治", exact: true }).click();
     await page.getByRole("button", { name: "重新執行" }).click();
     await page.getByText("放行。G0 與六道閘門都有紀錄，沒有靜默略過。").waitFor();

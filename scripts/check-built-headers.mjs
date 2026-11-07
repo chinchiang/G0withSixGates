@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { vercelHeaderRoute } from "./security-headers.mjs";
+import { vercelHeaderRoute, vercelInstallHeaderRoute } from "./security-headers.mjs";
 
 // Vercel applies this generated route before serving files or rendering SSR.
 const config = JSON.parse(readFileSync(".vercel/output/config.json", "utf8"));
@@ -12,3 +12,7 @@ for (const [name, value] of Object.entries(expected.headers)) {
   if (route.headers?.[name] !== value) throw new Error(`Incorrect built security header: ${name}`);
 }
 console.log("Built Vercel security headers verified.");
+
+const install = vercelInstallHeaderRoute(readFileSync("scripts/install-page.html", "utf8"));
+if (JSON.stringify(config.routes?.[1]) !== JSON.stringify(install))
+  throw new Error("Missing install tutorial hash policy");

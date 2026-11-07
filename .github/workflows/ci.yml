@@ -52,7 +52,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
       - run: npm run preview:restart
       - run: npm run test:e2e
@@ -64,6 +64,8 @@ jobs:
       - run: npm run test:pages
       # GitHub Pages 版也降速 10 倍再測一次。 Test the GitHub Pages build again with the CPU slowed tenfold.
       - run: npm run test:pages:throttled
+      - run: E2E_BROWSER=firefox npm run test:pages
+      - run: E2E_BROWSER=webkit npm run test:pages
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

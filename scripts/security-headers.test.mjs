@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  vercelInstallHeaderRoute,
+  nonceSecurityHeaders,
   CSP_REPORT_PATH,
   REPORTING,
   RESOURCE_POLICY,
@@ -69,7 +71,10 @@ test("the Vercel route only adds headers and lets routing continue to SSR", () =
   assert.equal(route.src, "/(.*)");
   assert.equal(route.continue, true);
   assert.equal(route.dest, undefined);
-  assert.deepEqual(route.headers, securityHeaders());
+  assert.deepEqual(route.headers, {
+    ...securityHeaders(),
+    "Content-Security-Policy": `${STRUCTURAL_POLICY}; ${REPORTING}`,
+  });
 });
 
 test("ships the non-CSP hardening headers", () => {
@@ -78,4 +83,20 @@ test("ships the non-CSP hardening headers", () => {
   assert.equal(headers["Referrer-Policy"], "strict-origin-when-cross-origin");
   assert.match(headers["Permissions-Policy"], /camera=\(\)/);
   assert.match(headers["Strict-Transport-Security"], /^max-age=\d+$/);
+});
+
+test("request CSP permits only the nonce for inline scripts", () => {
+  const headers = nonceSecurityHeaders("abcdefghijklmnopqrstuvwxyzABCDEF");
+  const scripts = directives(headers["Content-Security-Policy"])["script-src"];
+  assert.deepEqual(scripts, ["'self'", "'nonce-abcdefghijklmnopqrstuvwxyzABCDEF'"]);
+  assert.throws(() => nonceSecurityHeaders("bad; policy"));
+});
+
+test("tutorial hashes authorize only the exact template script", () => {
+  const route = vercelInstallHeaderRoute("<script>alert(1)</script>");
+  assert.match(
+    route.headers["Content-Security-Policy"],
+    /'sha256-bhHHL3z2vDgxUt0W3dWQOrprscmda2Y5pLsLg4GF\+pI='/,
+  );
+  assert.deepEqual(route.has, [{ type: "query", key: "install", value: "1" }]);
 });

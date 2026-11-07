@@ -85,12 +85,12 @@ describe("pipeline gaps", () => {
       en: "No findings this run",
     });
     assert.deepEqual(gapSummary(catchStatus(plan, allChecked)), {
-      zh: "本次 14 個發現，你們的管線都攔得下",
-      en: "All 14 findings this run would be caught by your pipeline",
+      zh: "本次 15 個發現，你們的管線都攔得下",
+      en: "All 15 findings this run would be caught by your pipeline",
     });
     assert.deepEqual(gapSummary(catchStatus(plan, { "g2-push": true, "g5-bola": true })), {
-      zh: "本次 14 個發現中，有 11 個可能會漏掉",
-      en: "11 of the 14 findings this run may slip through",
+      zh: "本次 15 個發現中，有 12 個可能會漏掉",
+      en: "12 of the 15 findings this run may slip through",
     });
   });
 

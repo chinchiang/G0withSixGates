@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { DOCUMENT_HEAD } from "./src/document-head.ts";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
@@ -16,7 +18,10 @@ const base = repo && repo.toLowerCase() !== `${owner?.toLowerCase()}.github.io` 
 const sharedHead: Plugin = {
   name: "six-gate-shared-head",
   transformIndexHtml: (html) =>
-    html.replace(/\n\s*<\/head>/, `\n${pagesHeadTags().replace(/^/gm, "    ")}\n  </head>`),
+    html.replace(
+      /\n\s*<\/head>/,
+      `\n<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-${createHash("sha256").update(DOCUMENT_HEAD.bootstrap).digest("base64")}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">\n${pagesHeadTags().replace(/^/gm, "    ")}\n  </head>`,
+    ),
 };
 
 export default defineConfig({

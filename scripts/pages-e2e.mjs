@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chromium } from "playwright";
+import { chromium, firefox, webkit } from "playwright";
 import { preview } from "vite";
 import { VIEWS } from "../src/data/model.ts";
 import { VIEWPORTS, cpuThrottleFromEnv, load, reload, throttle } from "./e2e-shared.mjs";
@@ -13,7 +13,11 @@ const server = await preview({
   preview: { host: "127.0.0.1", port: 8086, strictPort: true },
 });
 const base = new URL(server.config.base, "http://127.0.0.1:8086");
-const browser = await chromium.launch();
+const browserName = process.env.E2E_BROWSER ?? "chromium";
+const browserType = { chromium, firefox, webkit }[browserName];
+if (!browserType) throw new Error(`Unknown E2E_BROWSER: ${browserName}`);
+if (browserName !== "chromium" && THROTTLE > 1) throw new Error("CPU throttling requires Chromium");
+const browser = await browserType.launch();
 try {
   for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
@@ -62,6 +66,17 @@ try {
       await page.getByText("不准放行。", { exact: false }).first().isVisible(),
       `${name}: the verdict survives a reload`,
     );
+    await page.getByRole("radio", { name: "已整治的客服知識庫" }).click();
+    await page.getByText("設定已改，這份裁決對不上目前的系統。請再跑一次。").waitFor();
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "下載紀錄" }).click(),
+    ]);
+    let record = "";
+    for await (const chunk of await download.createReadStream()) record += chunk;
+    assert.match(record, /設定已經改過/);
+    assert.match(record, /匯出與控制項評估時間/);
+    assert.match(record, /不構成 ASVS 符合性證明/);
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.waitForFunction(() => document.documentElement.lang === "en");
     await reload(page);
@@ -73,6 +88,19 @@ try {
     assert.deepEqual(errors, [], `${name}: console and network errors`);
     await context.close();
   }
+  const probe = await browser.newPage();
+  await load(probe, base.href);
+  assert.match(
+    await probe.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content"),
+    /script-src 'self' 'sha256-/,
+  );
+  await probe.evaluate(() => {
+    const script = document.createElement("script");
+    script.textContent = "window.__sixgateCspProbe = true";
+    document.body.append(script);
+  });
+  assert.equal(await probe.evaluate(() => window.__sixgateCspProbe), undefined);
+  await probe.close();
   // JS 模組還沒載入前，淺色使用者就要拿到淺色主題與淺色 theme-color：只讓 <head> 的行內開機腳本執行。
   // Before any JS module loads, a light-theme user already gets the light theme and theme-color: only the inline bootstrap in <head> runs.
   const context = await browser.newContext();

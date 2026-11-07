@@ -1,0 +1,12 @@
+
+> six-gate-for-vibe-code@1.0.0 regress
+> node scripts/regress.mjs
+
+PASS audit 2s
+PASS lint 8s
+PASS format 9s
+PASS typecheck 12s
+PASS test 20s
+PASS build 3s
+PASS preview 2s
+FAIL e2e 121s (log: /tmp/six-gate-regress/e2e.log)
