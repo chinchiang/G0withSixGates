@@ -653,8 +653,8 @@ export const FINDING_CATALOGUE = {
       "promptfoo: a test account requests restricted test data; the response contains the protected test marker and violates the case’s denial condition (demo).",
     ),
     fix: bi(
-      "工具權限與核可必須由執行端驗證，不依賴提示詞保密；拒絕未授權操作並記錄。",
-      "Enforce tool authorization and approval in the executor independently of prompt secrecy; reject and log unauthorized actions.",
+      "檢索與工具執行前須在可信任層驗證主體與資源權限，不把未授權資料送入模型；工具動作另需核可。拒絕並記錄未授權存取，不依賴提示詞保密。",
+      "Verify principal and resource permissions in a trusted layer before retrieval or tool execution; never supply unauthorized data to the model. Require approval for applicable tool actions, and deny and log unauthorized access independently of prompt secrecy.",
     ),
     tool: bi("promptfoo", "promptfoo"),
     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
@@ -682,12 +682,12 @@ export const FINDING_CATALOGUE = {
       "Instructions in an untrusted document redirect the model.",
     ),
     evidence: bi(
-      "示範文件使模型嘗試執行未授權動作。",
-      "The demo document causes an unauthorized action attempt.",
+      "惡意文件使回覆包含受保護的測試標記；檢索與回覆紀錄顯示，未通過資料授權仍將該資料提供給測試帳號（示範）。",
+      "A malicious document causes the response to contain a protected test marker; retrieval and response logs show the test account received data without authorization (demo).",
     ),
     fix: bi(
-      "限制工具權限與資料流，並測試不受信任內容。",
-      "Restrict tool permissions and data flows and test untrusted content.",
+      "在檢索與工具執行前驗證主體與資源權限，不把文件指令當成授權；依系統能力限制資料流、工具與外連。",
+      "Verify principal and resource permissions before retrieval and tool execution; document instructions do not grant authorization. Restrict data flows, tools and outbound access as applicable.",
     ),
     tool: bi("promptfoo", "promptfoo"),
     cwe: bi("營運對照：LLM01", "Operational reference: LLM01"),
@@ -697,8 +697,8 @@ export const FINDING_CATALOGUE = {
       "External content may induce unauthorized actions or exfiltration.",
     ),
     retest: bi(
-      "使用惡意文件複測並檢查工具呼叫與外洩通道。",
-      "Retest malicious documents and inspect tool calls and exfiltration paths.",
+      "使用惡意文件與不同權限帳號複測；確認受保護標記不出現在未授權回覆，並檢查檢索、工具核可及適用的外洩通道紀錄。",
+      "Retest malicious documents across differently authorized accounts; protected markers must not appear in unauthorized responses. Inspect retrieval, tool approval and applicable exfiltration logs.",
     ),
   },
   "g6-dow": {
