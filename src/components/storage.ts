@@ -11,16 +11,24 @@
  * mode or a full quota just skips persistence instead of crashing the app.
  */
 
+import { DEFAULT_PROFILE, GATE_DOCS, parseProfile, type Profile } from "../data/model.ts";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "../i18n/locale.ts";
+import { THEME_KEY, isTheme, type Theme } from "../theme.ts";
+
 export const PROFILE_KEY = "six-gate-profile-v1";
 export const CHECK_KEY = "six-gate-checks-v1";
 export const LOCALE_KEY = "six-gate-locale";
 // 主題鍵與型別守衛集中在 src/theme.ts。 The theme key and type guard live in src/theme.ts.
-export { THEME_KEY, isTheme } from "../theme.ts";
+export { THEME_KEY, isTheme };
 /**
  * 最近一次 Harness 執行，存在 sessionStorage：重新整理還在，關掉分頁就清掉。
  * The latest Harness run, kept in sessionStorage: it survives a reload and is gone when the tab closes.
  */
 export const RUN_KEY = "six-gate-run-v1";
+
+export const CONTROL_IDS: ReadonlySet<string> = new Set(
+  GATE_DOCS.flatMap((doc) => doc.controls.map((item) => item.id)),
+);
 
 /** 更名前的鍵。 Keys from before the rename. */
 export const LEGACY_KEYS: Record<string, string> = {
@@ -33,6 +41,23 @@ export interface KeyValueStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+}
+
+/** 測試用的記憶體儲存替身。 In-memory store adapter for tests. */
+export function memoryStore(
+  initial: Record<string, string> = {},
+): KeyValueStore & { data: Record<string, string> } {
+  const data = { ...initial };
+  return {
+    data,
+    getItem: (key) => (key in data ? data[key] : null),
+    setItem: (key, value) => {
+      data[key] = value;
+    },
+    removeItem: (key) => {
+      delete data[key];
+    },
+  };
 }
 
 function defaultStore(): KeyValueStore | null {
@@ -132,11 +157,56 @@ export function writeString(
  * 勾選狀態只接受「已知控制項 id → 布林」；其他型別或過期的 id 一律丟掉。
  * Checks accept only "known control id → boolean"; other shapes and stale ids are dropped.
  */
-export function parseChecks(raw: unknown, knownIds: ReadonlySet<string>): Record<string, boolean> {
+export function parseChecks(
+  raw: unknown,
+  knownIds: ReadonlySet<string> = CONTROL_IDS,
+): Record<string, boolean> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, boolean> = {};
   for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
     if (knownIds.has(id) && typeof value === "boolean") out[id] = value;
   }
   return out;
+}
+
+export interface StoredPreferences {
+  profile: Profile;
+  checks: Record<string, boolean>;
+  locale: Locale;
+  theme: Theme;
+}
+
+/**
+ * 一次讀回 localStorage 裡記住的受測系統設定、控制項勾選、語系與主題（含舊鍵自動搬移與預設值）。
+ * Load the remembered profile, control checks, locale and theme from localStorage in one call
+ * (including legacy-key migration and defaults).
+ */
+export function loadPreferences(store: KeyValueStore | null = defaultStore()): StoredPreferences {
+  const rememberedLocale = readString(LOCALE_KEY, store);
+  const rememberedTheme = readString(THEME_KEY, store);
+  return {
+    profile: loadWithMigration(PROFILE_KEY, parseProfile, DEFAULT_PROFILE, store),
+    checks: loadWithMigration(CHECK_KEY, (raw) => parseChecks(raw, CONTROL_IDS), {}, store),
+    locale: isLocale(rememberedLocale) ? rememberedLocale : DEFAULT_LOCALE,
+    theme: isTheme(rememberedTheme) ? rememberedTheme : "dark",
+  };
+}
+
+export function saveProfile(profile: Profile, store: KeyValueStore | null = defaultStore()): void {
+  save(PROFILE_KEY, profile, store);
+}
+
+export function saveChecks(
+  checks: Record<string, boolean>,
+  store: KeyValueStore | null = defaultStore(),
+): void {
+  save(CHECK_KEY, checks, store);
+}
+
+export function saveLocale(locale: Locale, store: KeyValueStore | null = defaultStore()): void {
+  writeString(LOCALE_KEY, locale, store);
+}
+
+export function saveTheme(theme: Theme, store: KeyValueStore | null = defaultStore()): void {
+  writeString(THEME_KEY, theme, store);
 }

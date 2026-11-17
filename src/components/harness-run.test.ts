@@ -9,28 +9,13 @@ import {
   isStale,
   loadRun,
   planFor,
+  projectHarnessRun,
   revealedCount,
   saveRun,
   type HarnessRunEvent,
   type HarnessRunState,
 } from "./harness-run.ts";
-import { RUN_KEY, type KeyValueStore } from "./storage.ts";
-
-function memoryStore(
-  initial: Record<string, string> = {},
-): KeyValueStore & { data: Record<string, string> } {
-  const data = { ...initial };
-  return {
-    data,
-    getItem: (key) => (key in data ? data[key] : null),
-    setItem: (key, value) => {
-      data[key] = value;
-    },
-    removeItem: (key) => {
-      delete data[key];
-    },
-  };
-}
+import { RUN_KEY, memoryStore, type KeyValueStore } from "./storage.ts";
 
 const at = new Date("2026-10-04T02:00:00.000Z");
 const later = new Date("2026-10-04T03:00:00.000Z");
@@ -142,6 +127,14 @@ describe("harness run lifecycle", () => {
     assert.equal(isStale(done, PRESETS.platform), true);
     assert.equal(isStale(run(done, start(PRESETS.kb)), PRESETS.platform), false, "while revealing");
     assert.equal(isStale(INITIAL_HARNESS_RUN, PRESETS.platform), false);
+    assert.deepEqual(projectHarnessRun(done, PRESETS.platform), {
+      phase: "done",
+      run: done.run,
+      plan: buildPlan(PRESETS.kb),
+      stale: true,
+      invalid: false,
+      revealed: STEPS,
+    });
   });
 });
 

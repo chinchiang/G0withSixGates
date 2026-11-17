@@ -7,6 +7,7 @@ import {
   readString,
   remove,
   save,
+  sessionStore,
   type KeyValueStore,
 } from "./storage.ts";
 
@@ -112,6 +113,34 @@ export function isStale(state: HarnessRunState, profile: Profile): boolean {
   return harnessPhase(state) === "done" && !!state.run && !sameResult(state.run.profile, profile);
 }
 
+export interface HarnessProjection {
+  phase: HarnessPhase;
+  run: HarnessRun | null;
+  /** 最近一次執行的裁決；閘門頁用它標出每個控制項攔下了什麼。 Latest verdict; the gates page uses it to show what each control catches. */
+  plan: RunPlan | null;
+  stale: boolean;
+  invalid: boolean;
+  /** 已揭示的閘門數。 Gates revealed so far. */
+  revealed: number;
+}
+
+/**
+ * 將執行狀態與目前設定投影為畫面所需的欄位（階段、執行紀錄、裁決計畫、過期與已揭示閘門數）。
+ * Project the run state and current settings into the fields views read (phase, run, verdict plan,
+ * staleness and revealed gate count).
+ */
+export function projectHarnessRun(state: HarnessRunState, profile: Profile): HarnessProjection {
+  const plan = planFor(state.run);
+  return {
+    phase: harnessPhase(state),
+    run: state.run,
+    plan,
+    stale: isStale(state, profile),
+    invalid: state.invalid,
+    revealed: revealedCount(state, plan),
+  };
+}
+
 /**
  * 解析存下的執行；時間或設定壞掉、或設定正規化後會改變，都當成沒有這份執行。
  * Parse a stored run; a broken time or profile, or one that normalization would change, counts as no run.
@@ -145,7 +174,10 @@ function parseStoredRun(raw: unknown): HarnessRun | null {
  * 讀回最近一次執行。有紀錄卻讀不回來時回報 `invalid`，並刪掉那筆紀錄。
  * Load the latest run. A record that exists but cannot be read reports `invalid` and is removed.
  */
-export function loadRun(store: KeyValueStore | null): { run: HarnessRun | null; invalid: boolean } {
+export function loadRun(store: KeyValueStore | null = sessionStore()): {
+  run: HarnessRun | null;
+  invalid: boolean;
+} {
   const saved = readString(RUN_KEY, store);
   const run = loadWithMigration(RUN_KEY, parseStoredRun, null, store);
   const invalid = saved !== null && run === null;
@@ -154,7 +186,10 @@ export function loadRun(store: KeyValueStore | null): { run: HarnessRun | null; 
 }
 
 /** 存下最近一次執行；`null` 就刪除。 Save the latest run, or remove it for `null`. */
-export function saveRun(run: HarnessRun | null, store: KeyValueStore | null): void {
+export function saveRun(
+  run: HarnessRun | null,
+  store: KeyValueStore | null = sessionStore(),
+): void {
   if (run)
     save(
       RUN_KEY,

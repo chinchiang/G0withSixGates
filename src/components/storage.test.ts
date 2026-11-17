@@ -3,29 +3,19 @@ import assert from "node:assert/strict";
 import {
   CHECK_KEY,
   PROFILE_KEY,
+  loadPreferences,
   loadWithMigration,
+  memoryStore,
   parseChecks,
   remove,
   save,
+  saveChecks,
+  saveLocale,
+  saveProfile,
+  saveTheme,
   type KeyValueStore,
 } from "./storage.ts";
 import { PRESETS, parseProfile } from "../data/model.ts";
-
-function memoryStore(
-  initial: Record<string, string> = {},
-): KeyValueStore & { data: Record<string, string> } {
-  const data = { ...initial };
-  return {
-    data,
-    getItem: (key) => (key in data ? data[key] : null),
-    setItem: (key, value) => {
-      data[key] = value;
-    },
-    removeItem: (key) => {
-      delete data[key];
-    },
-  };
-}
 
 describe("storage migration", () => {
   it("moves the old vibegate keys to the six-gate keys once", () => {
@@ -93,5 +83,39 @@ describe("parseChecks", () => {
     assert.deepEqual(parseChecks(null, known), {});
     assert.deepEqual(parseChecks([true], known), {});
     assert.deepEqual(parseChecks("x", known), {});
+  });
+});
+
+describe("domain preferences", () => {
+  it("loads defaults when storage is empty or contains invalid locale and theme", () => {
+    assert.deepEqual(loadPreferences(memoryStore()), {
+      profile: PRESETS.kb,
+      checks: {},
+      locale: "zh",
+      theme: "dark",
+    });
+    assert.deepEqual(
+      loadPreferences(memoryStore({ "six-gate-locale": "fr", "six-gate-theme": "neon" })),
+      {
+        profile: PRESETS.kb,
+        checks: {},
+        locale: "zh",
+        theme: "dark",
+      },
+    );
+  });
+
+  it("round-trips profile, known checks, locale and theme", () => {
+    const store = memoryStore();
+    saveProfile(PRESETS.platform, store);
+    saveChecks({ "g0-dfd": true, "g9-unknown": true }, store);
+    saveLocale("en", store);
+    saveTheme("light", store);
+    assert.deepEqual(loadPreferences(store), {
+      profile: PRESETS.platform,
+      checks: { "g0-dfd": true },
+      locale: "en",
+      theme: "light",
+    });
   });
 });
