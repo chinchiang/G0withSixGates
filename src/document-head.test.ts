@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { pagesHeadTags } from "./document-head.ts";
 
 describe("document head", () => {
-  it("escapes the title and description, and leaves the script as it is", () => {
-    const tags = pagesHeadTags({
+  it("escapes the title and description, and hashes the raw bootstrap script for CSP", () => {
+    const tags = pagesHeadTags((s) => `digest(${s})`, {
       title: 'A & <B> "C"',
       description: 'x "y" <z> & w',
       themeColor: "#070b12",
@@ -13,6 +13,7 @@ describe("document head", () => {
     assert.equal(
       tags,
       [
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'self' 'sha256-digest(var a=1;)'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'\">",
         "<title>A &amp; &lt;B&gt; &quot;C&quot;</title>",
         '<meta name="description" content="x &quot;y&quot; &lt;z&gt; &amp; w" />',
         '<meta name="theme-color" content="#070b12" />',
@@ -22,7 +23,11 @@ describe("document head", () => {
   });
 
   it("gives the Pages build the server's title, bilingual description, dark theme-color and bootstrap", () => {
-    const tags = pagesHeadTags();
+    const tags = pagesHeadTags((s) => `len:${s.length}`);
+    assert.match(
+      tags,
+      /^<meta http-equiv="Content-Security-Policy" content=".*'sha256-len:\d+'.*">$/m,
+    );
     assert.match(tags, /^<title>六扇門 Six-Gate for Vibe Code<\/title>$/m);
     assert.match(
       tags,

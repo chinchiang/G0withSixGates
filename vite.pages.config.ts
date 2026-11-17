@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { DOCUMENT_HEAD } from "./src/document-head.ts";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
@@ -10,17 +9,18 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const repo = process.env.GITHUB_REPOSITORY?.split("/")[1];
 const owner = process.env.GITHUB_REPOSITORY?.split("/")[0];
 const base = repo && repo.toLowerCase() !== `${owner?.toLowerCase()}.github.io` ? `/${repo}/` : "/";
+const sha256Base64 = (text: string) => createHash("sha256").update(text).digest("base64");
 
 /**
- * 把標題、描述、theme-color 與主題開機腳本注入 pages/index.html，內容與伺服器版共用 src/document-head.ts。
- * Inject the title, description, theme-color and theme bootstrap into pages/index.html, sharing src/document-head.ts with the server.
+ * 把 CSP、標題、描述、theme-color 與主題開機腳本注入 pages/index.html，內容與伺服器版共用 src/document-head.ts。
+ * Inject the CSP, title, description, theme-color and theme bootstrap into pages/index.html, sharing src/document-head.ts with the server.
  */
 const sharedHead: Plugin = {
   name: "six-gate-shared-head",
   transformIndexHtml: (html) =>
     html.replace(
       /\n\s*<\/head>/,
-      `\n<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-${createHash("sha256").update(DOCUMENT_HEAD.bootstrap).digest("base64")}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">\n${pagesHeadTags().replace(/^/gm, "    ")}\n  </head>`,
+      `\n${pagesHeadTags(sha256Base64).replace(/^/gm, "    ")}\n  </head>`,
     ),
 };
 

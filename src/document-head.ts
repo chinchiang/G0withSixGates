@@ -35,11 +35,16 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Pages 版 `<head>` 要注入的標籤；開機腳本是程式碼，原樣放進 `<script>`。
- * The tags the Pages build injects into `<head>`; the bootstrap is code and goes into `<script>` as it is.
+ * Pages 版 `<head>` 要注入的標籤；開機腳本是程式碼，原樣放進 `<script>`，並以 `sha256Base64` 算出 CSP 雜湊。
+ * The tags the Pages build injects into `<head>`; the bootstrap is code, goes into `<script>` as it is,
+ * and `sha256Base64` computes its CSP digest.
  */
-export function pagesHeadTags(head: DocumentHead = DOCUMENT_HEAD): string {
+export function pagesHeadTags(
+  sha256Base64: (text: string) => string,
+  head: DocumentHead = DOCUMENT_HEAD,
+): string {
   return [
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-${sha256Base64(head.bootstrap)}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">`,
     `<title>${escapeHtml(head.title)}</title>`,
     `<meta name="description" content="${escapeHtml(head.description)}" />`,
     `<meta name="theme-color" content="${escapeHtml(head.themeColor)}" />`,
