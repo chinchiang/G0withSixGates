@@ -261,7 +261,7 @@ G0withSixGates/
 │   ├── eslint-config.test.mjs      # 本專案 app：ESLint 規則確實套用（畫面文字走 bi()、Vite 設定檔匯入鏈不用 @/）/ the lint rules apply (on-screen text via bi(), no @/ in the Vite config import chain)
 │   ├── e2e.mjs                     # 本專案 app：npm run test:e2e，瀏覽器互動測試 / browser e2e
 │   ├── e2e-shared.mjs              # 本專案 app：e2e 與 pages-e2e 共用的降速、等水合與畫面尺寸 / throttling, hydration waits and screen sizes shared by both browser suites
-│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)   # 本專案 app：npm run regress，Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all / Chromium regression; use npm run regress:all for full CI coverage
+│   ├── regress.mjs、regress-timing.mjs(.test.mjs)、browser-libs.mjs(.test.mjs)、audit-gate.mjs(.test.mjs)   # 本專案 app：npm run regress，Chromium 回歸檢查；完整 CI 範圍用 npm run regress:all / Chromium regression; use npm run regress:all for full CI coverage
 │   ├── behaviour-snapshot.mjs、compare-with-main.mjs、snapshot-core.mjs(.test.mjs)   # 本專案 app：重構前後的行為比對 / behaviour comparison for refactors
 │   ├── security-headers.mjs(.test.mjs)   # 本專案 app：正式建置安全標頭
 │   ├── check-built-headers.mjs、check-built-bundles.mjs(.test.mjs)   # 本專案 app：建置後檢查安全標頭與程式包切分 / post-build checks of the headers and code splitting

@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ALLOWED, auditVerdict } from "./audit-allowlist.mjs";
+import { ALLOWED, auditVerdict } from "./audit-gate.mjs";
 
 const advisory = (id, severity) => ({
   name: "pkg",
@@ -73,6 +73,6 @@ test("the preconditions behind the allowlist still hold in src/", () => {
     "secondaryStorage",
   ]) {
     const hits = code.filter(([, text]) => text.includes(word)).map(([path]) => path);
-    assert.deepEqual(hits, [], `${word} appears in src/; recheck scripts/audit-allowlist.mjs`);
+    assert.deepEqual(hits, [], `${word} appears in src/; recheck scripts/audit-gate.mjs`);
   }
 });

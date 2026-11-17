@@ -30,9 +30,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      # 格式與正式相依套件的已知高風險漏洞；放行的公告與理由在 scripts/audit-allowlist.mjs。
+      # 格式與正式相依套件的已知高風險漏洞；放行的公告與理由在 scripts/audit-gate.mjs。
       # Formatting, and known high-severity vulnerabilities in production dependencies; allowed
-      # advisories and their reasons live in scripts/audit-allowlist.mjs.
+      # advisories and their reasons live in scripts/audit-gate.mjs.
       - run: npm run format:check
       - run: node scripts/audit-gate.mjs
       - run: npm test

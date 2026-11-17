@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { missingFromLdd, missingLibrariesAdvice, missingLibraryError } from "./browser-libs.mjs";
+import {
+  diagnoseLaunchError,
+  missingFromLdd,
+  missingLibrariesAdvice,
+  missingLibraryError,
+} from "./browser-libs.mjs";
 
 const SHELL =
   "/home/me/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell";
@@ -47,5 +52,24 @@ describe("browser libraries", () => {
     assert.match(advice, /libnspr4\.so, libasound\.so\.2/);
     assert.match(advice, /sudo npx playwright install-deps chromium/);
     assert.match(advice, /LD_LIBRARY_PATH=/);
+  });
+
+  it("diagnoses launch errors with ldd output, falls back to the first library, and passes other errors through", () => {
+    const launchError = `[pid=18032][err] ${SHELL}: error while loading shared libraries: libnspr4.so: cannot open shared object file`;
+    const withLdd = diagnoseLaunchError(launchError, (executable) => {
+      assert.equal(executable, SHELL);
+      return "\tlibnspr4.so => not found\n\tlibnss3.so => not found\n";
+    });
+    assert.match(withLdd, /missing system libraries: libnspr4\.so, libnss3\.so/);
+
+    const fallback = diagnoseLaunchError(launchError, () => "");
+    assert.match(fallback, /missing system libraries: libnspr4\.so$/m);
+
+    assert.equal(
+      diagnoseLaunchError("Executable doesn't exist", () => {
+        throw new Error("should not call ldd");
+      }),
+      "Chromium cannot start:\nExecutable doesn't exist",
+    );
   });
 });

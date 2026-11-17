@@ -1,12 +1,13 @@
 // @ts-check
 /**
- * 判斷 Playwright 的 Chromium 是不是因為缺系統函式庫而啟動失敗，並列出缺了哪些。
- * 啟動錯誤只會寫出第一個找不到的函式庫，完整清單要對執行檔跑 `ldd`；這裡只放解析，執行在 `regress.mjs`。
+ * 判斷 Playwright 的 Chromium 是不是因為缺系統函式庫而啟動失敗，並列出缺了哪些與補救方式。
+ * 啟動錯誤只會寫出第一個找不到的函式庫，完整清單要對執行檔跑 `ldd`。
  *
  * Tell whether Playwright's Chromium failed to launch because system libraries are missing, and
- * which ones. The launch error names only the first missing library; the full list needs `ldd` on
- * the executable. This module only parses; `regress.mjs` runs the commands.
+ * list which ones and how to install them. The launch error names only the first missing library;
+ * the full list comes from running `ldd` on the executable.
  */
+import { spawnSync } from "node:child_process";
 
 /**
  * 從啟動錯誤找出執行檔與第一個缺少的函式庫；不是缺函式庫的錯誤就回傳 null。
@@ -45,4 +46,24 @@ export function missingLibrariesAdvice(libraries) {
     "Without sudo: apt-get download the packages that contain them, extract each with",
     "dpkg -x <deb> <root>, then rerun with LD_LIBRARY_PATH=<root>/usr/lib/x86_64-linux-gnu.",
   ].join("\n");
+}
+
+/**
+ * 診斷 Chromium 啟動錯誤：若缺系統函式庫，對執行檔跑 `readLdd`（若無輸出則回退至啟動錯誤中的函式庫）並回傳補救說明；其他錯誤則原樣回報。
+ * Diagnose a Chromium launch error: when system libraries are missing, inspect the executable with
+ * `readLdd` (falling back to the library named in the launch error) and return the install advice;
+ * otherwise return the generic failure message.
+ *
+ * @param {string} message
+ * @param {(executable: string) => string} [readLdd]
+ * @returns {string}
+ */
+export function diagnoseLaunchError(
+  message,
+  readLdd = (executable) => spawnSync("ldd", [executable], { encoding: "utf8" }).stdout ?? "",
+) {
+  const missing = missingLibraryError(message);
+  if (!missing) return `Chromium cannot start:\n${message}`;
+  const libraries = missingFromLdd(readLdd(missing.executable));
+  return missingLibrariesAdvice(libraries.length ? libraries : [missing.library]);
 }

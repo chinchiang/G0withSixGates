@@ -18,13 +18,13 @@
  * and the wall clock: when the host sleeps WSL pauses and the monotonic clock stops, so the
  * difference is how long it paused (`regress-timing.mjs`).
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { missingFromLdd, missingLibrariesAdvice, missingLibraryError } from "./browser-libs.mjs";
+import { diagnoseLaunchError } from "./browser-libs.mjs";
 import { allPassed, skipLine, stepLine, summaryLine } from "./regress-timing.mjs";
 
 const args = process.argv.slice(2);
@@ -52,15 +52,7 @@ async function checkBrowser() {
     await (await chromium.launch()).close();
     return true;
   } catch (error) {
-    const message = String(/** @type {Error} */ (error)?.message ?? error);
-    const missing = missingLibraryError(message);
-    if (!missing) {
-      console.error(`Chromium cannot start:\n${message}`);
-      return false;
-    }
-    const ldd = spawnSync("ldd", [missing.executable], { encoding: "utf8" });
-    const libraries = missingFromLdd(ldd.stdout ?? "");
-    console.error(missingLibrariesAdvice(libraries.length ? libraries : [missing.library]));
+    console.error(diagnoseLaunchError(String(/** @type {Error} */ (error)?.message ?? error)));
     return false;
   }
 }
