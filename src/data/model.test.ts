@@ -13,6 +13,7 @@ import {
   displayName,
   parseProfile,
   parseSearch,
+  patchSearch,
 } from "./model.ts";
 
 /**
@@ -105,6 +106,29 @@ describe("parseSearch", () => {
 
   it("drops the defaults so they stay out of the URL", () => {
     assert.deepEqual(parseSearch({ view: "overview", lang: "zh" }), { ...NONE, lang: "zh" });
+  });
+
+  it("normalizes search patches and omits defaults when resetting", () => {
+    const active = patchSearch(NONE, {
+      view: "map",
+      gate: "G3",
+      lang: "en",
+      tab: "chapters",
+      filter: "G5",
+      q: "授權",
+    });
+    assert.deepEqual(active, {
+      view: "map",
+      gate: "G3",
+      lang: "en",
+      tab: "chapters",
+      filter: "G5",
+      q: "授權",
+    });
+    assert.deepEqual(
+      patchSearch(active, { view: "overview", tab: "cross", filter: "all", q: "   " }),
+      { ...NONE, gate: "G3", lang: "en" },
+    );
   });
 });
 

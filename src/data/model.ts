@@ -46,6 +46,8 @@ export interface Profile {
 export const VIEWS: ViewId[] = ["overview", "harness", "gates", "levels", "map", "tools"];
 export const GATES: GateId[] = ["G0", "G1", "G2", "G3", "G4", "G5", "G6"];
 
+export type MapTab = "cross" | "chapters";
+
 export interface AppSearch {
   view?: ViewId;
   gate?: GateId;
@@ -56,14 +58,24 @@ export interface AppSearch {
   q?: string;
 }
 
+export interface SearchPatch {
+  view?: ViewId;
+  gate?: GateId;
+  lang?: Locale;
+  tab?: MapTab;
+  filter?: GateId | "all";
+  q?: string;
+}
+
 /** 對照頁搜尋字的長度上限。 Maximum length of the map search query. */
 export const MAX_QUERY = 100;
 
 /**
- * 網址只留合法的參數，其他一律丟掉；預設值（總覽、中文、風險對閘門）不寫進網址。
+ * 網址只留合法的參數，其他一律丟掉；預設值（總覽、風險對閘門、全部閘門、空搜尋字）不寫進網址。
  * 搜尋字可能被路由解析成數字，轉回字串並截短。
- * The URL keeps only valid parameters; defaults (overview, Chinese, the risk tab) stay out of it.
- * The router may parse a query as a number, so it is turned back into text and truncated.
+ * The URL keeps only valid parameters; defaults (overview, the risk tab, all-gates filter and
+ * empty query) stay out of it. The router may parse a query as a number, so it is turned back
+ * into text and truncated.
  */
 export function parseSearch(search: Record<string, unknown>): AppSearch {
   const view = VIEWS.find((item) => item === search.view);
@@ -79,6 +91,14 @@ export function parseSearch(search: Record<string, unknown>): AppSearch {
     filter: GATES.find((item) => item === search.filter),
     q: q.trim() ? q : undefined,
   };
+}
+
+/**
+ * 更新網址查詢狀態並套用相同的正規化與預設值省略規則。
+ * Apply a search-parameter patch through the same normalization and default-omission rules.
+ */
+export function patchSearch(prev: AppSearch, patch: SearchPatch): AppSearch {
+  return parseSearch({ ...prev, ...patch });
 }
 
 export type Track = "design" | "whitebox" | "blackbox";

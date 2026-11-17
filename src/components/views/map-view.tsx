@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
-import {
-  CHAPTERS,
-  GATES,
-  GATE_NAME,
-  MAP_ROWS,
-  MAX_QUERY,
-  type AppSearch,
-  type GateId,
-} from "@/data/model";
+import { CHAPTERS, GATES, GATE_NAME, MAP_ROWS, MAX_QUERY, type GateId } from "@/data/model";
 import { useApp } from "@/components/app-state";
 import { Badge, FilterChip, Panel } from "@/components/ui";
 import { bi } from "@/i18n/locale";
@@ -40,29 +31,23 @@ const T = {
   noChapters: bi("沒有符合的章節。", "No matching chapters."),
 };
 
-const route = getRouteApi("/");
-
 export function MapView() {
-  const { openGate } = useApp();
+  const {
+    openGate,
+    mapTab: tab,
+    setMapTab: setTab,
+    mapFilter: gate,
+    setMapFilter: setGate,
+    mapQuery,
+    setMapQuery,
+  } = useApp();
   const t = useT();
-  // 分頁、篩選與搜尋寫在網址裡，跟其他畫面一樣可以直接分享。
-  // The tab, filter and query live in the URL, so the view can be shared like the others.
-  const search = route.useSearch();
-  const navigate = route.useNavigate();
-  const tab = search.tab ?? "cross";
-  const gate: GateId | "all" = search.filter ?? "all";
   // 輸入框用本地狀態：直接綁網址會打斷注音、倉頡等輸入法的選字。
   // The input keeps local state: binding it straight to the URL would break IME composition.
-  const [query, setQueryState] = useState(search.q ?? "");
-  const setSearch = (patch: Partial<AppSearch>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
-  const setTab = (next: "cross" | "chapters") =>
-    setSearch({ tab: next === "chapters" ? next : undefined });
-  const setGate = (next: GateId | "all") =>
-    setSearch({ filter: next === "all" ? undefined : next });
+  const [query, setQueryState] = useState(mapQuery);
   function setQuery(next: string) {
     setQueryState(next);
-    setSearch({ q: next.trim() ? next : undefined });
+    setMapQuery(next);
   }
 
   const rows = useMemo(() => {

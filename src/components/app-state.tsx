@@ -8,7 +8,15 @@ import {
   type ReactNode,
 } from "react";
 import { getRouteApi } from "@tanstack/react-router";
-import { DEFAULT_PROFILE, GATE_DOCS, type GateId, type Profile, type ViewId } from "@/data/model";
+import {
+  DEFAULT_PROFILE,
+  GATE_DOCS,
+  patchSearch,
+  type GateId,
+  type MapTab,
+  type Profile,
+  type ViewId,
+} from "@/data/model";
 import {
   INITIAL_HARNESS_RUN,
   harnessRunReducer,
@@ -53,6 +61,12 @@ interface AppState {
   setView: (view: ViewId) => void;
   gate: GateId;
   openGate: (gate: GateId) => void;
+  mapTab: MapTab;
+  setMapTab: (tab: MapTab) => void;
+  mapFilter: GateId | "all";
+  setMapFilter: (filter: GateId | "all") => void;
+  mapQuery: string;
+  setMapQuery: (query: string) => void;
   locale: Locale;
   setLocale: (locale: Locale) => void;
   theme: Theme;
@@ -75,6 +89,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const navigate = route.useNavigate();
   const view = search.view ?? "overview";
   const gate = search.gate ?? "G0";
+  const mapTab: MapTab = search.tab ?? "cross";
+  const mapFilter: GateId | "all" = search.filter ?? "all";
+  const mapQuery = search.q ?? "";
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [harnessState, dispatch] = useReducer(harnessRunReducer, INITIAL_HARNESS_RUN);
@@ -151,17 +168,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return {
       view,
       // gate 留在網址裡，回到閘門頁時仍是上次看的那一道。 gate stays in the URL so the gates page reopens where you left it.
-      setView: (next) =>
-        navigate({ search: (prev) => ({ ...prev, view: next === "overview" ? undefined : next }) }),
+      setView: (next) => navigate({ search: (prev) => patchSearch(prev, { view: next }) }),
       gate,
-      openGate: (next) => navigate({ search: (prev) => ({ ...prev, view: "gates", gate: next }) }),
+      openGate: (next) =>
+        navigate({ search: (prev) => patchSearch(prev, { view: "gates", gate: next }) }),
+      mapTab,
+      setMapTab: (next) =>
+        navigate({ search: (prev) => patchSearch(prev, { tab: next }), replace: true }),
+      mapFilter,
+      setMapFilter: (next) =>
+        navigate({ search: (prev) => patchSearch(prev, { filter: next }), replace: true }),
+      mapQuery,
+      setMapQuery: (next) =>
+        navigate({ search: (prev) => patchSearch(prev, { q: next }), replace: true }),
       locale,
       // 語系同時寫進網址（可分享）與 localStorage（下次記得）。 Locale goes to the URL (shareable) and localStorage (remembered).
       setLocale: (next) => {
         setStoredLocale(next);
         saveLocale(next);
         navigate({
-          search: (prev) => ({ ...prev, lang: next }),
+          search: (prev) => patchSearch(prev, { lang: next }),
         });
       },
       theme,
@@ -191,7 +217,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ...harnessActions,
       },
     };
-  }, [view, gate, locale, theme, navigate, profile, checks, harnessState, harnessActions]);
+  }, [
+    view,
+    gate,
+    mapTab,
+    mapFilter,
+    mapQuery,
+    locale,
+    theme,
+    navigate,
+    profile,
+    checks,
+    harnessState,
+    harnessActions,
+  ]);
 
   return (
     <Ctx.Provider value={value}>
