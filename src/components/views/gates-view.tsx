@@ -14,7 +14,7 @@ import { useApp } from "@/components/app-state";
 import { STALE_NOTICE } from "@/components/harness-run";
 import { Badge, Panel } from "@/components/ui";
 import { TRACK_TONE, segStyle } from "@/components/tone";
-import { bi, joinList, quote, type Bi } from "@/i18n/locale";
+import { bi, joinList } from "@/i18n/locale";
 import { useT } from "@/i18n/context";
 
 /**
@@ -42,18 +42,6 @@ const T = {
   controlsEyebrow: bi("控制項", "Controls"),
   controlsTitle: bi("這道閘門要能勾完", "This gate should be fully checked"),
   catches: bi("本次 Harness 會攔下", "Caught in this Harness run"),
-  /** 發現名稱加上須一起勾選的控制項。 A finding's title plus the controls that must be checked with this one. */
-  together: (title: Bi, partners: Bi[]) =>
-    bi(
-      `${title.zh}（需搭配${joinList(
-        "zh",
-        partners.map((item) => quote("zh", item.zh)),
-      )}）`,
-      `${title.en} (together with ${joinList(
-        "en",
-        partners.map((item) => quote("en", item.en)),
-      )})`,
-    ),
   process: bi(
     "流程性控制項：管線該有，但示範發現不會因為它被攔下。",
     "Process control: your pipeline should have it, but no demo finding is caught by it.",
@@ -212,16 +200,7 @@ export function GatesView() {
                         {t(T.catches)}:{" "}
                         {joinList(
                           locale,
-                          catches.map(({ finding, partners }) =>
-                            t(
-                              partners.length === 0
-                                ? finding.title
-                                : T.together(
-                                    finding.title,
-                                    partners.map((partner) => partner.text),
-                                  ),
-                            ),
-                          ),
+                          catches.map(({ label }) => t(label)),
                         )}
                       </span>
                     )}

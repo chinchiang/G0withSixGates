@@ -125,22 +125,27 @@ describe("pipeline gaps", () => {
   });
 
   it("finds what a control catches in the run, with the controls it needs alongside", () => {
+    const bola = findingsCaughtWith(plan, "g5-bola");
     assert.deepEqual(
-      findingsCaughtWith(plan, "g5-bola").map(({ finding, partners }) => [
-        finding.id,
-        partners.length,
-      ]),
+      bola.map(({ finding, partners }) => [finding.id, partners.length]),
       [
         ["g4-bola", 0],
         ["g5-idor", 0],
       ],
     );
+    assert.deepEqual(bola[0]?.label, bola[0]?.finding.title);
+    const dfd = findingsCaughtWith(plan, "g0-dfd");
     assert.deepEqual(
-      findingsCaughtWith(plan, "g0-dfd").map(({ finding, partners }) => [
-        finding.id,
-        partners.map((item) => item.id),
-      ]),
+      dfd.map(({ finding, partners }) => [finding.id, partners.map((item) => item.id)]),
       [["g0-model", ["g0-stride"]]],
+    );
+    assert.match(
+      dfd[0]?.label.zh ?? "",
+      /^尚未文件化威脅模型（需搭配「一般功能已用 STRIDE[^」]+」）$/,
+    );
+    assert.match(
+      dfd[0]?.label.en ?? "",
+      /^Threat model not documented \(together with “Ordinary features[^”]+”\)$/,
     );
     assert.deepEqual(findingsCaughtWith(plan, "g1-sbom"), []);
   });

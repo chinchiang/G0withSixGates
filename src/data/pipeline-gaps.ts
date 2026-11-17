@@ -114,21 +114,35 @@ export function catchStatus(plan: RunPlan, checks: Record<string, boolean>): Cat
 }
 
 /**
- * 這次執行中，這個控制項參與了哪些發現的攔截條件；`partners` 是還要一起勾的控制項，任一型為空。
+ * 這次執行中，這個控制項參與了哪些發現的攔截條件；`partners` 是還要一起勾的控制項，任一型為空，`label` 是閘門頁直接顯示的雙語說明。
  * Which findings in the run list this control in their catch requirement; `partners` are the
- * controls it must be checked together with, empty for an `any` requirement.
+ * controls it must be checked together with (empty for an `any` requirement), and `label` is the
+ * bilingual description shown on the Gates page.
  */
 export function findingsCaughtWith(
   plan: RunPlan,
   controlId: string,
-): { finding: Finding; partners: ControlRef[] }[] {
+): { finding: Finding; partners: ControlRef[]; label: Bi }[] {
   return plan.steps
     .flatMap((s) => s.findings)
     .flatMap((finding) => {
       const { mode, controls } = catchRequirement(finding.id);
       if (!controls.some((item) => item.id === controlId)) return [];
       const partners = mode === "all" ? controls.filter((item) => item.id !== controlId) : [];
-      return [{ finding, partners }];
+      const label =
+        partners.length === 0
+          ? finding.title
+          : bi(
+              `${finding.title.zh}（需搭配${joinList(
+                "zh",
+                partners.map((item) => quote("zh", item.text.zh)),
+              )}）`,
+              `${finding.title.en} (together with ${joinList(
+                "en",
+                partners.map((item) => quote("en", item.text.en)),
+              )})`,
+            );
+      return [{ finding, partners, label }];
     });
 }
 

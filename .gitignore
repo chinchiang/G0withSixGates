@@ -37,3 +37,8 @@ reports/
 # 架構審視等本機報告草稿，不進版控
 # Local report drafts such as architecture reviews; never tracked
 scratch/
+
+# 本機安裝的第三方代理技能副本（儲存庫設定在 docs/agents/）
+# Locally installed third-party agent skills (repo config lives in docs/agents/)
+.agents/
+skills-lock.json

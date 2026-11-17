@@ -87,7 +87,7 @@ flowchart TB
         BI["src/i18n/locale.ts<br/>Bi＝{ zh, en }<br/>bi()・pick()・joinList()"]
         MODEL["src/data/model.ts<br/>閘門・控制項・ASVS・預設情境<br/>gates・controls・presets<br/>文案使用 Bi bilingual copy"]
         ENGINE["src/data/engine.ts<br/>示範模擬 demo simulation<br/>recommendLevel → buildPlan<br/>→ 裁決 verdict"]
-        CATALOGUE["src/data/finding-catalogue.ts<br/>發現目錄 finding catalogue<br/>FindingId・文案 text・縱深項 depth items<br/>quota-example.ts：配額案例 quota example"]
+        CATALOGUE["src/data/finding-catalogue.ts<br/>發現目錄 finding catalogue<br/>FindingId・文案 text・縱深項 depth items"]
         GAPS["src/data/pipeline-gaps.ts<br/>攔截條件 catch requirements<br/>catchStatus → 管線缺口 pipeline gaps"]
     end
 
@@ -116,8 +116,8 @@ flowchart TB
    `AppStateProvider` reads and writes the URL params, persists to localStorage (including the `vibegate-*` migration) through `storage.ts`, and hands the locale to `LocaleProvider`. The Harness run, its reveal, Stop, staleness and the sessionStorage record live in `harness-run.ts`; views read them through `useApp().harness`.
 4. **介面 UI**：`AppShell` 提供導覽、中文／EN 切換與淺色／深色主題切換；`ProfileForm` 調整會立即更新共用設定；在「管線」按下執行 Harness，才擷取當下設定快照。
    `AppShell` provides navigation, the 中文 / EN switch and the light / dark theme toggle; `ProfileForm` edits update shared settings immediately; Run in the Pipeline view captures the current snapshot.
-5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決，負責分級、閘門適用性、日誌、發現嚴重度與裁決，發現的主要文案、影響與重新驗證條件在發現目錄 `finding-catalogue.ts`；`pipeline-gaps.ts` 的 `catchStatus` 依各發現的攔截條件對照閘門頁勾選，算出管線缺口；顯示文案分布於 `model.ts`、發現目錄、配額案例與各介面檔案，使用共用雙語 `Bi` 型別。
-   `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict, handling level, gate applicability, logs, finding severity and release decisions; the main finding text, impact and retest criteria live in the finding catalogue `finding-catalogue.ts`; `catchStatus` in `pipeline-gaps.ts` checks each finding's catch requirement against the gates-page checks to find pipeline gaps; display copy lives in `model.ts`, the finding catalogue, quota example and UI files, using the shared bilingual `Bi` type.
+5. **規則 Rules**：`engine.ts` 以純函式 `recommendLevel → buildPlan` 產生七道閘門的結果與裁決，負責分級、閘門適用性、日誌、發現嚴重度與裁決，發現的主要文案、影響與重新驗證條件在發現目錄 `finding-catalogue.ts`；`pipeline-gaps.ts` 的 `catchStatus` 依各發現的攔截條件對照閘門頁勾選，算出管線缺口；顯示文案分布於 `model.ts`、發現目錄與各介面檔案，使用共用雙語 `Bi` 型別。
+   `engine.ts` runs the pure `recommendLevel → buildPlan` to produce the seven gate results and the verdict, handling level, gate applicability, logs, finding severity and release decisions; the main finding text, impact and retest criteria live in the finding catalogue `finding-catalogue.ts`; `catchStatus` in `pipeline-gaps.ts` checks each finding's catch requirement against the gates-page checks to find pipeline gaps; display copy lives in `model.ts`, the finding catalogue and UI files, using the shared bilingual `Bi` type.
 6. **輸出 Output**：`reportMarkdown(…, locale)` 依目前語系產生 `six-gate-release-YYYY-MM-DD.md` 供下載；日期與時間用使用者所在時區，紀錄分列執行與匯出／控制項評估時間。只有設定變更會改變 `buildPlan` 結果時，才在揭示完成後標記裁決過期並於下載加註；改名稱不算。
    `reportMarkdown(…, locale)` writes `six-gate-release-YYYY-MM-DD.md` in the current locale for download; the date and time are in the viewer's time zone, and reports distinguish run time from export/checklist assessment time. After revealing finishes, only a setting change that changes `buildPlan` marks the verdict stale and adds a note; renaming does not.
 
@@ -197,7 +197,7 @@ flowchart TB
     subgraph SRC["src/ ─ 應用程式 App"]
         ROUTES["routes/<br/>__root.tsx・index.tsx<br/>api/csp-report.ts"]
         COMP["components/<br/>shell・app-state・storage<br/>harness-run<br/>profile-form・ui・tone<br/>getting-started・related-sites<br/>views/ 六個畫面 six views<br/>preview-host-bridge（平台）"]
-        DATA["data/<br/>model.ts・engine.ts<br/>pipeline-gaps.ts<br/>finding-catalogue.ts<br/>quota-example.ts<br/>＋測試 tests"]
+        DATA["data/<br/>model.ts・engine.ts<br/>pipeline-gaps.ts<br/>finding-catalogue.ts<br/>＋測試 tests"]
         I18N["i18n/<br/>locale.ts・context.tsx"]
         LIBA["lib/（本專案 app）<br/>error-component<br/>not-found-component<br/>og/site.json"]
         LIBP["lib/（平台 platform）<br/>auth/・app-data/<br/>multiplayer/・db.ts<br/>env.server.ts・preview-*.ts"]
@@ -246,6 +246,7 @@ G0withSixGates/
 ├── CODING_STANDARDS.md             # 審查用的判斷型規則：註解中英對照、文字走 bi()、獨立的預期值 / review rules
 ├── README.md
 ├── attachments/                    # ASVS 5.0.0 原文 docx、心智圖 JSON（PDF、GIF 不進版控）
+├── docs/adr/                       # 架構決策紀錄 / architecture decision records
 ├── docs/agents/                    # 代理技能的設定：議題追蹤、分流標籤、領域文件 / agent-skill config
 ├── migrations/auth/0001_auth.sql   # 平台 platform：Better Auth 資料表；migrate.mjs 不讀子目錄，不由此腳本套用 / not picked up by this runner
 ├── pages/                          # GitHub Pages 版入口：index.html 只剩殼，頁首由 vite.pages.config.ts 注入 / the Pages entry; the head is injected
@@ -291,7 +292,6 @@ G0withSixGates/
 │   ├── routes/__root.tsx、index.tsx、api/csp-report.ts
 │   ├── i18n/locale.ts(.test.ts)、context.tsx
 │   ├── data/model.ts(.test.ts)、engine.ts(.test.ts)、pipeline-gaps.ts(.test.ts)、finding-catalogue.ts(.test.ts)
-│   ├── data/quota-example.ts(.test.ts) # 配額案例與邊界驗證 / quota example and boundary tests
 │   ├── components/
 │   │   ├── shell.tsx、app-state.tsx、profile-form.tsx、ui.tsx、tone.ts
 │   │   ├── getting-started.tsx、related-sites.tsx

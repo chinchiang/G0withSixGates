@@ -43,6 +43,9 @@ describe("finding catalogue", () => {
     assert.match(retest("g0-tri"), /只加人工核可不算完成/);
     assert.match(retest("g4-bola"), /兩個不同帳號/);
     assert.match(retest("g5-jwt"), /過期權杖都被拒絕/);
+    const dow = finding("g6-dow", "block").evidence;
+    assert.match(dow.zh, /第 1 次正常，第 2–50 次共 49 次應拒絕/);
+    assert.match(dow.en, /Request 1 is normal; requests 2–50 \(49 requests\) should be rejected/);
   });
   it("lists cause, impact, evidence, fix and retest in that order", () => {
     const item = finding("g2-key", "block", "ai");

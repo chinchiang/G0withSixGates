@@ -1,4 +1,3 @@
-import { QUOTA_EVIDENCE } from "./quota-example.ts";
 import { bi, type Bi } from "../i18n/locale.ts";
 import type { GateId, Severity } from "./model.ts";
 
@@ -709,7 +708,10 @@ export const FINDING_CATALOGUE = {
       "示範政策：每主體每分鐘上限 100k token，正常請求仍須可用；本案例的超量拒絕測試失敗。",
       "Demo policy: each principal is limited to 100k tokens per minute while normal requests remain available; this case fails the over-quota rejection test.",
     ),
-    evidence: QUOTA_EVIDENCE,
+    evidence: bi(
+      "同一測試帳號在同一分鐘內送出 50 次、每次計費 100k token；政策上限為每分鐘 100k。第 1 次正常，第 2–50 次共 49 次應拒絕，實際卻全部回 200（示範）。",
+      "One test account sends 50 requests in one minute, each billed at 100k tokens; the policy limit is 100k per minute. Request 1 is normal; requests 2–50 (49 requests) should be rejected, but all returned 200 (demo).",
+    ),
     fix: bi(
       "加上每主體配額、超時與熔斷，並把拒絕寫進安全日誌。",
       "Add a per-principal quota, timeouts and a circuit breaker, and write rejections to the security log.",
